@@ -40,7 +40,19 @@ COSMETIC = re.compile(r"^([^#]*)(##|#@#|#\?#|#@\?#|#\$#|#@\$#|#%#|#@%#)(.+)$")
 HOST_RULE = re.compile(
     r"^\|\|(?P<host>[a-z0-9][a-z0-9.-]*[a-z0-9])(?P<path>/[^*^|$]*)?\^?\|?$"
 )
-NETWORK_OPTIONS_OK = {"third-party", "3p", "important", "all", "document"}
+# Options a host rule may carry and still be applied. Resource-type options
+# are accepted: the classifier then blocks every third-party load from the
+# host, which is right for hosts that exist to serve ads or tracking.
+# Anything scoped to particular sites ($domain=), first-party-only, popup-only,
+# or rewriting requests ($redirect=, $csp=, ...) is skipped, because applying
+# it everywhere would block more than the list intends.
+NETWORK_OPTIONS_OK = {
+    "third-party", "3p", "important", "all", "document", "doc",
+    "script", "image", "stylesheet", "css", "xmlhttprequest", "xhr",
+    "subdocument", "frame", "ping", "beacon", "media", "object",
+    "websocket", "font", "other",
+}
+RESOURCE_TYPES = NETWORK_OPTIONS_OK - {"third-party", "3p", "important", "all"}
 EXCEPTION_COSMETIC_OPTIONS = {"generichide", "ghide", "elemhide", "ehide"}
 
 # Procedural or extension-specific selector syntax that CSS cannot apply.
@@ -72,6 +84,8 @@ def fragment(body):
 class Compiled:
     def __init__(self):
         self.blocked = defaultdict(set)  # table -> fragments
+        self.badfilters = set()  # (fragment, options) cancelled by $badfilter
+        self.rule_options = defaultdict(set)  # fragment -> option sets seen
         self.allowed = set()  # fragments unblocked everywhere
         self.generic = set()
         self.generic_except = defaultdict(set)  # selector -> domains
@@ -131,17 +145,30 @@ class Compiled:
             elif frag and not opts:
                 self.allowed.add(frag)
             return
+        if "badfilter" in opts:
+            # "rule$badfilter" cancels "rule" wherever it appears.
+            if frag:
+                self.badfilters.add((frag, frozenset(opts - {"badfilter"})))
+            return
         if frag is None:
             self.skipped["network-pattern"] += 1
         elif not opts <= NETWORK_OPTIONS_OK:
             self.skipped["network-options"] += 1
         else:
             self.blocked[table].add(frag)
+            self.rule_options[frag].add(frozenset(opts))
+
+    def _cancelled(self, frag):
+        # A fragment is dropped only if every rule that produced it was
+        # cancelled by a matching $badfilter.
+        seen = self.rule_options.get(frag, set())
+        return bool(seen) and all((frag, o) in self.badfilters for o in seen)
 
     def table_update(self, table):
         hashes = sorted(
             hashlib.sha256(f.encode()).digest()
             for f in self.blocked[table] - self.allowed
+            if not self._cancelled(f)
         )
         data = b"".join(hashes)
         head = f"n:1000\ni:{table}\na:1:32:{len(data)}\n".encode()

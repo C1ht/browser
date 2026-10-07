@@ -11,6 +11,8 @@ trap 'rm -rf "$CB_OUT"' EXIT
 python3 -I app/components/contentblocking/compile_lists.py "$CB_OUT" \
   app/components/contentblocking/lists/*.txt > /dev/null
 status=0
+echo "== tests/unit/compile_lists_test.py"
+python3 -I tests/unit/compile_lists_test.py || status=1
 for t in tests/unit/*.test.mjs; do
   echo "== $t"
   node "$t" || status=1
