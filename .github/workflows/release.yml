@@ -26,6 +26,11 @@ on:
         description: Mark the release as a pre-release
         type: boolean
         default: true
+      platforms:
+        description: Platforms to build (a release needs both)
+        type: choice
+        options: [both, linux, windows]
+        default: both
 
 permissions:
   contents: read
@@ -38,14 +43,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: linux-x86_64
-            mozconfig: ci-linux
-            archive: "*.tar.xz"
-          - platform: windows-x86_64
-            mozconfig: ci-win64
-            archive: "*.zip"
+        platform: ${{ fromJSON(inputs.platforms == 'linux' && '["linux-x86_64"]' || inputs.platforms == 'windows' && '["windows-x86_64"]' || '["linux-x86_64","windows-x86_64"]') }}
     env:
+      MOZCONFIG_NAME: ${{ startsWith(matrix.platform, 'windows') && 'ci-win64' || 'ci-linux' }}
+      ARCHIVE: ${{ startsWith(matrix.platform, 'windows') && '*.zip' || '*.tar.xz' }}
       # The runner's root disk is too small for Gecko; /mnt has room.
       WORK: /mnt/work
       MOZBUILD_STATE_PATH: /mnt/work/mozbuild
@@ -75,22 +76,26 @@ jobs:
             sudo apt-get update -qq && sudo apt-get install -y -qq msitools > /dev/null
           fi
           ./mach --no-interactive bootstrap --application-choice "Firefox for Desktop"
+          # Bootstrap installs Rust for the host only.
+          if [[ "${{ matrix.platform }}" == windows-* ]]; then
+            rustup target add x86_64-pc-windows-msvc
+          fi
         env:
-          MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ matrix.mozconfig }}
+          MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ env.MOZCONFIG_NAME }}
 
       - name: Build
         working-directory: ${{ env.WORK }}/mozilla-central
         run: ./mach build
         env:
-          MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ matrix.mozconfig }}
+          MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ env.MOZCONFIG_NAME }}
 
       - name: Package
         working-directory: ${{ env.WORK }}/mozilla-central
         run: |
           ./mach package
-          ls -la obj-release/dist/${{ matrix.archive }}
+          ls -la obj-release/dist/$ARCHIVE
         env:
-          MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ matrix.mozconfig }}
+          MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ env.MOZCONFIG_NAME }}
 
       - name: Smoke test (Linux)
         if: matrix.platform == 'linux-x86_64'
@@ -101,7 +106,7 @@ jobs:
       - name: Rename archive
         run: |
           cd "$WORK/mozilla-central/obj-release/dist"
-          src=$(ls ${{ matrix.archive }} | head -1)
+          src=$(ls $ARCHIVE | head -1)
           ext="${src##*.}"; [[ "$src" == *.tar.xz ]] && ext="tar.xz"
           mkdir -p "$WORK/out"
           cp "$src" "$WORK/out/browser-wip-${{ inputs.tag }}-${{ matrix.platform }}.$ext"
@@ -116,6 +121,7 @@ jobs:
   test-windows:
     name: Smoke test on Windows
     needs: build
+    if: inputs.platforms != 'linux'
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -140,7 +146,7 @@ jobs:
   release:
     name: Publish release
     needs: [build, test-windows]
-    if: inputs.publish
+    if: inputs.publish && inputs.platforms == 'both'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
