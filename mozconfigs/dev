@@ -1,0 +1,17 @@
+# Development build: optimized, using the system toolchain (Ubuntu 24.04
+# clang-20, rustc from rustup, cbindgen from crates.io) because Mozilla's
+# prebuilt toolchains are not reachable from every build environment.
+# Usage: MOZCONFIG=/path/to/browser/mozconfigs/dev ./mach build
+ac_add_options --enable-project=browser-wip
+ac_add_options --enable-optimize
+ac_add_options --disable-debug
+ac_add_options --disable-tests
+
+export CC=clang-20
+export CXX=clang++-20
+ac_add_options --with-libclang-path=/usr/lib/llvm-20/lib
+ac_add_options --enable-linker=lld
+# Built by tools/setup-system-toolchain.sh from Ubuntu's wasi-libc and libc++ packages.
+ac_add_options --with-wasi-sysroot=$HOME/.mozbuild/wasi-sysroot
+
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-browser-wip

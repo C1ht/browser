@@ -1,0 +1,19 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# The app has no DIST_SUBDIR: its chrome, prefs and localization install into
+# the GRE directory and share one omni.ja with toolkit, like Thunderbird.
+
+DIRS += [
+    "base",
+    "locales",
+    "themes",
+    "launcher",
+]
+
+JS_PREFERENCE_PP_FILES += [
+    "profile/browser-wip.js",
+]
+
+DEFINES["APP_VERSION"] = CONFIG["MOZ_APP_VERSION"]

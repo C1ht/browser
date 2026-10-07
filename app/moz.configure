@@ -1,0 +1,37 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# browser-wip: a standalone Gecko application built against toolkit/.
+#
+# Everything that identifies the product lives in this block so that a rename
+# is mechanical (see tools/rename.sh).
+imply_option("--with-app-name", "browser-wip")
+imply_option("--with-app-basename", "browser-wip")
+imply_option("MOZ_APP_VENDOR", "browser-wip")
+imply_option("MOZ_APP_ID", "{b91e6eea-59c2-49c6-9a5f-155294362e18}")
+imply_option("MOZ_APP_PROFILE", "browser-wip")
+imply_option("MOZ_APP_REMOTINGNAME", "browser-wip")
+imply_option("BROWSER_CHROME_URL", "chrome://browser-wip/content/browser.xhtml")
+
+# Toolkit features the app is built on.
+imply_option("MOZ_PLACES", True)
+imply_option("MOZ_DEDICATED_PROFILES", True)
+imply_option("MOZ_BLOCK_PROFILE_DOWNGRADE", True)
+
+# Features that report to, or download from, third parties. They are switched
+# off at build time so no pref can turn them back on. Normandy, the messaging
+# system, Sync and health reporting are not implied here, and Normandy and the
+# messaging system are only built for MOZ_BUILD_APP == "browser".
+imply_option("MOZ_TELEMETRY_REPORTING", False)
+imply_option("--enable-crashreporter", False)
+imply_option("--enable-updater", False)
+imply_option("--enable-backgroundtasks", False)
+imply_option("--enable-necko-wifi", False)
+
+# No DRM in the first release. Widevine can be added later by building with
+# --enable-eme=widevine and adding an on-demand install prompt; nothing else in
+# the app depends on EME being absent.
+imply_option("--enable-eme", False)
+
+include("../toolkit/moz.configure")
