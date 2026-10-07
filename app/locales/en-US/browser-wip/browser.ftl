@@ -65,6 +65,27 @@ tab-close-button =
     .aria-label = Close tab
 tab-new-tab-label = New Tab
 
+## Tab context menu
+
+tab-context-reload =
+    .label = Reload
+tab-context-duplicate =
+    .label = Duplicate tab
+tab-context-pin =
+    .label = Pin tab
+tab-context-unpin =
+    .label = Unpin tab
+tab-context-mute =
+    .label = Mute tab
+tab-context-unmute =
+    .label = Unmute tab
+tab-context-close =
+    .label = Close tab
+tab-context-close-others =
+    .label = Close other tabs
+tab-context-reopen =
+    .label = Reopen closed tab
+
 ## Menu
 
 app-menu-new-tab =

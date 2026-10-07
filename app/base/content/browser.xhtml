@@ -75,6 +75,17 @@
       <xul:menuitem data-l10n-id="app-menu-quit" command="cmd_quit"/>
     </xul:menupopup>
 
+    <xul:menupopup id="tab-context-menu" class="wip-menu">
+      <xul:menuitem id="tab-ctx-reload" data-l10n-id="tab-context-reload"/>
+      <xul:menuitem id="tab-ctx-duplicate" data-l10n-id="tab-context-duplicate"/>
+      <xul:menuitem id="tab-ctx-pin" data-l10n-id="tab-context-pin"/>
+      <xul:menuitem id="tab-ctx-mute" data-l10n-id="tab-context-mute"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="tab-ctx-close" data-l10n-id="tab-context-close"/>
+      <xul:menuitem id="tab-ctx-close-others" data-l10n-id="tab-context-close-others"/>
+      <xul:menuitem id="tab-ctx-reopen" data-l10n-id="tab-context-reopen" key="key_reopenTab"/>
+    </xul:menupopup>
+
     <xul:panel id="protections-panel" class="wip-panel" type="arrow" role="dialog"
                aria-labelledby="protections-title">
       <h2 id="protections-title" class="panel-title"></h2>

@@ -466,6 +466,10 @@ body {
   display: grid;
 }
 
+.tab[muted] .tab-state.audio {
+  content: url("chrome://browser-wip/skin/icons/muted.svg");
+}
+
 .tab[sharing] .tab-state.sharing {
   display: grid;
   color: var(--rec-fg);

@@ -27,6 +27,7 @@ var BrowserWip = {
 
     this._wireButtons();
     this._wirePanels();
+    this._wireTabContextMenu();
     gBrowser.tabContainer.addEventListener("TabSelect", () => this._onTabSelect());
     gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
       if (e.target == gBrowser.selectedTab) {
@@ -204,6 +205,59 @@ var BrowserWip = {
       }
     }
     window.close();
+  },
+
+  // -----------------------------------------------------------------------
+  // Tab context menu
+
+  _wireTabContextMenu() {
+    let menu = document.getElementById("tab-context-menu");
+    let target = null;
+    gBrowser.tabContainer.addEventListener("contextmenu", e => {
+      target = e.target.closest(".tab");
+      if (!target) {
+        return;
+      }
+      e.preventDefault();
+      let pinned = target.hasAttribute("pinned");
+      let muted = !!target.linkedBrowser.browsingContext?.mediaController?.muted;
+      document.l10n.setAttributes(
+        document.getElementById("tab-ctx-pin"),
+        pinned ? "tab-context-unpin" : "tab-context-pin"
+      );
+      document.l10n.setAttributes(
+        document.getElementById("tab-ctx-mute"),
+        muted ? "tab-context-unmute" : "tab-context-mute"
+      );
+      document.getElementById("tab-ctx-mute").hidden = !target.hasAttribute("soundplaying") && !muted;
+      document.getElementById("tab-ctx-close-others").disabled = gBrowser.tabs.length < 2;
+      document.getElementById("tab-ctx-reopen").disabled = !gBrowser._closedTabs.length;
+      menu.openPopupAtScreen(e.screenX, e.screenY, true, e);
+    });
+    let on = (id, fn) => document.getElementById(id).addEventListener("command", () => target && fn(target));
+    on("tab-ctx-reload", tab => tab.linkedBrowser.reload());
+    on("tab-ctx-duplicate", tab =>
+      gBrowser.addTab(tab.linkedBrowser.currentURI.spec, { index: gBrowser.tabs.indexOf(tab) + 1 })
+    );
+    on("tab-ctx-pin", tab => gBrowser.setPinned(tab, !tab.hasAttribute("pinned")));
+    on("tab-ctx-mute", tab => {
+      let controller = tab.linkedBrowser.browsingContext?.mediaController;
+      if (controller?.muted) {
+        controller.unmute();
+      } else {
+        controller?.mute();
+      }
+      tab.toggleAttribute("muted", !!controller?.muted);
+    });
+    on("tab-ctx-close", tab => gBrowser.removeTab(tab));
+    on("tab-ctx-close-others", tab => {
+      for (let other of [...gBrowser.tabs]) {
+        if (other != tab && !other.hasAttribute("pinned")) {
+          gBrowser.removeTab(other);
+        }
+      }
+    });
+    on("tab-ctx-reopen", () => gBrowser.reopenClosedTab());
   },
 
   // -----------------------------------------------------------------------
