@@ -7,6 +7,7 @@
 "use strict";
 
 ChromeUtils.defineESModuleGetters(this, {
+  AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
   ContentBlockingAllowList: "resource://gre/modules/ContentBlockingAllowList.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
 });
@@ -20,6 +21,7 @@ var gURLBar;
 
 var BrowserWip = {
   startup() {
+    this._setUpTitlebar();
     gBrowser = new TabBrowser(window);
     gURLBar = new URLBar(window, gBrowser);
     // Gecko asks this object where to open links and window.open() calls.
@@ -120,6 +122,22 @@ var BrowserWip = {
     } else {
       findbar.onFindCommand();
     }
+  },
+
+  // Windows: the app draws the title bar (decided in docs/PLAN.md). The
+  // toolbar becomes the drag region and gets caption buttons. Linux keeps
+  // the desktop's decorations.
+  _setUpTitlebar() {
+    if (AppConstants.platform != "win") {
+      return;
+    }
+    document.documentElement.setAttribute("customtitlebar", "true");
+    document.getElementById("window-controls").hidden = false;
+    let on = (id, fn) => document.getElementById(id).addEventListener("click", fn);
+    on("window-minimize", () => window.minimize());
+    on("window-maximize", () => window.maximize());
+    on("window-restore", () => window.restore());
+    on("window-close", () => this.closeWindow());
   },
 
   _wireButtons() {

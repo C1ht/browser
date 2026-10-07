@@ -2,7 +2,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-# The program is installed as dist/bin/browser-wip next to libxul.
+# The browser-wip executable (dist/bin/browser-wip[.exe]). Mirrors the
+# program rules in browser/app/moz.build so the Windows startup path matches
+# what Mozilla ships.
+
 DIST_SUBDIR = ""
 
 GeckoProgram(CONFIG["MOZ_APP_NAME"], linkage="standalone")
@@ -21,5 +24,54 @@ LOCAL_INCLUDES += [
     "/xpcom/build",
 ]
 
+if CONFIG["CC_TYPE"] == "clang-cl":
+    # Always enter through wmain, console application or not.
+    WIN32_EXE_LDFLAGS += ["-ENTRY:wmainCRTStartup"]
+
 if CONFIG["OS_ARCH"] == "WINNT":
-    error("Windows support needs the launcher process and sandbox broker; see docs/PLAN.md")
+    # Icon and version resources; browser-wip.exe.manifest is embedded
+    # automatically because it sits next to the sources.
+    RCINCLUDE = "browser-wip.rc"
+    DEFINES["APP_ICO"] = '"%s/%s/browser-wip.ico"' % (TOPSRCDIR, CONFIG["MOZ_BRANDING_DIRECTORY"])
+
+    # Mozilla's Windows launcher: launcher process, early DLL blocklist,
+    # de-elevation. Generic Gecko code that happens to live under browser/.
+    DIRS += ["/browser/app/winlauncher"]
+    USE_LIBS += ["winlauncher"]
+    LOCAL_INCLUDES += ["/browser/app/winlauncher"]
+    OS_LIBS += [
+        "advapi32",
+        "shell32",
+        "uuid",
+    ]
+    DELAYLOAD_DLLS += [
+        "advapi32.dll",
+        "oleaut32.dll",
+        "ole32.dll",
+        "rpcrt4.dll",
+        "shell32.dll",
+        "version.dll",
+    ]
+    libpath_flag = "-LIBPATH:" if CONFIG["CC_TYPE"] == "clang-cl" else "-L"
+    WIN32_EXE_LDFLAGS += [
+        libpath_flag + TOPOBJDIR + "/browser/app/winlauncher/freestanding",
+    ]
+    # As for firefox.exe: CET is only enabled for processes without JIT.
+    LINK_FLAGS["CETCOMPAT"] = []
+
+if CONFIG["MOZ_SANDBOX"] and CONFIG["OS_ARCH"] == "WINNT":
+    LOCAL_INCLUDES += [
+        "/security/sandbox/chromium",
+        "/security/sandbox/chromium-shim",
+    ]
+    USE_LIBS += ["sandbox_s"]
+    OS_LIBS += [
+        "shlwapi",
+        "winmm",
+    ]
+    DELAYLOAD_DLLS += [
+        "winmm.dll",
+        "user32.dll",
+        "userenv.dll",
+        "usp10.dll",
+    ]

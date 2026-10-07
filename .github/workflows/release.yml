@@ -1,0 +1,170 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Build browser-wip for Linux and Windows, smoke-test both, and publish them
+# as a GitHub release. Windows is cross-compiled on Linux with Mozilla's
+# toolchains (clang-cl + Windows SDK via --enable-bootstrap), then tested on
+# a real Windows runner.
+#
+# Run from the Actions tab (or the API) with a tag such as v0.1.0-alpha.1.
+# With "publish" off, it builds and tests without creating a release.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create, e.g. v0.1.0-alpha.1
+        required: true
+      publish:
+        description: Create the GitHub release after the builds pass
+        type: boolean
+        default: true
+      prerelease:
+        description: Mark the release as a pre-release
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            mozconfig: ci-linux
+            archive: "*.tar.xz"
+          - platform: windows-x86_64
+            mozconfig: ci-win64
+            archive: "*.zip"
+    env:
+      # The runner's root disk is too small for Gecko; /mnt has room.
+      WORK: /mnt/work
+      MOZBUILD_STATE_PATH: /mnt/work/mozbuild
+    steps:
+      - name: Make room on the runner
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force > /dev/null || true
+          sudo mkdir -p "$WORK" && sudo chown "$USER" "$WORK"
+          # Swap protects the largest Rust and link steps from the OOM killer.
+          sudo fallocate -l 8G /mnt/swapfile && sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile && sudo swapon /mnt/swapfile
+          df -h / /mnt; free -h
+
+      - uses: actions/checkout@v4
+        with:
+          path: browser
+
+      - name: Fetch the pinned Gecko release
+        run: GECKO_DIR="$WORK/mozilla-central" browser/tools/fetch-gecko.sh
+
+      - name: Bootstrap the toolchains
+        working-directory: ${{ env.WORK }}/mozilla-central
+        run: |
+          ./mach --no-interactive bootstrap --application-choice "Firefox for Desktop"
+        env:
+          MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ matrix.mozconfig }}
+
+      - name: Build
+        working-directory: ${{ env.WORK }}/mozilla-central
+        run: ./mach build
+        env:
+          MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ matrix.mozconfig }}
+
+      - name: Package
+        working-directory: ${{ env.WORK }}/mozilla-central
+        run: |
+          ./mach package
+          ls -la obj-release/dist/${{ matrix.archive }}
+        env:
+          MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ matrix.mozconfig }}
+
+      - name: Smoke test (Linux)
+        if: matrix.platform == 'linux-x86_64'
+        run: |
+          sudo apt-get install -y -qq strace > /dev/null
+          python3 browser/tools/runtime/check.py "$WORK/mozilla-central/obj-release/dist/bin" --part 1 2 3 4
+
+      - name: Rename archive
+        run: |
+          cd "$WORK/mozilla-central/obj-release/dist"
+          src=$(ls ${{ matrix.archive }} | head -1)
+          ext="${src##*.}"; [[ "$src" == *.tar.xz ]] && ext="tar.xz"
+          mkdir -p "$WORK/out"
+          cp "$src" "$WORK/out/browser-wip-${{ inputs.tag }}-${{ matrix.platform }}.$ext"
+          ls -la "$WORK/out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: browser-wip-${{ matrix.platform }}
+          path: ${{ env.WORK }}/out/*
+          retention-days: 7
+
+  test-windows:
+    name: Smoke test on Windows
+    needs: build
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: browser
+      - uses: actions/download-artifact@v4
+        with:
+          name: browser-wip-windows-x86_64
+          path: dist
+      - name: Unpack
+        shell: pwsh
+        run: |
+          Expand-Archive -Path (Get-ChildItem dist/*.zip).FullName -DestinationPath app
+          Get-ChildItem app -Recurse -Filter browser-wip.exe | Select-Object -First 1 FullName
+      - name: Run checks (app identity, prefs, blocking, first run, chrome)
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem app -Recurse -Filter browser-wip.exe | Select-Object -First 1
+          python browser/tools/runtime/check.py $exe.DirectoryName --part 1 2 3 4
+
+  release:
+    name: Publish release
+    needs: [build, test-windows]
+    if: inputs.publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la assets
+          gecko=$(sed -n 's/^version=//p' GECKO_REVISION)
+          cat > notes.md <<EOF
+          Early test build of browser-wip, built from ${GITHUB_SHA::12} on Gecko ${gecko} (Firefox Release).
+
+          | Platform | Download |
+          |---|---|
+          | Linux x86_64 | \`browser-wip-${{ inputs.tag }}-linux-x86_64.tar.xz\`: extract and run \`browser-wip/browser-wip\` |
+          | Windows x86_64 | \`browser-wip-${{ inputs.tag }}-windows-x86_64.zip\`: extract and run \`browser-wip.exe\` |
+
+          This is a pre-release for testing. Both builds passed automated checks for privacy defaults, ad and tracker blocking, first run and the browser window.
+
+          Not yet included: DRM (by design for now), extensions, downloads panel, session restore, history and bookmarks screens, page context menu, camera and microphone permission prompts, automatic updates. Windows builds are unsigned, so SmartScreen will warn on first launch.
+          EOF
+          flags=()
+          [[ "${{ inputs.prerelease }}" == "true" ]] && flags+=(--prerelease)
+          gh release create "${{ inputs.tag }}" assets/* \
+            --target "$GITHUB_SHA" --title "browser-wip ${{ inputs.tag }}" --notes-file notes.md "${flags[@]}"

@@ -28,6 +28,21 @@ app-menu-button =
     .title = Menu
     .aria-label = Menu
 
+## Window controls (Windows)
+
+window-minimize =
+    .title = Minimize
+    .aria-label = Minimize
+window-maximize =
+    .title = Maximize
+    .aria-label = Maximize
+window-restore =
+    .title = Restore down
+    .aria-label = Restore down
+window-close =
+    .title = Close
+    .aria-label = Close
+
 ## Address field
 
 urlbar-input =

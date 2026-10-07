@@ -1,0 +1,20 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Windows resources for browser-wip.exe. APP_ICO is defined in moz.build.
+   The icon IDs are the ones toolkit looks up (nsNativeAppSupportWin.h). */
+
+#include <windows.h>
+#include "nsNativeAppSupportWin.h"
+
+IDI_APPICON ICON APP_ICO
+IDI_APPLICATION ICON APP_ICO
+IDI_DOCUMENT ICON APP_ICO
+IDI_NEWWINDOW ICON APP_ICO
+IDI_NEWTAB ICON APP_ICO
+
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_STARTMENU_APPNAME, "@MOZ_APP_DISPLAYNAME@"
+END

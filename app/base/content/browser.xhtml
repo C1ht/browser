@@ -153,6 +153,15 @@
         <img class="icon" src="chrome://browser-wip/skin/icons/menu.svg" alt=""/>
       </button>
     </div>
+
+    <!-- Window controls, shown only where the app draws its own title bar
+         (Windows). On Linux the desktop draws them. -->
+    <div id="window-controls" hidden="true">
+      <button id="window-minimize" class="caption-button" data-l10n-id="window-minimize"/>
+      <button id="window-maximize" class="caption-button" data-l10n-id="window-maximize"/>
+      <button id="window-restore" class="caption-button" data-l10n-id="window-restore"/>
+      <button id="window-close" class="caption-button" data-l10n-id="window-close"/>
+    </div>
   </header>
 
   <div id="tab-strip">

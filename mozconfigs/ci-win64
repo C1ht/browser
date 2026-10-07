@@ -1,0 +1,13 @@
+# Release build for Windows x86_64, cross-compiled on Linux in CI with
+# clang-cl and the Windows SDK, both fetched by --enable-bootstrap. This is
+# how Mozilla builds Windows Firefox.
+ac_add_options --enable-project=browser-wip
+export MOZ_BUILD_HOOK="$topsrcdir/browser-wip/build/hook.mozbuild"
+ac_add_options --target=x86_64-pc-windows-msvc
+ac_add_options --enable-bootstrap
+ac_add_options --enable-optimize
+ac_add_options --disable-debug
+ac_add_options --disable-tests
+ac_add_options --enable-release
+ac_add_options --disable-debug-symbols
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-release

@@ -299,6 +299,97 @@ body {
   transition: transform 200ms ease-out;
 }
 
+/* ---------- App-drawn title bar (Windows) ----------
+ * With customtitlebar the toolbar doubles as the title bar: empty toolbar
+ * space drags the window, and the caption buttons sit at its end, full
+ * height. -moz-default-appearance marks them as caption buttons for Windows
+ * (Snap Layouts on maximize) while we draw them ourselves. */
+
+:root[customtitlebar] #nav-bar {
+  -moz-window-dragging: drag;
+  padding-inline-end: 0;
+}
+
+:root[customtitlebar] #nav-bar :is(button, input, #urlbar) {
+  -moz-window-dragging: no-drag;
+}
+
+#window-controls {
+  display: flex;
+  align-self: stretch;
+  margin-inline-start: 6px;
+}
+
+#window-controls[hidden] {
+  display: none;
+}
+
+.caption-button {
+  appearance: none;
+  width: 46px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: var(--chrome-fg);
+  font: 10px / 1 "Segoe Fluent Icons", "Segoe MDL2 Assets";
+}
+
+.caption-button:hover {
+  background-color: var(--hover-bg);
+}
+
+.caption-button:hover:active {
+  background-color: var(--active-bg);
+}
+
+#window-minimize {
+  -moz-default-appearance: -moz-window-button-minimize;
+}
+
+#window-minimize::before {
+  content: "\e921";
+}
+
+#window-maximize {
+  -moz-default-appearance: -moz-window-button-maximize;
+}
+
+#window-maximize::before {
+  content: "\e922";
+}
+
+#window-restore {
+  -moz-default-appearance: -moz-window-button-restore;
+}
+
+#window-restore::before {
+  content: "\e923";
+}
+
+#window-close {
+  -moz-default-appearance: -moz-window-button-close;
+}
+
+#window-close::before {
+  content: "\e8bb";
+}
+
+/* Windows' own close-button red, the one place a non-theme color is right. */
+#window-close:hover {
+  background-color: #C42B1C;
+  color: #FFFFFF;
+}
+
+#window-close:hover:active {
+  background-color: #C94F4F;
+}
+
+:root:is([sizemode="maximized"], [sizemode="fullscreen"]) #window-maximize,
+:root:not([sizemode="maximized"], [sizemode="fullscreen"]) #window-restore {
+  display: none;
+}
+
 /* ---------- Tab strip ---------- */
 
 #tab-strip {

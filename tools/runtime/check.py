@@ -74,8 +74,9 @@ class Browser:
                 f.write(f"user_pref({json.dumps(k)}, {json.dumps(v)});\n")
         env = {k: v for k, v in os.environ.items() if "proxy" not in k.lower()}
         self.log = open(self.profile / "browser.log", "w")
+        exe = Path(bindir) / ("browser-wip.exe" if sys.platform == "win32" else "browser-wip")
         self.proc = subprocess.Popen(
-            [str(Path(bindir) / "browser-wip"), "--marionette", "--headless", "--no-remote",
+            [str(exe), "--marionette", "--headless", "--no-remote",
              "--profile", str(self.profile), *args],
             stdout=self.log, stderr=subprocess.STDOUT, env=env,
         )
@@ -249,10 +250,11 @@ def part2(bindir, base):
     finally:
         b.quit()
 
-    result = subprocess.run([str(ROOT / "tools/netsilence/run.sh"), bindir, "60"],
-                            capture_output=True, text=True)
-    record(2, "network silence: no outbound connections while idle", result.returncode == 0,
-           (result.stdout + result.stderr)[-1500:])
+    if sys.platform.startswith("linux"):
+        result = subprocess.run([str(ROOT / "tools/netsilence/run.sh"), bindir, "60"],
+                                capture_output=True, text=True)
+        record(2, "network silence: no outbound connections while idle", result.returncode == 0,
+               (result.stdout + result.stderr)[-1500:])
 
 
 # ---------------------------------------------------------------------------

@@ -5,6 +5,8 @@
 # The app has no DIST_SUBDIR: its chrome, prefs and localization install into
 # the GRE directory and share one omni.ja with toolkit, like Thunderbird.
 
+CONFIGURE_SUBST_FILES += ["installer/Makefile"]
+
 DIRS += [
     "base",
     "components",
