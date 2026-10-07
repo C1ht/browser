@@ -9,21 +9,33 @@
  * them loads anything from the network (each sets a chrome:-only CSP).
  */
 
+const PRIVILEGED = Ci.nsIAboutModule.ALLOW_SCRIPT | Ci.nsIAboutModule.IS_SECURE_CHROME_UI;
+// Error pages that web content can be shown: they run in the content process
+// under their own about: principal, never with chrome privileges.
+const ERROR_PAGE =
+  Ci.nsIAboutModule.URI_SAFE_FOR_UNTRUSTED_CONTENT |
+  Ci.nsIAboutModule.URI_CAN_LOAD_IN_CHILD |
+  Ci.nsIAboutModule.ALLOW_SCRIPT |
+  Ci.nsIAboutModule.HIDE_FROM_ABOUTABOUT;
+
 const PAGES = {
-  newtab: "chrome://browser-wip/content/newtab.html",
-  home: "chrome://browser-wip/content/newtab.html",
-  welcome: "chrome://browser-wip/content/welcome.html",
-  settings: "chrome://browser-wip/content/settings.html",
+  newtab: { url: "chrome://browser-wip/content/newtab.html", flags: PRIVILEGED },
+  home: { url: "chrome://browser-wip/content/newtab.html", flags: PRIVILEGED },
+  welcome: { url: "chrome://browser-wip/content/welcome.html", flags: PRIVILEGED },
+  settings: { url: "chrome://browser-wip/content/settings.html", flags: PRIVILEGED },
+  // Gecko shows about:certerror for certificate problems. Firefox registers
+  // it in browser/; it is toolkit's shared network-error page.
+  certerror: { url: "chrome://global/content/aboutNetError.html", flags: ERROR_PAGE },
 };
 
 function pageFor(uri) {
   // "about:settings#privacy" -> "settings"
   let name = uri.pathQueryRef.replace(/[?#].*$/, "").toLowerCase();
-  let url = PAGES[name];
-  if (!url) {
+  let page = PAGES[name];
+  if (!page) {
     throw Components.Exception(`No such page: about:${name}`, Cr.NS_ERROR_ILLEGAL_VALUE);
   }
-  return url;
+  return page;
 }
 
 export function AboutPages() {}
@@ -32,20 +44,26 @@ AboutPages.prototype = {
   QueryInterface: ChromeUtils.generateQI(["nsIAboutModule"]),
 
   newChannel(uri, loadInfo) {
+    let page = pageFor(uri);
     let channel = Services.io.newChannelFromURIWithLoadInfo(
-      Services.io.newURI(pageFor(uri)),
+      Services.io.newURI(page.url),
       loadInfo
     );
     // Keep about:… in the address bar and as the document URL.
     channel.originalURI = uri;
+    if (page.flags & Ci.nsIAboutModule.URI_SAFE_FOR_UNTRUSTED_CONTENT) {
+      // Derive the document's principal from the about: URI, not chrome://,
+      // so the page has no special privileges (as AboutRedirector.cpp does).
+      loadInfo.resultPrincipalURI = uri;
+    }
     return channel;
   },
 
-  getURIFlags() {
-    return Ci.nsIAboutModule.ALLOW_SCRIPT | Ci.nsIAboutModule.IS_SECURE_CHROME_UI;
+  getURIFlags(uri) {
+    return pageFor(uri).flags;
   },
 
   getChromeURI(uri) {
-    return Services.io.newURI(pageFor(uri));
+    return Services.io.newURI(pageFor(uri).url);
   },
 };

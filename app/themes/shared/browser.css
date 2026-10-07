@@ -130,6 +130,12 @@ body {
   outline-offset: -2px;
 }
 
+/* The page area takes focus whenever a page does; outlining it would frame
+   every page. Focus inside pages is the page's business. */
+browser:focus-visible {
+  outline: none;
+}
+
 /* ---------- Toolbar ---------- */
 
 #nav-bar {
@@ -516,8 +522,9 @@ body {
   background-color: var(--tab-tile, var(--chrome-muted));
 }
 
-.tab-icon[src] {
-  background: none;
+.tab-icon[internal] {
+  background: url("chrome://branding/content/icon32.png") center / 16px no-repeat;
+  font-size: 0;
 }
 
 .tab[busy] .tab-icon {
@@ -614,20 +621,25 @@ body {
 
 /* ---------- Content ---------- */
 
+/* Every browser stays laid out, stacked in one grid cell: a remote browser
+   only connects to its content process once it has a frame, so hiding
+   background tabs with display: none would stall them. Unselected ones are
+   hidden visually only, as Firefox's tab panels are. */
 #browsers {
   flex: 1;
   min-height: 0;
-  display: flex;
+  display: grid;
   background-color: var(--page-bg);
 }
 
 #browsers > browser {
-  flex: 1;
+  grid-area: 1 / 1;
   min-width: 0;
+  min-height: 0;
 }
 
 #browsers > browser:not([selected]) {
-  display: none;
+  visibility: hidden;
 }
 
 /* ---------- Panels ---------- */

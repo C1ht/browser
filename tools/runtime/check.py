@@ -369,7 +369,10 @@ def part4(bindir, base, shots):
         # Typing words searches with the default engine.
         b.js("""gURLBar.input.focus(); gURLBar.input.value = "privacy browser";
                 gURLBar.input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));""")
-        host = b.wait("let u = gBrowser.selectedBrowser.currentURI; return u.host == 'search.brave.com' && u.spec;")
+        # This container has no internet, so the page itself fails to load;
+        # what matters is where the browser sent the search.
+        host = b.wait("let s = gBrowser.selectedBrowser.currentURI?.spec ?? ''; "
+                      "return s.startsWith('https://search.brave.com/') && s;")
         record(4, "typing words searches with Brave Search", bool(host) and "q=privacy%20browser" in host, host)
 
         # window.open() from a page (popup blocking is relaxed for the test
@@ -388,15 +391,17 @@ def part4(bindir, base, shots):
                            " return t.startsWith('target') && t;", opened)
             record(4, "opened tab keeps its opener", title == "target page, opener kept", title)
 
-        # Reorder by dragging the selected tab two places to the right.
+        # Reorder by dragging the first tab two places to the right.
         order = b.js("""
           while (gBrowser.tabs.length < 4) gBrowser.addTab("about:blank", { select: false });
           let tab = gBrowser.tabs[0]; gBrowser.selectTab(tab);
-          let r = tab.getBoundingClientRect(), w = r.width, y = r.top + r.height / 2;
-          let u = windowUtils, x = r.left + w / 2;
-          u.sendMouseEvent("mousedown", x, y, 0, 1, 0);
-          for (let i = 1; i <= 10; i++) u.sendMouseEvent("mousemove", x + (w * 2.2 * i) / 10, y, 0, 0, 0);
-          u.sendMouseEvent("mouseup", x + w * 2.2, y, 0, 1, 0);
+          let r = tab.getBoundingClientRect(), w = r.width, y = r.top + r.height / 2, x = r.left + w / 2;
+          let fire = (target, type, cx) => target.dispatchEvent(new PointerEvent(type,
+            { bubbles: true, clientX: cx, clientY: y, button: 0, buttons: type == "pointerup" ? 0 : 1,
+              pointerId: 1, isPrimary: true, pointerType: "mouse" }));
+          fire(tab.querySelector(".tab-label"), "pointerdown", x);
+          for (let i = 1; i <= 10; i++) fire(window, "pointermove", x + (w * 2.2 * i) / 10);
+          fire(window, "pointerup", x + w * 2.2);
           return gBrowser.tabs.indexOf(tab);""")
         record(4, "dragging a tab reorders it", order == 2, f"dragged tab now at {order}")
 

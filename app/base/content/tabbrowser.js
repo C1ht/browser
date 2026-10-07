@@ -436,10 +436,11 @@ class TabBrowser {
     } catch (e) {
       // about:, data: and friends have no host.
     }
+    let isBlank = spec => !spec || spec == "about:blank" || spec == "about:newtab";
     if (!label) {
-      if (pendingURL && (!uri || uri.spec == "about:blank")) {
+      if (pendingURL && !isBlank(pendingURL) && isBlank(uri?.spec)) {
         label = pendingURL;
-      } else if (uri && uri.spec != "about:blank") {
+      } else if (!isBlank(uri?.spec)) {
         label = host || uri.spec;
       }
     }
@@ -451,9 +452,13 @@ class TabBrowser {
       el.textContent = label;
     }
     tab.setAttribute("aria-label", label || "");
+    // Web pages get a letter tile until favicons are supported; the
+    // browser's own pages show its mark.
     let icon = tab.querySelector(".tab-icon");
+    let internal = !host && !(pendingURL && /^https?:/.test(pendingURL));
+    icon.toggleAttribute("internal", internal);
     let tile = tileFor(host || label || "");
-    icon.textContent = tile.letter;
+    icon.textContent = internal ? "" : tile.letter;
     icon.style.setProperty("--tab-tile", tile.color);
     this._notify(tab, "TabAttrModified");
   }
@@ -591,7 +596,11 @@ class TabBrowser {
         }
         dragging = true;
         this.selectTab(tab);
-        tab.setPointerCapture(event.pointerId);
+        try {
+          // Keeps the drag when the pointer leaves the strip. Not essential:
+          // the move/up listeners are on the window.
+          tab.setPointerCapture(event.pointerId);
+        } catch (e) {}
         tab.setAttribute("dragging", "true");
         this.tabContainer.setAttribute("reordering", "true");
         rects = this.tabs.map(t => t.getBoundingClientRect());
