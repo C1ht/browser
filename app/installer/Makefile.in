@@ -8,5 +8,15 @@
 
 STANDALONE_MAKEFILE := 1
 
+# Test, debugging and telemetry leftovers that the build places in dist/bin
+# but users should not get. Patterns are relative to the app directory.
+NO_PKG_FILES += \
+  gmp-fake/** gmp-fakeopenh264/** gmp-clearkey/** \
+  gfxtest gfxtest.exe xpcshell xpcshell.exe rapl rapl.exe \
+  pingsender pingsender.exe \
+  EventArtifactDefinitions.json ScalarArtifactDefinitions.json \
+  libxul.so-gdb.py dependentlibs.list.gtest precomplete \
+  *.pdb
+
 include $(topsrcdir)/config/rules.mk
 include $(topsrcdir)/toolkit/mozapps/installer/packager.mk
