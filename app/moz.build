@@ -16,6 +16,9 @@ DIRS += [
     "launcher",
 ]
 
+if CONFIG["OS_ARCH"] == "WINNT":
+    DIRS += ["build/win"]
+
 JS_PREFERENCE_FILES += [
     "profile/browser-wip.js",
 ]
