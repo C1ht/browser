@@ -214,10 +214,9 @@ def part2(bindir, base):
         title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith('ad:') && t;", timeout=30)
         record(2, "ad slot hidden, page content visible", title == "ad:none content:block", title)
         log = b.wait("""
-          return gBrowser.selectedBrowser.getContentBlockingLog().then(JSON.parse).then(log => {
-            let blocked = Object.entries(log).filter(([, e]) => e.some(([, blocked]) => blocked)).map(([o]) => o);
-            return blocked.length >= 2 && blocked;
-          });""", timeout=15)
+          let log = JSON.parse(gBrowser.selectedBrowser.getContentBlockingLog() ?? "{}");
+          let blocked = Object.entries(log).filter(([, e]) => e.some(([, blocked]) => blocked)).map(([o]) => o);
+          return blocked.length >= 2 && blocked;""", timeout=15)
         record(2, "tracker and ad requests blocked",
                bool(log) and any("google-analytics" in o for o in log) and any("doubleclick" in o for o in log), log)
         count = b.js("return gBrowser.selectedTab.blockedTrackers;")
@@ -239,8 +238,11 @@ def part2(bindir, base):
                     restart: PrivacyModes.pendingRestart };
           PrivacyModes.setMode("standard");
           r.after = PrivacyModes.mode;
-          r.userPrefs = Services.prefs.getChildList("").filter(n => Services.prefs.prefHasUserValue(n)
-            && /^(javascript\\.options|dom\\.security|media\\.peerconnection|privacy\\.)/.test(n));
+          // Only the prefs PrivacyModes manages; Gecko sets a few internal
+          // migration flags of its own on first run.
+          let managed = Object.values(PrivacyModes.TOGGLES).flatMap(t => Object.keys(t.strict ?? {}))
+            .concat("privacy.fingerprintingProtection.overrides");
+          r.userPrefs = managed.filter(n => Services.prefs.prefHasUserValue(n));
           return r;""")
         record(2, "Strict Privacy applies live", strict["mode"] == "strict" and strict["httpsOnly"]
                and strict["ion"] is False and strict["noHost"] and "+WebGLVendorSanitize" in strict["fpp"], strict)

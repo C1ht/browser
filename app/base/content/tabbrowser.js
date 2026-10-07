@@ -66,6 +66,9 @@ class TabProgressListener {
       this.tabbrowser._setTabState(this.tab, { busy: true, progress: 0.05 });
     } else if (flags & Ci.nsIWebProgressListener.STATE_STOP) {
       this.tabbrowser._setTabState(this.tab, { busy: false, progress: 1 });
+      // Gecko reports a content-blocking event only when the page's blocking
+      // state changes, not for each further blocked request; recount here.
+      this.tabbrowser._updateBlockedCount(this.tab);
     }
   }
 
@@ -455,10 +458,11 @@ class TabBrowser {
     this._notify(tab, "TabAttrModified");
   }
 
-  async _updateBlockedCount(tab) {
+  _updateBlockedCount(tab) {
     let log;
     try {
-      log = JSON.parse(await tab.linkedBrowser.getContentBlockingLog());
+      // A JSON string, or null before the page has a window global.
+      log = JSON.parse(tab.linkedBrowser.getContentBlockingLog() ?? "{}");
     } catch (e) {
       return;
     }

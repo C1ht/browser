@@ -25,6 +25,9 @@ const JSWINDOWACTORS = {
     },
     matches: ["http://*/*", "https://*/*"],
     allFrames: true,
+    // Runs in ordinary web processes. Safe there: the child only adds
+    // stylesheets and never messages the parent.
+    safeForUntrustedWebProcess: true,
   },
 };
 
@@ -69,6 +72,11 @@ BrowserWipGlue.prototype = {
   _onFinalUIStartup() {
     // Importing ActorManagerParent registers toolkit's actors (select
     // dropdowns, find bar, form autofill, printing, ...). Apps must do this.
+    try {
+      lazy.ContentBlockingLists.publishCosmeticIndex();
+    } catch (e) {
+      console.error("browser-wip: element-hiding rules unavailable", e);
+    }
     lazy.ActorManagerParent.addJSWindowActors(JSWINDOWACTORS);
     applyAppearance();
     Services.prefs.addObserver(APPEARANCE_PREF, applyAppearance);

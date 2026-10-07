@@ -15,6 +15,12 @@
 const BASE = "resource://gre/defaults/contentblocking/";
 const AGENT_SHEET = Ci.nsIStyleSheetService.AGENT_SHEET;
 
+// Services.stylesheet is not exposed in content processes; the service is.
+const lazy = {};
+ChromeUtils.defineLazyGetter(lazy, "styleSheetService", () =>
+  Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService)
+);
+
 // Parsed once per content process and shared by every document in it.
 let gGenericSheet = null;
 let gIndex = null;
@@ -25,7 +31,7 @@ const gSiteSheets = new Map();
 const MAX_SITE_SHEETS = 64;
 
 function genericSheet() {
-  gGenericSheet ??= Services.stylesheet.preloadSheet(
+  gGenericSheet ??= lazy.styleSheetService.preloadSheet(
     Services.io.newURI(BASE + "cosmetic-generic.css"),
     AGENT_SHEET
   );
@@ -35,7 +41,7 @@ function genericSheet() {
 function siteSheet(css) {
   let sheet = gSiteSheets.get(css);
   if (!sheet) {
-    sheet = Services.stylesheet.preloadSheet(
+    sheet = lazy.styleSheetService.preloadSheet(
       Services.io.newURI("data:text/css;charset=utf-8," + encodeURIComponent(css)),
       AGENT_SHEET
     );
@@ -50,10 +56,13 @@ function siteSheet(css) {
   return sheet;
 }
 
+// The per-site rules, published by the parent process (content processes are
+// sandboxed and cannot read the file themselves). Shared memory, so every
+// process sees one copy.
+const INDEX_KEY = "browserwip:cosmetic-sites";
+
 function siteIndex() {
-  gIndex ??= JSON.parse(
-    Cu.readUTF8URI(Services.io.newURI(BASE + "cosmetic-sites.json"))
-  );
+  gIndex ??= Services.cpmm.sharedData.get(INDEX_KEY) ?? null;
   return gIndex;
 }
 
@@ -64,6 +73,10 @@ function hostSuffixes(host) {
 }
 
 export function selectorsForHost(host, index = siteIndex()) {
+  if (!index) {
+    // Not published yet (only possible in the first moments of startup).
+    return { useGeneric: true, selectors: [] };
+  }
   let suffixes = hostSuffixes(host);
   let excepted = new Set(suffixes.flatMap(d => index.specificExcept[d] ?? []));
   let selectors = new Set();

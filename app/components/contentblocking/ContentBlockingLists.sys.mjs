@@ -54,8 +54,20 @@ function applyUpdate(dbService, table, data) {
   });
 }
 
+export const COSMETIC_INDEX_KEY = "browserwip:cosmetic-sites";
+
 export const ContentBlockingLists = {
   _loading: null,
+
+  /**
+   * Share the per-site element-hiding rules with content processes, which
+   * are sandboxed and cannot read them from disk.
+   */
+  publishCosmeticIndex() {
+    let index = JSON.parse(readBinary(BASE + "cosmetic-sites.json"));
+    Services.ppmm.sharedData.set(COSMETIC_INDEX_KEY, index);
+    Services.ppmm.sharedData.flush();
+  },
 
   get stats() {
     return JSON.parse(readBinary(BASE + "compile-stats.json"));
