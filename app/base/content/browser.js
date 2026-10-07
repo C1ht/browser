@@ -104,6 +104,22 @@ var BrowserWip = {
     cmd_newWindow: () => BrowserWip.openNewWindow(),
     cmd_closeWindow: () => BrowserWip.closeWindow(),
     cmd_quit: () => Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit),
+    cmd_find: () => BrowserWip.find(),
+    cmd_findAgain: () => BrowserWip.find({ again: true }),
+    cmd_findPrevious: () => BrowserWip.find({ again: true, previous: true }),
+  },
+
+  // Find in page: one toolkit findbar per window, bound to the selected tab.
+  find({ again = false, previous = false } = {}) {
+    let findbar = document.getElementById("findbar");
+    if (findbar.browser != gBrowser.selectedBrowser) {
+      findbar.browser = gBrowser.selectedBrowser;
+    }
+    if (again && !findbar.hidden) {
+      findbar.onFindAgainCommand(previous);
+    } else {
+      findbar.onFindCommand();
+    }
   },
 
   _wireButtons() {
@@ -124,6 +140,10 @@ var BrowserWip = {
   },
 
   _onTabSelect() {
+    let findbar = document.getElementById("findbar");
+    if (!findbar.hidden) {
+      findbar.close(true);
+    }
     gURLBar.update();
     this._updateTitle();
     let browser = gBrowser.selectedBrowser;

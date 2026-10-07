@@ -41,6 +41,9 @@
     <xul:command id="cmd_newWindow"/>
     <xul:command id="cmd_closeWindow"/>
     <xul:command id="cmd_quit"/>
+    <xul:command id="cmd_find"/>
+    <xul:command id="cmd_findAgain"/>
+    <xul:command id="cmd_findPrevious"/>
   </xul:commandset>
 
   <!-- reserved="true": handled by the browser even when a page has focus. -->
@@ -63,6 +66,11 @@
     <xul:key id="key_prevTab2" keycode="VK_PAGE_UP" modifiers="accel" command="cmd_prevTab" reserved="true"/>
     <xul:key id="key_moveTabNext" keycode="VK_PAGE_DOWN" modifiers="accel,shift" command="cmd_moveTabNext"/>
     <xul:key id="key_moveTabPrev" keycode="VK_PAGE_UP" modifiers="accel,shift" command="cmd_moveTabPrev"/>
+    <xul:key id="key_find" key="f" modifiers="accel" command="cmd_find"/>
+    <xul:key id="key_findAgain" key="g" modifiers="accel" command="cmd_findAgain"/>
+    <xul:key id="key_findPrevious" key="g" modifiers="accel,shift" command="cmd_findPrevious"/>
+    <xul:key id="key_findAgain2" keycode="VK_F3" command="cmd_findAgain"/>
+    <xul:key id="key_findPrevious2" keycode="VK_F3" modifiers="shift" command="cmd_findPrevious"/>
   </xul:keyset>
 
   <xul:popupset id="main-popupset">
@@ -155,5 +163,6 @@
   </div>
 
   <div id="browsers"></div>
+  <xul:findbar id="findbar" hidden="true"/>
 </body>
 </html>
