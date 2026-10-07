@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<!-- A first-party page that embeds a known tracker and ad network, plus an
+     element matching a generic element-hiding rule. The title reports the
+     element's computed display once the page has loaded. -->
+<meta charset="utf-8">
+<title>loading</title>
+<div id="AD_160">advertisement</div>
+<p id="content">Article text</p>
+<script src="https://www.google-analytics.com/analytics.js"></script>
+<img src="https://securepubads.g.doubleclick.net/pixel.gif" alt="">
+<script>
+  window.addEventListener("load", () => {
+    let ad = getComputedStyle(document.getElementById("AD_160")).display;
+    let text = getComputedStyle(document.getElementById("content")).display;
+    document.title = `ad:${ad} content:${text}`;
+  });
+</script>

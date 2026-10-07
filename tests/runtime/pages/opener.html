@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<!-- window.open() and target=_blank, for the tab-opening checks. -->
+<meta charset="utf-8">
+<title>opener</title>
+<a id="blank" href="target.html" target="_blank">open in new tab</a>
+<script>
+  function openPopup() {
+    let w = window.open("target.html");
+    document.title = w ? "opened" : "blocked";
+  }
+  if (location.search == "?auto") {
+    window.addEventListener("load", openPopup);
+  }
+</script>
