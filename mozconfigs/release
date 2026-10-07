@@ -1,6 +1,8 @@
 # Release build. Privacy-relevant options are implied by app/moz.configure,
 # so they cannot drift between configs.
 ac_add_options --enable-project=browser-wip
+# Lets the app adjust shared build definitions without editing mozilla-central.
+export MOZ_BUILD_HOOK="$topsrcdir/browser-wip/build/hook.mozbuild"
 ac_add_options --enable-optimize
 ac_add_options --disable-debug
 ac_add_options --disable-tests

@@ -1,0 +1,15 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Evaluated after every moz.build in the tree (MOZ_BUILD_HOOK, set in
+# mozconfigs/*). This is mozbuild's supported way for a downstream app to
+# adjust shared build definitions without editing mozilla-central.
+
+# services/settings/dumps/gen_last_modified.py only knows Mozilla's own apps
+# and asserts on any other MOZ_BUILD_APP. Use an equivalent generator that
+# reads the same toolkit dump directory.
+if RELATIVEDIR == "services/settings/dumps":
+    GENERATED_FILES["last_modified.json"].script = (
+        "/browser-wip/build/gen_rs_last_modified.py:main"
+    )
