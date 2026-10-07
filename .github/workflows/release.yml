@@ -70,6 +70,10 @@ jobs:
       - name: Bootstrap the toolchains
         working-directory: ${{ env.WORK }}/mozilla-central
         run: |
+          # Unpacking the Windows SDK installers needs msiextract.
+          if [[ "${{ matrix.platform }}" == windows-* ]]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq msitools > /dev/null
+          fi
           ./mach --no-interactive bootstrap --application-choice "Firefox for Desktop"
         env:
           MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ matrix.mozconfig }}
