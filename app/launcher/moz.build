@@ -56,6 +56,16 @@ if CONFIG["OS_ARCH"] == "WINNT":
     WIN32_EXE_LDFLAGS += [
         libpath_flag + TOPOBJDIR + "/browser/app/winlauncher/freestanding",
     ]
+    # The freestanding blocklist links against ntdll_freestanding.lib. Gecko
+    # only generates it for Firefox, so generate it here with Mozilla's script.
+    if CONFIG["COMPILE_ENVIRONMENT"]:
+        GeneratedFile(
+            "%sntdll_freestanding.%s" % (CONFIG["LIB_PREFIX"], CONFIG["LIB_SUFFIX"]),
+            script="/browser/app/winlauncher/freestanding/gen_ntdll_freestanding_lib.py",
+            inputs=["/browser/app/winlauncher/freestanding/ntdll_freestanding.def"],
+            flags=[CONFIG["WIP_LLVM_DLLTOOL"]] + CONFIG["WIP_LLVM_DLLTOOL_FLAGS"],
+        )
+        WIN32_EXE_LDFLAGS += [libpath_flag + OBJDIR]
     # As for firefox.exe: CET is only enabled for processes without JIT.
     LINK_FLAGS["CETCOMPAT"] = []
 
@@ -75,3 +85,16 @@ if CONFIG["MOZ_SANDBOX"] and CONFIG["OS_ARCH"] == "WINNT":
         "userenv.dll",
         "usp10.dll",
     ]
+
+# As for firefox.exe: a smaller default process heap (the CRT heap is what
+# Gecko uses), no STL wrappers in the standalone launcher, and a GUI-subsystem
+# executable so no console window opens next to the browser.
+if CONFIG["OS_ARCH"] == "WINNT" and CONFIG["CC_TYPE"] not in ("clang", "gcc"):
+    LDFLAGS += ["/HEAP:0x40000"]
+
+DisableStlWrapping()
+
+if CONFIG["MOZ_ASAN"] or CONFIG["MOZ_DEBUG"]:
+    WINCONSOLE = True
+else:
+    WINCONSOLE = False

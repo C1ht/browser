@@ -35,3 +35,34 @@ imply_option("--enable-necko-wifi", False)
 imply_option("--enable-eme", False)
 
 include("../toolkit/moz.configure")
+
+# llvm-dlltool (Windows)
+# ==============================================================
+# The Windows launcher links Mozilla's freestanding DLL blocklist, which needs
+# an import library for ntdll built with llvm-dlltool. Toolkit only looks for
+# the tool when building Firefox ("browser"), so look for it here as well.
+
+
+@depends(target, "--enable-compile-environment")
+def wip_want_llvm_dlltool(target, compile_environment):
+    return target.os == "WINNT" and compile_environment
+
+
+check_prog(
+    "WIP_LLVM_DLLTOOL",
+    ("llvm-dlltool",),
+    what="llvm-dlltool",
+    when=wip_want_llvm_dlltool,
+    paths=clang_search_path,
+)
+
+
+@depends(target, when=wip_want_llvm_dlltool)
+def wip_llvm_dlltool_flags(target):
+    return [
+        "-m",
+        {"x86": "i386", "x86_64": "i386:x86-64", "aarch64": "arm64"}[target.cpu],
+    ]
+
+
+set_config("WIP_LLVM_DLLTOOL_FLAGS", wip_llvm_dlltool_flags)
