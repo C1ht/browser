@@ -46,3 +46,13 @@ PrivacyModes.init(); PrivacyModes.setStrict("jit", true);
 assert(PrivacyModes.pendingRestart.includes("jit"), "JIT change reports pending restart");
 PrivacyModes.setStrict("jit", false);
 assert(PrivacyModes.pendingRestart.length == 0, "reverting JIT clears pending restart");
+
+// State helpers used by the first-run preview.
+const strictState = PrivacyModes.stateForMode("strict");
+assert(PrivacyModes.modeFor(strictState) == "strict", "modeFor(strict preset) -> strict");
+assert(PrivacyModes.modeFor(PrivacyModes.stateForMode("standard")) == "standard", "modeFor(standard preset) -> standard");
+assert(PrivacyModes.modeFor({ ...strictState, jit: false }) == "custom", "modeFor(strict minus JIT) -> custom");
+PrivacyModes.applyState({ ...strictState, utcTimezone: true });
+assert(PrivacyModes.mode == "custom" && PrivacyModes.isStrict("utcTimezone") && PrivacyModes.isStrict("jit"), "applyState writes a previewed custom state");
+PrivacyModes.applyState(PrivacyModes.stateForMode("standard"));
+assert(user.size == 0, "applyState(standard) leaves no protection prefs: " + [...user.keys()]);

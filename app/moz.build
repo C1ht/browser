@@ -7,7 +7,9 @@
 
 DIRS += [
     "base",
+    "components",
     "locales",
+    "policies",
     "themes",
     "launcher",
 ]

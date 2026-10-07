@@ -6,6 +6,10 @@ ac_add_options --enable-project=browser-wip
 ac_add_options --enable-optimize
 ac_add_options --disable-debug
 ac_add_options --disable-tests
+# Debug info roughly doubles rustc and linker memory; a 4-core, ~13 GB build
+# box runs out of memory compiling the largest Rust crates with it.
+ac_add_options --disable-debug-symbols
+mk_add_options MOZ_PARALLEL_BUILD=3
 
 export CC=clang-20
 export CXX=clang++-20

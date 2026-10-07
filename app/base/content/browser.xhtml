@@ -3,22 +3,145 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
-<!-- Placeholder main window for the scaffolding milestone. Replaced by the
-     Folio chrome in Stage 3, part 4. -->
+<!-- The browser window. Toolbar with the address field, the tab strip below
+     it, then the pages. Window decorations come from the desktop. -->
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
       id="main-window"
       windowtype="navigator:browser"
-      data-l10n-id="browser-window"
       width="1200" height="800"
       persist="screenX screenY width height sizemode">
 <head>
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src chrome:; img-src chrome: moz-icon: page-icon: data: blob:; style-src chrome: 'unsafe-inline'; object-src 'none'"/>
+  <title data-l10n-id="browser-main-window-title"></title>
   <link rel="stylesheet" href="chrome://global/skin/global.css"/>
   <link rel="stylesheet" href="chrome://browser-wip/skin/browser.css"/>
   <link rel="localization" href="branding/brand.ftl"/>
   <link rel="localization" href="browser-wip/browser.ftl"/>
+  <script src="chrome://browser-wip/content/tabbrowser.js"/>
+  <script src="chrome://browser-wip/content/urlbar.js"/>
+  <script src="chrome://browser-wip/content/browser.js"/>
 </head>
 <body>
-  <p id="scaffold-status">browser-wip scaffold is running.</p>
+  <xul:commandset id="main-commands">
+    <xul:command id="cmd_newTab" oncommand="BrowserWip.openNewTab()"/>
+    <xul:command id="cmd_closeTab" oncommand="gBrowser.removeTab(gBrowser.selectedTab)"/>
+    <xul:command id="cmd_reopenTab" oncommand="gBrowser.reopenClosedTab()"/>
+    <xul:command id="cmd_focusUrlbar" oncommand="gURLBar.focusAndSelect()"/>
+    <xul:command id="cmd_back" oncommand="gBrowser.selectedBrowser.goBack()"/>
+    <xul:command id="cmd_forward" oncommand="gBrowser.selectedBrowser.goForward()"/>
+    <xul:command id="cmd_reload" oncommand="BrowserWip.reloadOrStop()"/>
+    <xul:command id="cmd_reloadSkipCache" oncommand="BrowserWip.reload(true)"/>
+    <xul:command id="cmd_nextTab" oncommand="gBrowser.advanceSelectedTab(1)"/>
+    <xul:command id="cmd_prevTab" oncommand="gBrowser.advanceSelectedTab(-1)"/>
+    <xul:command id="cmd_moveTabNext" oncommand="gBrowser.moveSelectedTab(1)"/>
+    <xul:command id="cmd_moveTabPrev" oncommand="gBrowser.moveSelectedTab(-1)"/>
+    <xul:command id="cmd_settings" oncommand="BrowserWip.openSettings()"/>
+    <xul:command id="cmd_newWindow" oncommand="BrowserWip.openNewWindow()"/>
+    <xul:command id="cmd_closeWindow" oncommand="window.close()"/>
+  </xul:commandset>
+
+  <!-- reserved="true": handled by the browser even when a page has focus. -->
+  <xul:keyset id="main-keys">
+    <xul:key id="key_newTab" key="t" modifiers="accel" command="cmd_newTab" reserved="true"/>
+    <xul:key id="key_closeTab" key="w" modifiers="accel" command="cmd_closeTab" reserved="true"/>
+    <xul:key id="key_reopenTab" key="t" modifiers="accel,shift" command="cmd_reopenTab" reserved="true"/>
+    <xul:key id="key_newWindow" key="n" modifiers="accel" command="cmd_newWindow" reserved="true"/>
+    <xul:key id="key_closeWindow" key="w" modifiers="accel,shift" command="cmd_closeWindow" reserved="true"/>
+    <xul:key id="key_focusUrlbar" key="l" modifiers="accel" command="cmd_focusUrlbar" reserved="true"/>
+    <xul:key id="key_focusUrlbar2" keycode="VK_F6" command="cmd_focusUrlbar"/>
+    <xul:key id="key_back" keycode="VK_LEFT" modifiers="alt" command="cmd_back"/>
+    <xul:key id="key_forward" keycode="VK_RIGHT" modifiers="alt" command="cmd_forward"/>
+    <xul:key id="key_reload" key="r" modifiers="accel" command="cmd_reload"/>
+    <xul:key id="key_reload2" keycode="VK_F5" command="cmd_reload"/>
+    <xul:key id="key_reloadSkipCache" key="r" modifiers="accel,shift" command="cmd_reloadSkipCache"/>
+    <xul:key id="key_nextTab" keycode="VK_TAB" modifiers="control" command="cmd_nextTab" reserved="true"/>
+    <xul:key id="key_prevTab" keycode="VK_TAB" modifiers="control,shift" command="cmd_prevTab" reserved="true"/>
+    <xul:key id="key_nextTab2" keycode="VK_PAGE_DOWN" modifiers="accel" command="cmd_nextTab" reserved="true"/>
+    <xul:key id="key_prevTab2" keycode="VK_PAGE_UP" modifiers="accel" command="cmd_prevTab" reserved="true"/>
+    <xul:key id="key_moveTabNext" keycode="VK_PAGE_DOWN" modifiers="accel,shift" command="cmd_moveTabNext"/>
+    <xul:key id="key_moveTabPrev" keycode="VK_PAGE_UP" modifiers="accel,shift" command="cmd_moveTabPrev"/>
+  </xul:keyset>
+
+  <xul:popupset id="main-popupset">
+    <xul:menupopup id="app-menu" class="wip-menu">
+      <xul:menuitem data-l10n-id="app-menu-new-tab" key="key_newTab" command="cmd_newTab"/>
+      <xul:menuitem data-l10n-id="app-menu-new-window" key="key_newWindow" command="cmd_newWindow"/>
+      <xul:menuseparator/>
+      <xul:menuitem data-l10n-id="app-menu-settings" command="cmd_settings"/>
+      <xul:menuseparator/>
+      <xul:menuitem data-l10n-id="app-menu-quit" oncommand="Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit)"/>
+    </xul:menupopup>
+
+    <xul:panel id="protections-panel" class="wip-panel" type="arrow" role="dialog"
+               aria-labelledby="protections-title">
+      <h2 id="protections-title" class="panel-title"></h2>
+      <p id="protections-summary" class="panel-text"></p>
+      <div class="panel-row">
+        <label id="protections-toggle-label" for="protections-toggle"
+               data-l10n-id="protections-toggle-label"></label>
+        <button id="protections-toggle" class="switch" role="switch" aria-checked="true"/>
+      </div>
+      <p class="panel-text" data-l10n-id="protections-toggle-help"></p>
+      <button class="panel-link" data-l10n-id="protections-open-settings"
+              data-command="cmd_settings"/>
+    </xul:panel>
+
+    <xul:panel id="identity-panel" class="wip-panel" type="arrow" role="dialog"
+               aria-labelledby="identity-title">
+      <h2 id="identity-title" class="panel-title"></h2>
+      <p id="identity-summary" class="panel-text"></p>
+    </xul:panel>
+  </xul:popupset>
+
+  <header id="nav-bar" role="toolbar" data-l10n-id="nav-bar">
+    <div id="nav-buttons">
+      <button id="back-button" class="toolbar-button" data-l10n-id="back-button" data-command="cmd_back" disabled="true">
+        <img class="icon" src="chrome://browser-wip/skin/icons/back.svg" alt=""/>
+      </button>
+      <button id="forward-button" class="toolbar-button" data-l10n-id="forward-button" data-command="cmd_forward" disabled="true">
+        <img class="icon" src="chrome://browser-wip/skin/icons/forward.svg" alt=""/>
+      </button>
+      <button id="reload-button" class="toolbar-button" data-l10n-id="reload-button" data-command="cmd_reload">
+        <img class="icon" src="chrome://browser-wip/skin/icons/reload.svg" alt=""/>
+      </button>
+    </div>
+
+    <div id="urlbar">
+      <button id="identity-button" class="urlbar-button" data-l10n-id="identity-button-secure">
+        <img id="identity-icon" class="icon" src="chrome://browser-wip/skin/icons/site-info.svg" alt=""/>
+        <span id="identity-label" data-l10n-id="identity-not-secure"></span>
+      </button>
+      <div id="urlbar-input-box">
+        <input id="urlbar-input" type="text" spellcheck="false" autocomplete="off"
+               data-l10n-id="urlbar-input"/>
+        <div id="urlbar-display" aria-hidden="true"></div>
+      </div>
+      <button id="sharing-button" class="urlbar-button" hidden="true" data-l10n-id="sharing-button">
+        <img class="icon" src="chrome://browser-wip/skin/icons/camera.svg" alt=""/>
+      </button>
+      <button id="protections-button" class="urlbar-button" data-l10n-id="protections-button">
+        <img id="protections-icon" class="icon" src="chrome://browser-wip/skin/icons/shield.svg" alt=""/>
+        <span id="protections-count"></span>
+      </button>
+      <div id="urlbar-progress"></div>
+    </div>
+
+    <div id="tool-buttons">
+      <button id="app-menu-button" class="toolbar-button" data-l10n-id="app-menu-button">
+        <img class="icon" src="chrome://browser-wip/skin/icons/menu.svg" alt=""/>
+      </button>
+    </div>
+  </header>
+
+  <div id="tab-strip">
+    <div id="tabs" role="tablist" data-l10n-id="tab-strip"></div>
+    <button id="new-tab-button" class="toolbar-button" data-l10n-id="new-tab-button" data-command="cmd_newTab">
+      <img class="icon" src="chrome://browser-wip/skin/icons/plus.svg" alt=""/>
+    </button>
+  </div>
+
+  <div id="browsers"></div>
 </body>
 </html>

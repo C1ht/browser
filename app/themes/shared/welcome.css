@@ -1,0 +1,52 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* First run: one centered column, the two choices side by side. */
+
+body {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 48px 24px;
+  box-sizing: border-box;
+}
+
+#welcome {
+  width: min(760px, 100%);
+  display: grid;
+  gap: 24px;
+}
+
+#welcome > header {
+  display: grid;
+  gap: 10px;
+}
+
+#welcome-mark {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+}
+
+#welcome > header p {
+  max-width: 62ch;
+}
+
+#toggles {
+  margin-top: 6px;
+}
+
+#welcome > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+#welcome > footer p {
+  font-size: 14px;
+}

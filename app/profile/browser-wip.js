@@ -21,6 +21,18 @@
 pref("toolkit.defaultChromeURI", "chrome://browser-wip/content/browser.xhtml");
 pref("browser.chromeURL", "chrome://browser-wip/content/browser.xhtml");
 
+// Appearance: "auto" follows the desktop; "light" or "dark" force one.
+pref("browserwip.appearance", "auto");
+
+// Links and window.open() calls that ask for a new window open a tab instead
+// (3), except popups that set a size or position (restriction 2).
+pref("browser.link.open_newwindow", 3);
+pref("browser.link.open_newwindow.restriction", 2);
+pref("browser.link.open_newwindow.override.external", -1);
+
+// Closing the last tab closes the window.
+pref("browser.tabs.closeWindowWithLastTab", true);
+
 // Search. Brave Search runs its own index and needs no API key for results.
 // Suggestions send each keystroke to the engine, so they are opt-in.
 pref("browserwip.search.engine", "brave");

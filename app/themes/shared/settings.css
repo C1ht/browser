@@ -1,0 +1,33 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Settings: one readable column of sections. */
+
+#settings {
+  width: min(720px, 100% - 48px);
+  margin: 0 auto;
+  padding-block: 48px 80px;
+  display: grid;
+  gap: 40px;
+}
+
+#settings > section {
+  display: grid;
+  gap: 16px;
+}
+
+.inline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+#restart-row {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background-color: var(--warn-bg);
+  color: var(--warn-fg);
+}

@@ -4,4 +4,14 @@
 
 browser-wip.jar:
 % content browser-wip %content/browser-wip/
-  content/browser-wip/browser.xhtml (content/browser.xhtml)
+  content/browser-wip/browser.xhtml          (content/browser.xhtml)
+  content/browser-wip/browser.js             (content/browser.js)
+  content/browser-wip/tabbrowser.js          (content/tabbrowser.js)
+  content/browser-wip/urlbar.js              (content/urlbar.js)
+  content/browser-wip/privacy-controls.js    (content/privacy-controls.js)
+  content/browser-wip/welcome.html           (content/welcome.html)
+  content/browser-wip/welcome.js             (content/welcome.js)
+  content/browser-wip/settings.html          (content/settings.html)
+  content/browser-wip/settings.js            (content/settings.js)
+  content/browser-wip/newtab.html            (content/newtab.html)
+  content/browser-wip/newtab.js              (content/newtab.js)

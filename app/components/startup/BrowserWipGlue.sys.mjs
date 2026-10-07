@@ -28,6 +28,19 @@ const JSWINDOWACTORS = {
   },
 };
 
+/**
+ * Appearance: Light, Dark or Auto, applied to the browser and to web pages
+ * together and live. Gecko's values: 0 dark, 1 light, 2 follow the system.
+ */
+const APPEARANCE_PREF = "browserwip.appearance";
+const APPEARANCE_VALUES = { dark: 0, light: 1, auto: 2 };
+
+function applyAppearance() {
+  let value = APPEARANCE_VALUES[Services.prefs.getStringPref(APPEARANCE_PREF, "auto")] ?? 2;
+  Services.prefs.setIntPref("browser.theme.toolbar-theme", value);
+  Services.prefs.setIntPref("layout.css.prefers-color-scheme.content-override", value);
+}
+
 export function BrowserWipGlue() {}
 
 BrowserWipGlue.prototype = {
@@ -48,6 +61,8 @@ BrowserWipGlue.prototype = {
     // Importing ActorManagerParent registers toolkit's actors (select
     // dropdowns, find bar, form autofill, printing, ...). Apps must do this.
     lazy.ActorManagerParent.addJSWindowActors(JSWINDOWACTORS);
+    applyAppearance();
+    Services.prefs.addObserver(APPEARANCE_PREF, applyAppearance);
     lazy.PrivacyModes.init();
     lazy.ContentBlockingLists.ensureLoaded().catch(() => {
       // Already reported; pages still load, just without blocking.

@@ -211,25 +211,48 @@ export const PrivacyModes = {
     this._recordMode();
   },
 
-  /** "standard", "strict" or "custom", from the current prefs. */
-  get mode() {
-    let state = Object.entries(TOGGLES).map(([id, t]) => [t, this.isStrict(id)]);
-    if (state.every(([, strict]) => !strict)) {
-      return "standard";
-    }
-    if (state.every(([t, strict]) => strict == t.inStrictMode)) {
-      return "strict";
+  /** Current state of every toggle: { id: strict }. */
+  get state() {
+    return Object.fromEntries(Object.keys(TOGGLES).map(id => [id, this.isStrict(id)]));
+  },
+
+  /** The toggle states a mode stands for. */
+  stateForMode(mode) {
+    return Object.fromEntries(
+      Object.entries(TOGGLES).map(([id, t]) => [id, mode == "strict" && t.inStrictMode])
+    );
+  },
+
+  /** "standard", "strict" or "custom" for a { id: strict } state. */
+  modeFor(state) {
+    for (let mode of MODES) {
+      let expected = this.stateForMode(mode);
+      if (Object.keys(TOGGLES).every(id => !!state[id] == expected[id])) {
+        return mode;
+      }
     }
     return "custom";
+  },
+
+  /** "standard", "strict" or "custom", from the current prefs. */
+  get mode() {
+    return this.modeFor(this.state);
+  },
+
+  /** Write a whole { id: strict } state, e.g. one previewed on first run. */
+  applyState(state) {
+    for (let id of Object.keys(TOGGLES)) {
+      if (this.isStrict(id) != !!state[id]) {
+        this.setStrict(id, !!state[id]);
+      }
+    }
   },
 
   setMode(mode) {
     if (!MODES.includes(mode)) {
       throw new Error(`Unknown privacy mode: ${mode}`);
     }
-    for (let [id, toggle] of Object.entries(TOGGLES)) {
-      this.setStrict(id, mode == "strict" && toggle.inStrictMode);
-    }
+    this.applyState(this.stateForMode(mode));
   },
 
   /** Toggles whose current value differs from what the running process uses. */

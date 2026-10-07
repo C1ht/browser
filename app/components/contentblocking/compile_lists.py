@@ -188,15 +188,20 @@ class Compiled:
 def compile_lists(out_dir, list_paths):
     c = Compiled()
     digest = hashlib.sha256()
+    snapshot = None
     for p in sorted(map(Path, list_paths)):
         text = p.read_text(encoding="utf-8")
         digest.update(text.encode())
-        c.add_list(p.stem, text.splitlines())
+        lines = text.splitlines()
+        snapshot = snapshot or next(
+            (l.split(":", 1)[1].strip() for l in lines[:5] if l.startswith("! Snapshot:")), None
+        )
+        c.add_list(p.stem, lines)
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     # The browser reloads its classifier tables when this changes.
-    stats = {"version": digest.hexdigest()[:16], "tables": {}}
+    stats = {"version": digest.hexdigest()[:16], "snapshot": snapshot, "tables": {}}
     for table in TABLES.values():
         data, count = c.table_update(table)
         (out_dir / f"{table}.update").write_bytes(data)

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!-- First run: choose Standard or Strict Privacy. Standard is preselected
+     and is what every way of leaving this page keeps. -->
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src chrome:; style-src chrome:; object-src 'none'"/>
+  <title data-l10n-id="welcome-page-title"></title>
+  <link rel="stylesheet" href="chrome://browser-wip/skin/pages.css"/>
+  <link rel="stylesheet" href="chrome://browser-wip/skin/welcome.css"/>
+  <link rel="localization" href="branding/brand.ftl"/>
+  <link rel="localization" href="browser-wip/privacy.ftl"/>
+  <link rel="localization" href="browser-wip/welcome.ftl"/>
+  <script src="chrome://browser-wip/content/privacy-controls.js"></script>
+  <script src="chrome://browser-wip/content/welcome.js"></script>
+</head>
+<body>
+  <main id="welcome">
+    <header>
+      <img id="welcome-mark" src="chrome://branding/content/icon.svg" alt=""/>
+      <h1 data-l10n-id="welcome-heading"></h1>
+      <p class="muted" data-l10n-id="welcome-intro"></p>
+    </header>
+    <div id="modes" class="modes"></div>
+    <details id="advanced" class="advanced">
+      <summary data-l10n-id="welcome-advanced"></summary>
+      <div id="toggles" class="toggles"></div>
+    </details>
+    <footer>
+      <p class="muted" data-l10n-id="welcome-change-later"></p>
+      <button id="continue" class="primary" type="button" data-l10n-id="welcome-continue"></button>
+    </footer>
+  </main>
+</body>
+</html>
