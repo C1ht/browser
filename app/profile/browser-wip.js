@@ -30,6 +30,13 @@ pref("browser.link.open_newwindow", 3);
 pref("browser.link.open_newwindow.restriction", 2);
 pref("browser.link.open_newwindow.override.external", -1);
 
+// Find bar: toolkit's widget expects these (Firefox's values). Typing on a
+// page does not start a search.
+pref("accessibility.typeaheadfind", false);
+pref("accessibility.typeaheadfind.timeout", 5000);
+pref("accessibility.typeaheadfind.flashBar", 1);
+pref("accessibility.typeaheadfind.linksonly", false);
+
 // Closing the last tab closes the window.
 pref("browser.tabs.closeWindowWithLastTab", true);
 

@@ -50,6 +50,15 @@ BrowserWipGlue.prototype = {
     switch (topic) {
       case "app-startup":
         Services.obs.addObserver(this, "final-ui-startup", true);
+        Services.obs.addObserver(this, "browser-delayed-startup-finished", true);
+        break;
+      case "browser-delayed-startup-finished":
+        // After the first window is up and idle, startup is done. Firefox
+        // sends this topic too; Marionette and others wait for it.
+        Services.obs.removeObserver(this, "browser-delayed-startup-finished");
+        Services.tm.idleDispatchToMainThread(() =>
+          Services.obs.notifyObservers(null, "browser-idle-startup-tasks-finished")
+        );
         break;
       case "final-ui-startup":
         this._onFinalUIStartup();

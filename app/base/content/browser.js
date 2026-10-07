@@ -54,6 +54,12 @@ var BrowserWip = {
     if (gURLBar.input.value == "" && this._initialURLs()[0] == NEW_TAB_URL) {
       gURLBar.focusAndSelect();
     }
+
+    // Toolkit and the remote agent treat this as "the browser window is
+    // ready", as Firefox's window sends it.
+    Services.tm.idleDispatchToMainThread(() =>
+      Services.obs.notifyObservers(window, "browser-delayed-startup-finished")
+    );
   },
 
   /** URLs for the first tabs: command-line arguments, or the start page. */

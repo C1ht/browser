@@ -76,7 +76,7 @@ class Browser:
         self.log = open(self.profile / "browser.log", "w")
         exe = Path(bindir) / ("browser-wip.exe" if sys.platform == "win32" else "browser-wip")
         self.proc = subprocess.Popen(
-            [str(exe), "--marionette", "--headless", "--no-remote",
+            [str(exe), "--marionette", "--remote-allow-system-access", "--headless", "--no-remote",
              "--profile", str(self.profile), *args],
             stdout=self.log, stderr=subprocess.STDOUT, env=env,
         )
