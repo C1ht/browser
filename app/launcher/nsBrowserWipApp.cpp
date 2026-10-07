@@ -546,10 +546,6 @@ int main(int argc, char* argv[], char* envp[]) {
 
   int result = do_main(argc, argv, envp);
 
-#if defined(XP_WIN)
-  CleanupProcessRuntime();
-#endif
-
   gBootstrap->NS_LogTerm();
 
 #if defined(DEBUG) && defined(HAS_DLL_BLOCKLIST)
