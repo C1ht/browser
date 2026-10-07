@@ -84,7 +84,31 @@ var BrowserWip = {
     return urls;
   },
 
+  // Handlers for the <command> elements in browser.xhtml. They live here
+  // because the window's CSP forbids inline event handlers.
+  COMMANDS: {
+    cmd_newTab: () => BrowserWip.openNewTab(),
+    cmd_closeTab: () => gBrowser.removeTab(gBrowser.selectedTab),
+    cmd_reopenTab: () => gBrowser.reopenClosedTab(),
+    cmd_focusUrlbar: () => gURLBar.focusAndSelect(),
+    cmd_back: () => gBrowser.selectedBrowser.goBack(),
+    cmd_forward: () => gBrowser.selectedBrowser.goForward(),
+    cmd_reload: () => BrowserWip.reloadOrStop(),
+    cmd_reloadSkipCache: () => BrowserWip.reload(true),
+    cmd_nextTab: () => gBrowser.advanceSelectedTab(1),
+    cmd_prevTab: () => gBrowser.advanceSelectedTab(-1),
+    cmd_moveTabNext: () => gBrowser.moveSelectedTab(1),
+    cmd_moveTabPrev: () => gBrowser.moveSelectedTab(-1),
+    cmd_settings: () => BrowserWip.openSettings(),
+    cmd_newWindow: () => BrowserWip.openNewWindow(),
+    cmd_closeWindow: () => BrowserWip.closeWindow(),
+    cmd_quit: () => Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit),
+  },
+
   _wireButtons() {
+    for (let [id, handler] of Object.entries(this.COMMANDS)) {
+      document.getElementById(id).addEventListener("command", handler);
+    }
     document.addEventListener("click", e => {
       let button = e.target.closest("button[data-command]");
       if (button && !button.disabled) {

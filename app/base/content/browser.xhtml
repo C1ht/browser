@@ -25,21 +25,22 @@
 </head>
 <body>
   <xul:commandset id="main-commands">
-    <xul:command id="cmd_newTab" oncommand="BrowserWip.openNewTab()"/>
-    <xul:command id="cmd_closeTab" oncommand="gBrowser.removeTab(gBrowser.selectedTab)"/>
-    <xul:command id="cmd_reopenTab" oncommand="gBrowser.reopenClosedTab()"/>
-    <xul:command id="cmd_focusUrlbar" oncommand="gURLBar.focusAndSelect()"/>
-    <xul:command id="cmd_back" oncommand="gBrowser.selectedBrowser.goBack()"/>
-    <xul:command id="cmd_forward" oncommand="gBrowser.selectedBrowser.goForward()"/>
-    <xul:command id="cmd_reload" oncommand="BrowserWip.reloadOrStop()"/>
-    <xul:command id="cmd_reloadSkipCache" oncommand="BrowserWip.reload(true)"/>
-    <xul:command id="cmd_nextTab" oncommand="gBrowser.advanceSelectedTab(1)"/>
-    <xul:command id="cmd_prevTab" oncommand="gBrowser.advanceSelectedTab(-1)"/>
-    <xul:command id="cmd_moveTabNext" oncommand="gBrowser.moveSelectedTab(1)"/>
-    <xul:command id="cmd_moveTabPrev" oncommand="gBrowser.moveSelectedTab(-1)"/>
-    <xul:command id="cmd_settings" oncommand="BrowserWip.openSettings()"/>
-    <xul:command id="cmd_newWindow" oncommand="BrowserWip.openNewWindow()"/>
-    <xul:command id="cmd_closeWindow" oncommand="window.close()"/>
+    <xul:command id="cmd_newTab"/>
+    <xul:command id="cmd_closeTab"/>
+    <xul:command id="cmd_reopenTab"/>
+    <xul:command id="cmd_focusUrlbar"/>
+    <xul:command id="cmd_back"/>
+    <xul:command id="cmd_forward"/>
+    <xul:command id="cmd_reload"/>
+    <xul:command id="cmd_reloadSkipCache"/>
+    <xul:command id="cmd_nextTab"/>
+    <xul:command id="cmd_prevTab"/>
+    <xul:command id="cmd_moveTabNext"/>
+    <xul:command id="cmd_moveTabPrev"/>
+    <xul:command id="cmd_settings"/>
+    <xul:command id="cmd_newWindow"/>
+    <xul:command id="cmd_closeWindow"/>
+    <xul:command id="cmd_quit"/>
   </xul:commandset>
 
   <!-- reserved="true": handled by the browser even when a page has focus. -->
@@ -71,7 +72,7 @@
       <xul:menuseparator/>
       <xul:menuitem data-l10n-id="app-menu-settings" command="cmd_settings"/>
       <xul:menuseparator/>
-      <xul:menuitem data-l10n-id="app-menu-quit" oncommand="Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit)"/>
+      <xul:menuitem data-l10n-id="app-menu-quit" command="cmd_quit"/>
     </xul:menupopup>
 
     <xul:panel id="protections-panel" class="wip-panel" type="arrow" role="dialog"

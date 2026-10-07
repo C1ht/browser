@@ -122,8 +122,11 @@ class TabBrowser {
     this.tabContainer.addEventListener("keydown", this);
     this.browserContainer.addEventListener("WillChangeBrowserRemoteness", this);
     this.browserContainer.addEventListener("pagetitlechanged", this);
-    this.browserContainer.addEventListener("DOMAudioPlaybackStarted", this);
-    this.browserContainer.addEventListener("DOMAudioPlaybackStopped", this);
+    this.window.addEventListener(
+      "unload",
+      () => this.tabs.forEach(t => this._unregisterAudible(t)),
+      { once: true }
+    );
   }
 
   get selectedBrowser() {
@@ -176,6 +179,7 @@ class TabBrowser {
     // Inserting the browser creates its frame loader and browsing context.
     this.browserContainer.appendChild(browser);
     this._addProgressListener(tab);
+    this._registerAudible(tab);
     this._updateTabIdentity(tab, null, url);
 
     if (url && !openWindowInfo) {
@@ -267,6 +271,27 @@ class TabBrowser {
     }
   }
 
+  // The speaker icon: Gecko reports audibility through the tab's
+  // MediaController, which is replaced whenever the tab changes process.
+  _registerAudible(tab) {
+    this._unregisterAudible(tab);
+    let controller = tab.linkedBrowser.browsingContext?.mediaController;
+    if (!controller) {
+      return;
+    }
+    let handler = () => {
+      tab.toggleAttribute("soundplaying", controller.isAudible);
+      this._notify(tab, "TabAttrModified");
+    };
+    controller.addEventListener("audiblechange", handler);
+    tab.audible = { controller, handler };
+  }
+
+  _unregisterAudible(tab) {
+    tab.audible?.controller.removeEventListener("audiblechange", tab.audible.handler);
+    tab.audible = null;
+  }
+
   async removeTab(tab, { skipPermitUnload = false } = {}) {
     if (!tab || tab.closing) {
       return;
@@ -301,6 +326,7 @@ class TabBrowser {
     }
     this._notify(tab, "TabClose");
     this._removeProgressListener(tab);
+    this._unregisterAudible(tab);
     this.tabs.splice(index, 1);
     tab.remove();
     browser.remove();
@@ -486,18 +512,10 @@ class TabBrowser {
       case "keydown":
         this._onTabKeydown(event);
         break;
-      case "pagetitlechanged":
-      case "DOMAudioPlaybackStarted":
-      case "DOMAudioPlaybackStopped": {
+      case "pagetitlechanged": {
         let tab = this.getTabForBrowser(event.target);
-        if (!tab) {
-          return;
-        }
-        if (event.type == "pagetitlechanged") {
+        if (tab) {
           this._updateTabIdentity(tab);
-        } else {
-          tab.toggleAttribute("soundplaying", event.type == "DOMAudioPlaybackStarted");
-          this._notify(tab, "TabAttrModified");
         }
         break;
       }
@@ -519,6 +537,8 @@ class TabBrowser {
       "DidChangeBrowserRemoteness",
       () => {
         this._addProgressListener(tab);
+        // A process switch creates a new MediaController.
+        this._registerAudible(tab);
         // Re-assigning reapplies activeness to the new remote frame.
         // eslint-disable-next-line no-self-assign
         browser.docShellIsActive = browser.docShellIsActive;
