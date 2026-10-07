@@ -1,0 +1,29 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXTRA_JS_MODULES.browserwip += [
+    "ContentBlockingChild.sys.mjs",
+    "ContentBlockingLists.sys.mjs",
+]
+
+# Compile the vendored filter lists into classifier tables and element-hiding
+# sheets. The first output is written by the build; compile_lists.py writes
+# the rest next to it.
+lists = [
+    "lists/easylist.txt",
+    "lists/easyprivacy.txt",
+    "lists/fanboy-social.txt",
+]
+outputs = [
+    "compile-stats.json",
+    "wip-ads-digest256.update",
+    "wip-track-digest256.update",
+    "wip-social-digest256.update",
+    "cosmetic-generic.css",
+    "cosmetic-sites.json",
+]
+GeneratedFile(*outputs, script="compile_lists.py", entry_point="generate", inputs=lists)
+
+# resource://gre/defaults/contentblocking/
+FINAL_TARGET_FILES.defaults.contentblocking += ["!%s" % o for o in outputs]

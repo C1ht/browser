@@ -1,0 +1,12 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# resource:///modules/policies/ is where toolkit's policy engine looks.
+EXTRA_JS_MODULES.policies += [
+    "Policies.sys.mjs",
+    "schema.sys.mjs",
+]
+
+# <appdir>/distribution/policies.json (the XREAppDist directory).
+FINAL_TARGET_FILES.distribution += ["policies.json"]
