@@ -4,6 +4,7 @@
 
 DIRS += [
     "about",
+    "compat",
     "contentblocking",
     "privacy",
     "startup",
