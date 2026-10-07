@@ -1,0 +1,506 @@
+<title>browser-wip Chrome Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;500&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a single review column; each direction is a section holding its
+   light and dark chrome renders, which scroll sideways inside their own box on phones. */
+:root {
+  --bg: #F2F4F5;
+  --surface: #FFFFFF;
+  --fg: #182026;
+  --muted: #56636D;
+  --line: #D8DEE2;
+  --accent: #0B6E6E;
+  --accent-soft: #DCEFEE;
+  --f-ui: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1214; --surface: #171B1E; --fg: #E6EAED; --muted: #9AA6AF;
+    --line: #283036; --accent: #5EC4BE; --accent-soft: #163331; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1214; --surface: #171B1E; --fg: #E6EAED; --muted: #9AA6AF;
+  --line: #283036; --accent: #5EC4BE; --accent-soft: #163331; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--f-ui);
+  font-size: 15px; line-height: 1.55; padding: 0 16px; margin: 0;
+}
+.wrap { max-width: 1000px; margin: 0 auto; padding-block: 40px 80px; display: grid; gap: 56px; }
+header.top { display: grid; gap: 14px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1 { font-size: clamp(28px, 4vw, 38px); line-height: 1.12; margin: 0; font-weight: 600; letter-spacing: -.015em; text-wrap: balance; }
+h2 { font-size: 24px; margin: 0; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+h3 { font-size: 13px; margin: 0; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--muted); font-size: 16px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; padding: 3px; background: var(--surface); gap: 2px; }
+.seg button { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--muted); padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); font-weight: 600; }
+.seg button:focus-visible, .jump a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.jump { display: flex; gap: 6px 16px; flex-wrap: wrap; font-size: 14px; }
+.jump a { color: var(--fg); text-decoration: none; border-bottom: 1px solid var(--line); }
+.jump a:hover { border-color: var(--accent); }
+
+section.dir { display: grid; gap: 22px; }
+.dir-head { display: grid; gap: 10px; }
+.dir-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.badge { font-size: 12px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 10px; }
+.specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.spec { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.spec p { font-size: 14px; color: var(--muted); }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.sw { width: 26px; height: 26px; border-radius: 6px; border: 1px solid rgba(127,127,127,.35); }
+.sw-row { display: grid; gap: 6px; }
+.sw-label { font-size: 11px; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.frames { display: grid; gap: 18px; }
+.scroller { overflow-x: auto; border-radius: 14px; }
+.cap { font-size: 13px; color: var(--muted); padding: 6px 2px 0; }
+
+/* ---------- Browser frame (shared) ---------- */
+.frame {
+  width: 940px; border-radius: 12px; overflow: hidden; font-size: 13px; line-height: 1.3;
+  color: var(--c-fg); background: var(--c-chrome);
+  box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 14px 40px -12px rgba(0,0,0,.28);
+  user-select: none;
+}
+.frame svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.toolbar { display: flex; align-items: center; }
+.nav, .tools { display: flex; gap: 2px; }
+.ib { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--c-fg); background: transparent; border: 0; padding: 0; cursor: default; }
+.ib:hover { background: var(--c-hover); }
+.ib.dim { color: var(--c-muted); opacity: .55; }
+.field { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; outline: none; cursor: text; }
+.field .url { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--c-muted); }
+.field .url b { color: var(--c-fg); font-weight: 600; }
+.field .ident { display: grid; place-items: center; color: var(--c-muted); }
+.field .end { display: flex; align-items: center; gap: 4px; color: var(--c-muted); }
+.shield { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px 2px 5px; border-radius: 999px; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--c-muted); }
+.wm { display: flex; gap: 8px; padding-left: 8px; }
+.wm i { width: 12px; height: 12px; border-radius: 50%; background: var(--c-wm); display: block; }
+.strip { display: flex; align-items: flex-end; position: relative; }
+.pinned { display: flex; gap: 2px; align-items: flex-end; }
+.tabs { display: flex; flex: 1; min-width: 0; align-items: flex-end; }
+.tab { position: relative; display: flex; align-items: center; gap: 8px; flex: 1 1 0; min-width: 0; max-width: 220px; color: var(--c-muted); cursor: default; }
+.tab .title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab .x { opacity: 0; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; }
+.tab .x svg { width: 12px; height: 12px; }
+.tab:hover .x, .tab.active .x { opacity: .75; }
+.tab.active { color: var(--c-fg); z-index: 2; }
+.tab .state { display: grid; place-items: center; color: var(--c-muted); }
+.tab .state svg { width: 14px; height: 14px; }
+.tab .state.cam { color: var(--c-rec); }
+.fav { width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; flex: none; }
+.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--c-hover-strong); border-top-color: var(--c-accent); animation: spin 0.9s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+.fl { position: absolute; bottom: 0; display: block; pointer-events: none; }
+.page { background: var(--c-page); color: var(--c-page-fg); height: 330px; overflow: hidden; position: relative; }
+.site { display: grid; grid-template-columns: 1fr 250px; gap: 36px; padding: 26px 46px; }
+.site .sitebar { display: flex; justify-content: space-between; grid-column: 1 / -1; font-size: 12px; color: var(--c-page-muted); border-bottom: 1px solid var(--c-page-line); padding-bottom: 12px; }
+.site h4 { font-family: Georgia, "DejaVu Serif", serif; font-weight: 400; font-size: 30px; line-height: 1.12; margin: 0 0 8px; letter-spacing: -.01em; }
+.site .meta { font-size: 12px; color: var(--c-page-muted); margin-bottom: 14px; }
+.site p { font-family: Georgia, "DejaVu Serif", serif; font-size: 14.5px; line-height: 1.6; color: var(--c-page-fg); opacity: .88; max-width: none; }
+.site figure { margin: 0; }
+.site .img { height: 190px; border-radius: 6px;
+  background:
+    radial-gradient(circle at 30% 40%, #b7c48a 0 18px, transparent 19px),
+    radial-gradient(circle at 62% 30%, #d6c76b 0 12px, transparent 13px),
+    radial-gradient(circle at 48% 68%, #93a96b 0 26px, transparent 27px),
+    radial-gradient(circle at 76% 66%, #c9cf9a 0 15px, transparent 16px),
+    radial-gradient(circle at 20% 78%, #a8b77a 0 10px, transparent 11px),
+    linear-gradient(135deg, #5b5446, #3e3a31);
+}
+.site figcaption { font-size: 11.5px; color: var(--c-page-muted); margin-top: 8px; font-family: inherit; }
+
+/* Focus state on the address field: the one place the accent shows at rest is the
+   loading spinner; click a field to see the focus ring. */
+.field:focus { box-shadow: 0 0 0 2px var(--c-accent); }
+
+/* ---------- Direction A: Folio ---------- */
+.d-folio { font-family: "Instrument Sans", "Helvetica Neue", Arial, sans-serif; }
+.d-folio.m-light { --c-chrome:#E5E9EC; --c-fg:#1B2126; --c-muted:#5C6771; --c-hover:rgba(27,33,38,.07); --c-hover-strong:rgba(27,33,38,.14); --c-field:#FFFFFF; --c-field-line:#D0D6DB; --c-page:#FFFFFF; --c-page-fg:#1B2126; --c-page-muted:#6B747C; --c-page-line:#E7EAED; --c-accent:#0B6E6E; --c-divider:#C3CAD0; --c-wm:#C6CDD3; --c-rec:#C2352B; }
+.d-folio.m-dark { --c-chrome:#15191C; --c-fg:#E3E8EB; --c-muted:#96A1AA; --c-hover:rgba(255,255,255,.07); --c-hover-strong:rgba(255,255,255,.14); --c-field:#22282C; --c-field-line:#2D3439; --c-page:#1D2226; --c-page-fg:#E3E8EB; --c-page-muted:#909BA4; --c-page-line:#2B3237; --c-accent:#5EC4BE; --c-divider:#2D3439; --c-wm:#3A4248; --c-rec:#F0786E; }
+.d-folio .toolbar { height: 48px; padding: 0 12px; gap: 10px; }
+.d-folio .field { height: 34px; background: var(--c-field); border: 1px solid var(--c-field-line); border-radius: 10px; padding: 0 8px 0 10px; max-width: 700px; margin: 0 auto; }
+.d-folio .strip { height: 40px; padding: 0 12px; gap: 4px; }
+.d-folio .pinned .tab { flex: none; width: 40px; justify-content: center; }
+.d-folio .tab { height: 34px; padding: 0 10px 0 12px; border-radius: 10px 10px 0 0; }
+.d-folio .tab:not(.active):hover { background: var(--c-hover); }
+.d-folio .tabs .tab:not(.active) + .tab:not(.active)::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 1px; background: var(--c-divider); }
+.d-folio .tab.active { background: var(--c-page); font-weight: 500; }
+.d-folio .fl { width: 10px; height: 10px; }
+.d-folio .fl.l { left: -10px; background: radial-gradient(circle at 0 0, transparent 9.5px, var(--c-page) 10px); }
+.d-folio .fl.r { right: -10px; background: radial-gradient(circle at 100% 0, transparent 9.5px, var(--c-page) 10px); }
+.d-folio .newtab { margin-bottom: 3px; }
+
+/* ---------- Direction B: Graphite ---------- */
+.d-graphite { font-family: "Atkinson Hyperlegible", "Helvetica Neue", Arial, sans-serif; }
+.d-graphite.m-light { --c-chrome:#F4F4F5; --c-track:#E3E3E7; --c-fg:#121214; --c-muted:#5B5B65; --c-hover:rgba(18,18,20,.06); --c-hover-strong:rgba(18,18,20,.14); --c-field:#FFFFFF; --c-field-line:#CBCBD3; --c-page:#FFFFFF; --c-page-fg:#121214; --c-page-muted:#696972; --c-page-line:#E8E8EC; --c-accent:#2B59C3; --c-divider:#C9C9D1; --c-wm:#CDCDD4; --c-rec:#C2352B; }
+.d-graphite.m-dark { --c-chrome:#101113; --c-track:#08090A; --c-fg:#ECECEF; --c-muted:#9A9AA5; --c-hover:rgba(255,255,255,.06); --c-hover-strong:rgba(255,255,255,.14); --c-field:#18191C; --c-field-line:#2A2B31; --c-page:#18191C; --c-page-fg:#ECECEF; --c-page-muted:#94949F; --c-page-line:#26272C; --c-accent:#8AA9FF; --c-divider:#25262B; --c-wm:#34353B; --c-rec:#F0786E; }
+.d-graphite .toolbar { height: 42px; padding: 0 8px; gap: 8px; border-bottom: 1px solid var(--c-divider); }
+.d-graphite .ib { border-radius: 5px; width: 28px; height: 28px; }
+.d-graphite .field { height: 30px; background: var(--c-field); border: 1px solid var(--c-field-line); border-radius: 6px; padding: 0 6px 0 8px; }
+.d-graphite .url { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12.5px; }
+.d-graphite .url b { font-weight: 500; }
+.d-graphite .shield { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; border: 1px solid var(--c-field-line); border-radius: 4px; padding: 1px 6px 1px 4px; }
+.d-graphite .strip { height: 32px; background: var(--c-track); padding: 0 8px 0 0; }
+.d-graphite .pinned { padding: 0 4px 0 8px; height: 100%; align-items: center; border-right: 1px solid var(--c-divider); }
+.d-graphite .pinned .tab { flex: none; width: 30px; height: 26px; justify-content: center; border-radius: 5px; padding: 0; }
+.d-graphite .pinned .tab:hover { background: var(--c-hover); }
+.d-graphite .tabs .tab { height: 32px; padding: 0 8px 0 10px; border-right: 1px solid var(--c-divider); max-width: none; }
+.d-graphite .tabs .tab:not(.active):hover { background: var(--c-hover); }
+.d-graphite .tab.active { background: var(--c-page); border-right-color: transparent; }
+.d-graphite .tab .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10px; color: var(--c-muted); opacity: .7; width: 8px; }
+.d-graphite .tab.active .num { opacity: 1; }
+.d-graphite .newtab { width: 32px; height: 32px; border-radius: 0; }
+.d-graphite .fav { border-radius: 3px; }
+
+/* ---------- Direction C: Pebble ---------- */
+.d-pebble { font-family: "Figtree", "Helvetica Neue", Arial, sans-serif; }
+.d-pebble.m-light { --c-chrome:#E3DFDB; --c-fg:#241F1C; --c-muted:#6A625B; --c-hover:rgba(36,31,28,.07); --c-hover-strong:rgba(36,31,28,.14); --c-field:#F4F1EE; --c-field-line:transparent; --c-page:#FFFFFF; --c-page-fg:#241F1C; --c-page-muted:#776E67; --c-page-line:#ECE8E4; --c-accent:#A3346B; --c-divider:transparent; --c-wm:#C9C3BD; --c-rec:#C2352B; }
+.d-pebble.m-dark { --c-chrome:#191615; --c-fg:#EDE7E2; --c-muted:#A59B93; --c-hover:rgba(255,255,255,.07); --c-hover-strong:rgba(255,255,255,.14); --c-field:#2A2522; --c-field-line:transparent; --c-page:#221E1C; --c-page-fg:#EDE7E2; --c-page-muted:#A0968E; --c-page-line:#322C29; --c-accent:#E58AB4; --c-divider:transparent; --c-wm:#3B3431; --c-rec:#F0786E; }
+.d-pebble .toolbar { height: 52px; padding: 0 14px; gap: 10px; }
+.d-pebble .ib { border-radius: 50%; width: 32px; height: 32px; }
+.d-pebble .field { height: 36px; background: var(--c-field); border-radius: 999px; padding: 0 6px 0 12px; max-width: 640px; margin: 0 auto; }
+.d-pebble .shield { background: var(--c-hover); }
+.d-pebble .strip { height: 40px; padding: 0 14px; gap: 4px; }
+.d-pebble .pinned .tab { flex: none; width: 34px; justify-content: center; padding: 0; height: 30px; margin-bottom: 5px; border-radius: 999px; }
+.d-pebble .tab { height: 30px; margin-bottom: 5px; padding: 0 8px 0 10px; border-radius: 999px; }
+.d-pebble .tab:not(.active):hover, .d-pebble .pinned .tab:hover { background: var(--c-hover); }
+.d-pebble .tab.active { background: var(--c-page); height: 36px; margin-bottom: 0; border-radius: 16px 16px 0 0; font-weight: 600; }
+.d-pebble .fl { width: 14px; height: 14px; }
+.d-pebble .fl.l { left: -14px; background: radial-gradient(circle at 0 0, transparent 13.5px, var(--c-page) 14px); }
+.d-pebble .fl.r { right: -14px; background: radial-gradient(circle at 100% 0, transparent 13.5px, var(--c-page) 14px); }
+.d-pebble .fav { border-radius: 50%; }
+.d-pebble .page { margin: 0 8px 8px; border-radius: 14px; height: 322px; }
+.d-pebble .newtab { margin-bottom: 4px; }
+
+/* ---------- Indicator states (Folio) ---------- */
+.states { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.state-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.state-card p { font-size: 13.5px; color: var(--muted); }
+.mini { border-radius: 10px; padding: 8px; }
+.mini .field { width: 100%; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 8px 2px 6px; border-radius: 999px; white-space: nowrap; }
+.chip.warn { color: var(--c-warn); background: var(--c-warn-bg); }
+.chip.rec { color: var(--c-rec); background: var(--c-rec-bg); }
+.d-folio.m-light { --c-warn:#8A4B00; --c-warn-bg:#FBEBD4; --c-rec-bg:#FBE3E0; }
+.d-folio.m-dark { --c-warn:#F2B866; --c-warn-bg:#3A2A14; --c-rec-bg:#3D1F1C; }
+.progress { position: absolute; left: 0; bottom: -1px; height: 2px; width: 62%; background: var(--c-accent); border-radius: 2px; }
+
+/* ---------- First run (Folio) ---------- */
+.fr { width: 940px; border-radius: 12px; overflow: hidden; background: var(--c-chrome); color: var(--c-fg); font-family: "Instrument Sans", "Helvetica Neue", Arial, sans-serif; box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 14px 40px -12px rgba(0,0,0,.28); }
+.fr-bar { height: 40px; display: flex; justify-content: flex-end; align-items: center; padding: 0 14px; }
+.fr-body { background: var(--c-page); margin: 0 10px 10px; border-radius: 12px; padding: 40px 64px 34px; display: grid; gap: 22px; }
+.fr-body h5 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -.012em; color: var(--c-page-fg); }
+.fr-body .sub { color: var(--c-page-muted); font-size: 14.5px; margin-top: 6px; max-width: 60ch; }
+.opts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.opt { border: 1.5px solid var(--c-page-line); border-radius: 12px; padding: 18px 18px 16px; display: grid; gap: 8px; align-content: start; cursor: pointer; text-align: left; font: inherit; color: var(--c-page-fg); background: transparent; }
+.opt[aria-checked="true"] { border-color: var(--c-accent); box-shadow: inset 0 0 0 1px var(--c-accent); }
+.opt:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+.opt .row { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15.5px; }
+.radio { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--c-page-muted); display: grid; place-items: center; flex: none; }
+.opt[aria-checked="true"] .radio { border-color: var(--c-accent); }
+.opt[aria-checked="true"] .radio::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--c-accent); }
+.opt .rec { font-size: 11px; font-weight: 600; color: var(--c-page-muted); border: 1px solid var(--c-page-line); border-radius: 999px; padding: 0 8px; }
+.opt p { font-size: 13.5px; color: var(--c-page-muted); line-height: 1.5; }
+.opt ul { margin: 2px 0 0; padding-left: 18px; font-size: 13px; color: var(--c-page-muted); line-height: 1.6; }
+details.adv { border-top: 1px solid var(--c-page-line); padding-top: 14px; color: var(--c-page-fg); }
+details.adv summary { cursor: pointer; font-size: 14px; font-weight: 500; color: var(--c-page-muted); list-style: none; display: inline-flex; gap: 6px; align-items: center; }
+details.adv summary::-webkit-details-marker { display: none; }
+details.adv summary:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; border-radius: 4px; }
+details.adv summary .chev { transition: transform .15s; display: inline-block; }
+details.adv[open] summary .chev { transform: rotate(90deg); }
+.toggles { display: grid; gap: 2px; margin-top: 10px; }
+.tg { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 9px 0; border-bottom: 1px solid var(--c-page-line); }
+.tg:last-child { border-bottom: 0; }
+.tg b { font-weight: 500; font-size: 14px; display: block; }
+.tg span { font-size: 12.5px; color: var(--c-page-muted); }
+.sw2 { width: 34px; height: 20px; border-radius: 999px; background: var(--c-hover-strong); position: relative; flex: none; border: 0; cursor: pointer; padding: 0; }
+.sw2::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--c-page); box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: left .15s; }
+.sw2[aria-checked="true"] { background: var(--c-accent); }
+.sw2[aria-checked="true"]::after { left: 17px; }
+.sw2:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+.fr-foot { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.fr-foot span { font-size: 13px; color: var(--c-page-muted); }
+.btn { font: inherit; font-weight: 600; font-size: 14px; border: 0; border-radius: 9px; padding: 9px 22px; background: var(--c-fg); color: var(--c-chrome); cursor: pointer; }
+.btn:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+
+.rec-box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; display: grid; gap: 12px; }
+.rec-box ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 72ch; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-back" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></symbol>
+  <symbol id="i-fwd" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></symbol>
+  <symbol id="i-reload" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.5v3h-3"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 16 16"><path d="M3 5h5M11 5h2M3 11h2M8 11h5"/><circle cx="9.5" cy="5" r="1.5"/><circle cx="6.5" cy="11" r="1.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 2 3 4v4c0 3 2.2 5 5 6 2.8-1 5-3 5-6V4z"/></symbol>
+  <symbol id="i-star" viewBox="0 0 16 16"><path d="m8 2.5 1.7 3.4 3.8.6-2.7 2.6.6 3.8L8 11.1l-3.4 1.8.6-3.8-2.7-2.6 3.8-.6z"/></symbol>
+  <symbol id="i-down" viewBox="0 0 16 16"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 16 16"><path d="M3 4.5h10M3 8h10M3 11.5h10"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-audio" viewBox="0 0 16 16"><path d="M3 6h2.5L9 3v10L5.5 10H3z"/><path d="M11.5 5.5a3.5 3.5 0 0 1 0 5"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 16 16"><rect x="2" y="4.5" width="8.5" height="7" rx="1.5"/><path d="m10.5 7 3.5-2v6l-3.5-2"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 16 16"><rect x="6" y="2" width="4" height="7.5" rx="2"/><path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 2.5 14 13H2z"/><path d="M8 6.5v3M8 11.3v.2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></symbol>
+</svg>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">browser-wip · Stage 2 design review</div>
+    <h1>Three directions for the browser chrome</h1>
+    <p class="lede">Each direction is rendered in light and dark with the tab strip below the address bar. The active tab is drawn in the page's own color so it reads as part of the page. Hover tabs, click an address field to see the focus ring, and try the first-run screen at the bottom.</p>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Appearance to show">
+        <button type="button" id="show-both" data-show="both" aria-pressed="true">Light and dark</button>
+        <button type="button" id="show-light" data-show="light" aria-pressed="false">Light only</button>
+        <button type="button" id="show-dark" data-show="dark" aria-pressed="false">Dark only</button>
+      </div>
+      <nav class="jump" aria-label="Jump to direction">
+        <a href="#folio">A · Folio</a><a href="#graphite">B · Graphite</a><a href="#pebble">C · Pebble</a><a href="#states">Indicators</a><a href="#firstrun">First run</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="dir" id="folio">
+    <div class="dir-head">
+      <div class="dir-title"><h2>A · Folio</h2><span class="badge">Recommended</span></div>
+      <p>The active tab is cut like a folder tab, with curved shoulders that flow into the page. Inactive tabs have no background, only hairline dividers, so the strip stays quiet. The chrome is cool stone grey, the page area is the brightest surface on screen, and the accent is a deep teal.</p>
+    </div>
+    <div class="specs">
+      <div class="spec"><h3>Palette</h3>
+        <div class="sw-row"><span class="sw-label">Light</span><div class="swatches"><i class="sw" style="background:#E5E9EC"></i><i class="sw" style="background:#FFFFFF"></i><i class="sw" style="background:#5C6771"></i><i class="sw" style="background:#1B2126"></i><i class="sw" style="background:#0B6E6E"></i></div></div>
+        <div class="sw-row"><span class="sw-label">Dark</span><div class="swatches"><i class="sw" style="background:#15191C"></i><i class="sw" style="background:#1D2226"></i><i class="sw" style="background:#96A1AA"></i><i class="sw" style="background:#E3E8EB"></i><i class="sw" style="background:#5EC4BE"></i></div></div>
+      </div>
+      <div class="spec"><h3>Type</h3><p>Instrument Sans for the whole chrome. Slightly narrow, so long tab titles fit, with an open, modern feel. The hostname is semibold and the rest of the URL is muted.</p></div>
+      <div class="spec"><h3>Shape</h3><p>10px radii. The only shaped element is the active tab. Toolbar 48px plus tab strip 40px, 88px of chrome in total.</p></div>
+    </div>
+    <div class="frames" data-dir="folio"></div>
+  </section>
+
+  <section class="dir" id="graphite">
+    <div class="dir-head">
+      <div class="dir-title"><h2>B · Graphite</h2></div>
+      <p>A dense, precise direction for people who live in their browser. Tabs are equal-width cells in a recessed track. The active cell is filled with the page color and drops the divider below it. Each tab shows its Alt+number shortcut, URLs are set in monospace, and the accent is cobalt.</p>
+    </div>
+    <div class="specs">
+      <div class="spec"><h3>Palette</h3>
+        <div class="sw-row"><span class="sw-label">Light</span><div class="swatches"><i class="sw" style="background:#F4F4F5"></i><i class="sw" style="background:#E3E3E7"></i><i class="sw" style="background:#5B5B65"></i><i class="sw" style="background:#121214"></i><i class="sw" style="background:#2B59C3"></i></div></div>
+        <div class="sw-row"><span class="sw-label">Dark</span><div class="swatches"><i class="sw" style="background:#101113"></i><i class="sw" style="background:#08090A"></i><i class="sw" style="background:#9A9AA5"></i><i class="sw" style="background:#ECECEF"></i><i class="sw" style="background:#8AA9FF"></i></div></div>
+      </div>
+      <div class="spec"><h3>Type</h3><p>Atkinson Hyperlegible, designed for low-vision readers, so similar letterforms stay distinct. JetBrains Mono for URLs, where spotting a lookalike domain matters.</p></div>
+      <div class="spec"><h3>Shape</h3><p>5–6px radii, square cells, hairline borders. 42px toolbar plus 32px strip, 74px of chrome in total.</p></div>
+    </div>
+    <div class="frames" data-dir="graphite"></div>
+  </section>
+
+  <section class="dir" id="pebble">
+    <div class="dir-head">
+      <div class="dir-title"><h2>C · Pebble</h2></div>
+      <p>Soft and tactile. The page sits as an inset card on a warm grey backdrop. Controls are round, tabs are pills, and the active pill grows a stem down into the card. Of the three it is the friendliest and most consumer-facing. The accent is a muted berry.</p>
+    </div>
+    <div class="specs">
+      <div class="spec"><h3>Palette</h3>
+        <div class="sw-row"><span class="sw-label">Light</span><div class="swatches"><i class="sw" style="background:#E3DFDB"></i><i class="sw" style="background:#F4F1EE"></i><i class="sw" style="background:#6A625B"></i><i class="sw" style="background:#241F1C"></i><i class="sw" style="background:#A3346B"></i></div></div>
+        <div class="sw-row"><span class="sw-label">Dark</span><div class="swatches"><i class="sw" style="background:#191615"></i><i class="sw" style="background:#2A2522"></i><i class="sw" style="background:#A59B93"></i><i class="sw" style="background:#EDE7E2"></i><i class="sw" style="background:#E58AB4"></i></div></div>
+      </div>
+      <div class="spec"><h3>Type</h3><p>Figtree, a geometric sans with round dots and generous counters that suits the pebble shapes. Semibold is reserved for the active tab.</p></div>
+      <div class="spec"><h3>Shape</h3><p>Full pills, circular buttons, and a 14px card radius. 52px toolbar, 40px strip, and an 8px card margin: the most chrome of the three.</p></div>
+    </div>
+    <div class="frames" data-dir="pebble"></div>
+  </section>
+
+  <section class="dir" id="states">
+    <div class="dir-head">
+      <h2>Indicators in Folio</h2>
+      <p>Anything about the current page lives in the address field, which always describes the active tab. The tab strip carries only per-tab state that you need to see across tabs: loading, sound, and camera or microphone in use. HTTPS is the normal case, so it gets no badge. Only exceptions get a label.</p>
+    </div>
+    <div class="states" id="state-cards"></div>
+  </section>
+
+  <section class="dir" id="firstrun">
+    <div class="dir-head">
+      <h2>First run in Folio</h2>
+      <p>Standard is selected, so pressing Continue keeps it. Technical options stay collapsed under Advanced. Choosing a card or flipping a toggle updates the other, so the cards always match the toggles.</p>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="First-run appearance">
+          <button type="button" id="fr-light" data-fr="light" aria-pressed="true">Light</button>
+          <button type="button" id="fr-dark" data-fr="dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+    </div>
+    <div class="scroller">
+      <div class="fr d-folio m-light" id="fr">
+        <div class="fr-bar"><div class="wm"><i></i><i></i><i></i></div></div>
+        <div class="fr-body">
+          <div>
+            <h5>How much privacy do you want?</h5>
+            <p class="sub">Both choices block trackers, stop sites from following you with cookies, and never send your browsing to us or anyone else. You can change this later in Settings.</p>
+          </div>
+          <div class="opts" role="radiogroup" aria-label="Privacy level">
+            <button type="button" class="opt" id="opt-standard" role="radio" aria-checked="true" data-mode="standard">
+              <span class="row"><span class="radio"></span>Standard <span class="rec">Recommended</span></span>
+              <p>Strong protection that stays out of your way. Video calls, streaming and sign-ins work as you expect.</p>
+            </button>
+            <button type="button" class="opt" id="opt-strict" role="radio" aria-checked="false" data-mode="strict">
+              <span class="row"><span class="radio"></span>Strict Privacy</span>
+              <p>Hides more about your device and turns off features sites can misuse. Some sites will be slower, and a few may not work.</p>
+            </button>
+          </div>
+          <details class="adv" id="adv">
+            <summary><span class="chev">›</span> Advanced</summary>
+            <div class="toggles">
+              <div class="tg"><div><b>Fast JavaScript (JIT)</b><span>Turning this off reduces attack surface. Script-heavy sites get slower.</span></div><button type="button" class="sw2" id="tg-jit" role="switch" aria-checked="true" aria-label="Fast JavaScript"></button></div>
+              <div class="tg"><div><b>Video and voice calls (WebRTC)</b><span>When off, only your public address is shared in calls. Some calls may fail to connect.</span></div><button type="button" class="sw2" id="tg-webrtc" role="switch" aria-checked="true" aria-label="Full WebRTC"></button></div>
+              <div class="tg"><div><b>Hide device details</b><span>Randomizes canvas and graphics readouts and limits fonts and screen details sites can see.</span></div><button type="button" class="sw2" id="tg-fp" role="switch" aria-checked="false" aria-label="Hide device details"></button></div>
+              <div class="tg"><div><b>Report time zone as UTC</b><span>Clocks and calendars on websites may show the wrong time.</span></div><button type="button" class="sw2" id="tg-tz" role="switch" aria-checked="false" aria-label="Report time zone as UTC"></button></div>
+            </div>
+          </details>
+          <div class="fr-foot"><span>Using browser-wip as your default browser is set by your desktop.</span><button type="button" class="btn" id="fr-go">Continue</button></div>
+        </div>
+      </div>
+    </div>
+    <p class="cap" id="fr-status">Continue would keep the Standard settings.</p>
+  </section>
+
+  <section class="rec-box">
+    <h2>Why Folio</h2>
+    <ul>
+      <li>Putting tabs below the address bar puts them right next to the page, so a folder tab connects the two literally. The other directions need a stem (Pebble) or a missing divider (Graphite) to make the same point.</li>
+      <li>It wastes no pixels. Pebble's inset card costs about 8px on three sides of every page, which adds up on a 13-inch laptop.</li>
+      <li>It is neutral enough to sit inside your desktop without fighting it, and the folder tab is distinctive enough that nobody mistakes it for a stock browser.</li>
+      <li>Graphite's best ideas carry over: Alt+number hints on hover and the semibold-host URL treatment. Pebble's softness could come back later as a separate "comfortable" density.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const TABS = [
+  { t: "Weekly design sync", fav: "V", c: "#3B6EA8", state: "cam" },
+  { t: "Lichens of the Cascade Range", fav: "F", c: "#4E7A3A", active: true },
+  { t: "Inbox (3)", fav: "M", c: "#B4452F" },
+  { t: "Rust 1.97 release notes", loading: true },
+  { t: "Night Drive · Radio", fav: "R", c: "#6B4C9A", state: "audio" },
+];
+const PINNED = [{ fav: "C", c: "#2F7D74" }, { fav: "S", c: "#8C6A1E" }];
+const ic = (id) => `<svg aria-hidden="true"><use href="#i-${id}"/></svg>`;
+const fav = (f, c) => `<span class="fav" style="background:${c}">${f}</span>`;
+
+function tabHTML(tab, i, dir) {
+  const lead = tab.loading ? `<span class="spin" aria-label="Loading"></span>` : fav(tab.fav, tab.c);
+  const st = tab.state === "cam" ? `<span class="state cam" title="Camera and microphone in use">${ic("cam")}</span>`
+           : tab.state === "audio" ? `<span class="state" title="Playing audio">${ic("audio")}</span>` : "";
+  const num = dir === "graphite" ? `<span class="num">${i + 3}</span>` : "";
+  const fl = tab.active && dir !== "graphite" ? `<i class="fl l"></i><i class="fl r"></i>` : "";
+  return `<div class="tab${tab.active ? " active" : ""}" data-i="${i}">${fl}${num}${lead}<span class="title">${tab.t}</span>${st}<span class="x">${ic("x")}</span></div>`;
+}
+
+function frameHTML(dir, mode) {
+  const pinned = PINNED.map((p) => `<div class="tab" title="Pinned">${fav(p.fav, p.c)}</div>`).join("");
+  return `<div class="scroller" data-mode="${mode}"><div class="frame d-${dir} m-${mode}" role="img" aria-label="${dir} direction, ${mode} appearance">
+    <div class="toolbar">
+      <div class="nav"><span class="ib">${ic("back")}</span><span class="ib dim">${ic("fwd")}</span><span class="ib">${ic("reload")}</span></div>
+      <div class="field" tabindex="0"><span class="ident" title="Site information">${ic("tune")}</span>
+        <span class="url"><b>fieldguide.org</b>/lichens/cascade-range</span>
+        <span class="end">${ic("star")}<span class="shield" title="14 trackers blocked">${ic("shield")}14</span></span></div>
+      <div class="tools"><span class="ib">${ic("down")}</span><span class="ib">${ic("menu")}</span></div>
+      <div class="wm"><i></i><i></i><i></i></div>
+    </div>
+    <div class="strip">
+      <div class="pinned">${pinned}</div>
+      <div class="tabs">${TABS.map((t, i) => tabHTML(t, i, dir)).join("")}</div>
+      <span class="ib newtab" title="New tab">${ic("plus")}</span>
+    </div>
+    <div class="page"><div class="site">
+      <div class="sitebar"><span>Field Guide · Pacific Northwest</span><span>Lichens · Mosses · Fungi</span></div>
+      <div><h4>Lichens of the Cascade Range</h4><div class="meta">Field guide · 14 min read · Updated September 2026</div>
+      <p>Above 1,500 metres the old-growth canopy thins and the trunks turn grey-green with Lobaria oregana, the lettuce lichen. A single hectare of mature Douglas fir can carry more than a tonne of it, and when it falls it feeds the forest floor with nitrogen.</p></div>
+      <figure><div class="img"></div><figcaption>Crustose and foliose growth on basalt, Mount Rainier, 1,820 m</figcaption></figure>
+    </div></div>
+  </div></div>`;
+}
+
+document.querySelectorAll(".frames").forEach((el) => {
+  const dir = el.dataset.dir;
+  el.innerHTML = frameHTML(dir, "light") + frameHTML(dir, "dark");
+});
+
+// Clicking a tab makes it active, to show how the connected shape moves.
+document.addEventListener("click", (e) => {
+  const tab = e.target.closest(".tabs .tab");
+  if (!tab) return;
+  const strip = tab.parentElement;
+  const dir = [...tab.closest(".frame").classList].find((c) => c.startsWith("d-")).slice(2);
+  strip.querySelectorAll(".tab").forEach((t) => {
+    t.classList.remove("active");
+    t.querySelectorAll(".fl").forEach((f) => f.remove());
+  });
+  tab.classList.add("active");
+  if (dir !== "graphite") tab.insertAdjacentHTML("afterbegin", `<i class="fl l"></i><i class="fl r"></i>`);
+});
+
+// Appearance filter.
+document.querySelectorAll("[data-show]").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("[data-show]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  document.querySelectorAll(".frames .scroller").forEach((s) => {
+    s.hidden = b.dataset.show !== "both" && s.dataset.mode !== b.dataset.show;
+  });
+}));
+
+// Indicator states.
+const STATES = [
+  { title: "Normal HTTPS page", body: "No lock and no badge. The site-information button opens permissions, cookies and certificate details.", field: `<span class="ident">${ic("tune")}</span><span class="url"><b>fieldguide.org</b>/lichens</span><span class="end"><span class="shield">${ic("shield")}14</span></span>` },
+  { title: "Plain HTTP (HTTPS-First fell back)", body: "A warning chip replaces the site button. Passwords and card fields on the page also get an inline warning.", field: `<span class="chip warn">${ic("warn")}Not secure</span><span class="url"><b>printer.local</b>/setup</span><span class="end"></span>` },
+  { title: "Camera and microphone in use", body: "A red chip names the devices in use. Click it to stop sharing. The tab shows the same glyph so you can find the call.", field: `<span class="ident">${ic("tune")}</span><span class="url"><b>meet.example.com</b>/weekly-sync</span><span class="end"><span class="chip rec">${ic("cam")}${ic("mic")}</span></span>` },
+  { title: "Loading", body: "A thin accent line runs along the bottom of the field for the active tab. Background tabs show a spinner instead of their icon.", field: `<span class="ident">${ic("tune")}</span><span class="url"><b>doc.rust-lang.org</b>/releases</span><span class="end">${ic("x")}</span><span class="progress"></span>` },
+];
+document.getElementById("state-cards").innerHTML = STATES.map((s) => `
+  <div class="state-card"><h3>${s.title}</h3>
+    ${["light", "dark"].map((m) => `<div class="mini frame d-folio m-${m}" style="width:auto;box-shadow:none"><div class="field" tabindex="0" style="position:relative;max-width:none">${s.field}</div></div>`).join("")}
+    <p>${s.body}</p></div>`).join("");
+
+// First run.
+const fr = document.getElementById("fr");
+const PRESETS = { standard: { "tg-jit": true, "tg-webrtc": true, "tg-fp": false, "tg-tz": false },
+                  strict:   { "tg-jit": false, "tg-webrtc": false, "tg-fp": true, "tg-tz": false } };
+const status = document.getElementById("fr-status");
+function currentMode() {
+  for (const [mode, p] of Object.entries(PRESETS)) {
+    if (Object.entries(p).every(([id, v]) => (document.getElementById(id).getAttribute("aria-checked") === "true") === v)) return mode;
+  }
+  return "custom";
+}
+function sync() {
+  const mode = currentMode();
+  fr.querySelectorAll(".opt").forEach((o) => o.setAttribute("aria-checked", String(o.dataset.mode === mode)));
+  status.textContent = mode === "custom" ? "Continue would save a custom mix. Settings would label it Custom." :
+    `Continue would keep the ${mode === "standard" ? "Standard" : "Strict Privacy"} settings.`;
+}
+fr.querySelectorAll(".opt").forEach((o) => o.addEventListener("click", () => {
+  Object.entries(PRESETS[o.dataset.mode]).forEach(([id, v]) => document.getElementById(id).setAttribute("aria-checked", String(v)));
+  sync();
+}));
+fr.querySelectorAll(".sw2").forEach((s) => s.addEventListener("click", () => {
+  s.setAttribute("aria-checked", String(s.getAttribute("aria-checked") !== "true"));
+  sync();
+}));
+document.getElementById("fr-go").addEventListener("click", () => {
+  const m = currentMode();
+  status.textContent = `Saved: ${m === "custom" ? "Custom" : m === "standard" ? "Standard" : "Strict Privacy"}. In the real browser this opens your first tab.`;
+});
+document.querySelectorAll("[data-fr]").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("[data-fr]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  fr.classList.toggle("m-light", b.dataset.fr === "light");
+  fr.classList.toggle("m-dark", b.dataset.fr === "dark");
+}));
+</script>
