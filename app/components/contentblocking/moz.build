@@ -26,4 +26,4 @@ outputs = [
 GeneratedFile(*outputs, script="compile_lists.py", entry_point="generate", inputs=lists)
 
 # resource://gre/defaults/contentblocking/
-FINAL_TARGET_FILES.defaults.contentblocking += ["!%s" % o for o in outputs]
+FINAL_TARGET_FILES.defaults.contentblocking += sorted("!%s" % o for o in outputs)
