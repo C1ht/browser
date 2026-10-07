@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata for software centers and the desktop's app registry. -->
+<component type="desktop-application">
+  <id>browser-wip</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MPL-2.0</project_license>
+  <name>browser-wip</name>
+  <summary>Browse the web without being tracked</summary>
+  <description>
+    <p>A web browser built on Gecko that blocks trackers and ads out of the box,
+    never sends your browsing to anyone, and keeps sites working.</p>
+  </description>
+  <launchable type="desktop-id">browser-wip.desktop</launchable>
+  <categories>
+    <category>Network</category>
+    <category>WebBrowser</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+</component>
