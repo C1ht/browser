@@ -106,7 +106,9 @@ jobs:
       - name: Rename archive
         run: |
           cd "$WORK/mozilla-central/obj-release/dist"
-          src=$(ls $ARCHIVE | head -1)
+          # packager.mk records the real package; other zips (xpt artifacts) sit
+          # next to it.
+          src=$(cat package_name.txt)
           ext="${src##*.}"; [[ "$src" == *.tar.xz ]] && ext="tar.xz"
           mkdir -p "$WORK/out"
           cp "$src" "$WORK/out/browser-wip-${{ inputs.tag }}-${{ matrix.platform }}.$ext"

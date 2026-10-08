@@ -18,6 +18,7 @@ DIRS += [
 
 if CONFIG["OS_ARCH"] == "WINNT":
     DIRS += ["build/win"]
+    CONFIGURE_SUBST_FILES += ["installer/windows/Makefile"]
 
 JS_PREFERENCE_FILES += [
     "profile/browser-wip.js",
