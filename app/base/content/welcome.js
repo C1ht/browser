@@ -29,7 +29,7 @@ window.addEventListener("DOMContentLoaded", () => {
   controls = new PrivacyControls({
     cards: document.getElementById("modes"),
     toggles: document.getElementById("toggles"),
-    toggleIds: ["jit", "webrtc", "hideDeviceDetails", "utcTimezone"],
+    toggleIds: ["jit", "webrtc", "resistFingerprinting", "utcTimezone"],
     live: false,
     onChange() {
       // Turning off fast JavaScript needs a restart, so say so on the button.

@@ -149,7 +149,9 @@ def part1(bindir, base):
             profileDir: Services.dirsvc.get("ProfD", Ci.nsIFile).path,
           };""")
         record(1, "app identity is browser-wip", info["name"] == "browser-wip" and info["brand"] == "browser-wip", info)
-        record(1, "runs on the pinned Gecko release", info["gecko"].startswith("157."), info["gecko"])
+        pinned = (ROOT / "GECKO_REVISION").read_text().split("version=")[1].split()[0]
+        record(1, "runs on the pinned Gecko release", info["gecko"].startswith(pinned.split(".")[0] + "."),
+               f"{info['gecko']} (pinned {pinned})")
         record(1, "main window opened", info["windowType"] == "navigator:browser", info["windowType"])
         for key in ["crashreporter", "updater", "telemetry", "datareporting", "normandy", "sync", "eme"]:
             record(1, f"built without {key}", info[key] is False, info[key])
@@ -167,6 +169,7 @@ STANDARD_PREFS = {
     "privacy.trackingprotection.enabled": True,
     "privacy.fingerprintingProtection": True,
     "privacy.resistFingerprinting": False,
+    "privacy.resistFingerprinting.letterboxing": False,
     "privacy.globalprivacycontrol.enabled": True,
     "privacy.query_stripping.enabled": True,
     "privacy.bounceTrackingProtection.mode": 1,
@@ -185,6 +188,13 @@ STANDARD_PREFS = {
     "urlclassifier.trackingTable": "wip-ads-digest256,wip-track-digest256",
     "browserwip.search.engine": "brave",
 }
+
+
+def fingerprint(b, base):
+    b.js("gBrowser.addTab(arguments[0]);", f"{base}/fingerprint.html")
+    title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith('fp:') && t;", timeout=30)
+    b.js("gBrowser.removeTab(gBrowser.selectedTab);")
+    return json.loads(title[3:])
 
 
 def part2(bindir, base):
@@ -245,10 +255,35 @@ def part2(bindir, base):
           r.userPrefs = managed.filter(n => Services.prefs.prefHasUserValue(n));
           return r;""")
         record(2, "Strict Privacy applies live", strict["mode"] == "strict" and strict["httpsOnly"]
-               and strict["ion"] is False and strict["noHost"] and "+WebGLVendorSanitize" in strict["fpp"], strict)
+               and strict["ion"] is False and strict["noHost"] and "JSDateTimeUTC" not in strict["fpp"], strict)
         record(2, "only the JIT change asks for a restart", strict["restart"] == ["jit"], strict["restart"])
         record(2, "returning to Standard leaves no overrides behind",
                strict["after"] == "standard" and not strict["userPrefs"], strict["userPrefs"])
+
+        # What pages see: Standard hides device details only; Anonymous makes
+        # the browser look like every other resistFingerprinting browser.
+        fp = fingerprint(b, base)
+        record(2, "the user agent is Firefox's", fp["ua"].endswith(" Firefox/" + fp["ua"].split("rv:")[1].split(")")[0]),
+               fp["ua"])
+        b.js(IMPORTS + """
+          Services.prefs.setStringPref("browserwip.appearance", "dark");
+          PrivacyModes.setMode("anonymous");""")
+        anon = fingerprint(b, base)
+        b.js(IMPORTS + """
+          PrivacyModes.setMode("standard");
+          Services.prefs.clearUserPref("browserwip.appearance");""")
+        record(2, "Anonymous: UTC, English, light colors",
+               anon["timeZone"] in ("UTC", "Atlantic/Reykjavik") and anon["languages"] == ["en-US", "en"]
+               and anon["locale"] == "en-US" and anon["dark"] is False, anon)
+        if sys.platform == "win32":
+            fonts = b.js("""return Cc["@mozilla.org/gfx/fontenumerator;1"].getService(Ci.nsIFontEnumerator)
+              .EnumerateAllFontsAsync().then(list => [list.includes("Noto Sans Adlam"),
+                list.includes("Twemoji Mozilla"), list.includes("Calibri"), list.length]);""")
+            record(2, "Windows: pages get Mullvad Browser's fonts (bundled Noto, no Calibri)",
+                   fonts[0] and fonts[1] and not fonts[2], fonts)
+        record(2, "Anonymous: the page size comes in letterbox steps",
+               anon["innerWidth"] % 200 == 0 and anon["innerHeight"] % 100 == 0 and anon["innerWidth"] > 0
+               and anon["innerHeight"] > 0, anon)
     finally:
         b.quit()
 

@@ -5,7 +5,7 @@
 "use strict";
 
 /**
- * The Standard / Strict cards and the Advanced switches, shared by the
+ * The privacy mode cards and the Advanced switches, shared by the
  * first-run screen and Settings.
  *
  * In "live" mode (Settings) every click is applied at once. In "preview"
@@ -13,7 +13,7 @@
  * any other way keeps Standard.
  */
 
-const { PrivacyModes } = ChromeUtils.importESModule(
+const { PrivacyModes, MODES } = ChromeUtils.importESModule(
   "resource://gre/modules/browserwip/PrivacyModes.sys.mjs"
 );
 
@@ -23,18 +23,21 @@ const { PrivacyModes } = ChromeUtils.importESModule(
 const TOGGLE_UI = {
   jit: { l10n: "privacy-toggle-jit", on: strict => !strict },
   webrtc: { l10n: "privacy-toggle-webrtc", on: strict => !strict },
-  hideDeviceDetails: { l10n: "privacy-toggle-device", on: strict => strict },
   utcTimezone: { l10n: "privacy-toggle-timezone", on: strict => strict },
   httpsOnly: { l10n: "privacy-toggle-https-only", on: strict => strict },
   noStorageHeuristics: { l10n: "privacy-toggle-storage-heuristics", on: strict => !strict },
   blockSocial: { l10n: "privacy-toggle-social", on: strict => strict },
   webrtcOff: { l10n: "privacy-toggle-webrtc-off", on: strict => !strict },
+  resistFingerprinting: { l10n: "privacy-toggle-rfp", on: strict => strict },
+  spoofEnglish: { l10n: "privacy-toggle-english", on: strict => strict },
+  letterboxing: { l10n: "privacy-toggle-letterboxing", on: strict => strict },
+  hideReferrer: { l10n: "privacy-toggle-referrer", on: strict => strict },
 };
 
 class PrivacyControls {
   /**
    * @param {object} options
-   *   cards: element to fill with the two mode cards
+   *   cards: element to fill with one card per mode
    *   toggles: element to fill with switch rows
    *   toggleIds: which toggles to show, in order
    *   live: apply immediately (Settings) or hold until commit() (first run)
@@ -64,7 +67,7 @@ class PrivacyControls {
     let doc = this.cardsEl.ownerDocument;
     this.cardsEl.setAttribute("role", "radiogroup");
     doc.l10n.setAttributes(this.cardsEl, "privacy-modes-group");
-    for (let mode of ["standard", "strict"]) {
+    for (let mode of MODES) {
       let card = doc.createElement("button");
       card.type = "button";
       card.className = "mode";

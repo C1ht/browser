@@ -3,50 +3,31 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /**
- * Standard and Strict Privacy, and the Advanced toggles behind them.
+ * The privacy modes (Standard, Strict Privacy, Anonymous) and the Advanced
+ * toggles behind them.
  *
- * Standard is not stored anywhere: it is the default prefs file. Each toggle
- * is a set of prefs with a Standard value (the default) and a strict value
- * (written as a user pref). Strict Privacy turns every toggle strict. The
+ * Standard is not stored anywhere: it is the default prefs file, which
+ * already hides device details from pages. Each toggle is a set of prefs
+ * with a Standard value (the default) and a strict value (written as a user
+ * pref). Strict Privacy and Anonymous each turn a set of toggles strict. The
  * mode shown to the user is derived from the prefs themselves, so it can
  * never disagree with them: any other mix is "custom".
  */
 
 const FPP_OVERRIDES = "privacy.fingerprintingProtection.overrides";
 
-// Fingerprinting targets added by "Hide device details", on top of Gecko's
-// default Fingerprinting Protection set that Standard already uses.
-const EXTRA_FPP_TARGETS = [
-  "WebGLRendererConstant",
-  "WebGLVendorSanitize",
-  "FontVisibilityBaseSystem",
-  "ScreenRect",
-  "ScreenAvailRect",
-  "ScreenPixelDepth",
-  "WindowOuterSize",
-  "WindowScreenXY",
-  "MediaDevices",
-  "MediaCapabilities",
-  "AudioSampleRate",
-  "NetworkConnection",
-  "ReduceTimerPrecision",
-  "SpeechSynthesis",
-  "Gamepad",
-  "DeviceSensors",
-  "WebGPULimits",
-];
-
 /**
- * Each toggle: `strict` lists the prefs it writes when strict. The Standard
- * value is whatever the default branch holds, so it is never duplicated here.
- * `inStrictMode` says whether Strict Privacy turns it on.
+ * Each toggle: `strict` lists the prefs it writes when strict, or `fpp` the
+ * Fingerprinting Protection targets it adds. The Standard value is whatever
+ * the default branch holds, so it is never duplicated here.
+ * `modes` lists the modes that turn it strict.
  * `restart` marks toggles that only take effect after a restart.
  */
 export const TOGGLES = {
   // Fast JavaScript off for web pages; the browser's own UI keeps its JIT
   // through javascript.options.jit_trustedprincipals.
   jit: {
-    inStrictMode: true,
+    modes: ["strict", "anonymous"],
     restart: true,
     strict: {
       "javascript.options.baselinejit": false,
@@ -58,29 +39,25 @@ export const TOGGLES = {
   // Only the default route's public address in calls: no LAN addresses, and
   // no path around a VPN.
   webrtc: {
-    inStrictMode: true,
+    modes: ["strict", "anonymous"],
     strict: {
       "media.peerconnection.ice.default_address_only": true,
       "media.peerconnection.ice.no_host": true,
     },
   },
-  // Turns WebRTC off entirely. Advanced only; not part of Strict, so calls
-  // keep working there.
+  // Turns WebRTC off entirely, as Tor Browser does. Not part of Strict, so
+  // calls keep working there.
   webrtcOff: {
-    inStrictMode: false,
+    modes: ["anonymous"],
     strict: { "media.peerconnection.enabled": false },
-  },
-  hideDeviceDetails: {
-    inStrictMode: true,
-    fpp: EXTRA_FPP_TARGETS,
   },
   // Breaks clocks and calendars on websites; off even in Strict.
   utcTimezone: {
-    inStrictMode: false,
+    modes: ["anonymous"],
     fpp: ["JSDateTimeUTC"],
   },
   httpsOnly: {
-    inStrictMode: true,
+    modes: ["strict", "anonymous"],
     strict: {
       "dom.security.https_only_mode": true,
       "dom.security.https_only_mode_pbm": true,
@@ -89,7 +66,7 @@ export const TOGGLES = {
   // Sign-in flows that rely on storage-access heuristics ask for permission
   // instead of being let through automatically.
   noStorageHeuristics: {
-    inStrictMode: true,
+    modes: ["strict", "anonymous"],
     strict: {
       "privacy.restrict3rdpartystorage.heuristic.opened_window_after_interaction": false,
       "privacy.restrict3rdpartystorage.heuristic.redirect": false,
@@ -99,14 +76,43 @@ export const TOGGLES = {
   },
   // Social-network widgets (like buttons, embedded feeds) from other sites.
   blockSocial: {
-    inStrictMode: true,
+    modes: ["strict", "anonymous"],
     strict: {
       "privacy.trackingprotection.socialtracking.enabled": true,
     },
   },
+  // No referrer at all to other sites. Advanced only: no mode turns it on,
+  // since Tor Browser and Mullvad Browser send the origin, and some
+  // payment and sign-in pages check it.
+  hideReferrer: {
+    modes: [],
+    strict: { "network.http.referer.XOriginPolicy": 1 },
+  },
+  // Gecko's resistFingerprinting: pages see the same values as every other
+  // Tor Browser, Mullvad Browser and Firefox user with it on (screen, fonts,
+  // time zone UTC, light color scheme, user agent, timers and more).
+  resistFingerprinting: {
+    modes: ["anonymous"],
+    strict: {
+      "privacy.resistFingerprinting": true,
+      "privacy.resistFingerprinting.pbmode": true,
+    },
+  },
+  // Pages and requests ask for English, whatever the desktop language is.
+  // Gecko only applies it while resistFingerprinting is on.
+  spoofEnglish: {
+    modes: ["anonymous"],
+    strict: { "privacy.spoof_english": 2 },
+  },
+  // Margins around pages, so the page size reveals nothing about the window
+  // (letterbox.js).
+  letterboxing: {
+    modes: ["anonymous"],
+    strict: { "privacy.resistFingerprinting.letterboxing": true },
+  },
 };
 
-export const MODES = ["standard", "strict"];
+export const MODES = ["standard", "strict", "anonymous"];
 
 function defaultValue(name) {
   let branch = Services.prefs.getDefaultBranch("");
@@ -156,6 +162,14 @@ function fppTargets() {
       .filter(s => s.startsWith("+"))
       .map(s => s.slice(1))
   );
+}
+
+function defaultFppTargets() {
+  return defaultValue(FPP_OVERRIDES)
+    .split(",")
+    .map(s => s.trim())
+    .filter(s => s.startsWith("+"))
+    .map(s => s.slice(1));
 }
 
 function setFppTargets(targets) {
@@ -219,11 +233,11 @@ export const PrivacyModes = {
   /** The toggle states a mode stands for. */
   stateForMode(mode) {
     return Object.fromEntries(
-      Object.entries(TOGGLES).map(([id, t]) => [id, mode == "strict" && t.inStrictMode])
+      Object.entries(TOGGLES).map(([id, t]) => [id, t.modes.includes(mode)])
     );
   },
 
-  /** "standard", "strict" or "custom" for a { id: strict } state. */
+  /** A mode from MODES, or "custom", for a { id: strict } state. */
   modeFor(state) {
     for (let mode of MODES) {
       let expected = this.stateForMode(mode);
@@ -234,7 +248,7 @@ export const PrivacyModes = {
     return "custom";
   },
 
-  /** "standard", "strict" or "custom", from the current prefs. */
+  /** A mode from MODES, or "custom", from the current prefs. */
   get mode() {
     return this.modeFor(this.state);
   },
@@ -263,6 +277,12 @@ export const PrivacyModes = {
   },
 
   init() {
+    // Device details used to be a Strict toggle; Standard now hides them.
+    // A profile that wrote its own target list keeps it, with the new
+    // defaults added, and one that matches the defaults goes back to them.
+    if (Services.prefs.prefHasUserValue(FPP_OVERRIDES)) {
+      setFppTargets(new Set([...fppTargets(), ...defaultFppTargets()]));
+    }
     this._startupState = Object.fromEntries(
       Object.keys(TOGGLES).map(id => [id, this.isStrict(id)])
     );

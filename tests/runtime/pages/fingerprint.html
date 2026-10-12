@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>fingerprint</title>
+<!-- What a page can read about the browser, reported through the title for
+     tools/runtime/check.py. -->
+<script>
+  let o = {
+    ua: navigator.userAgent,
+    languages: navigator.languages,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    locale: Intl.DateTimeFormat().resolvedOptions().locale,
+    dark: matchMedia("(prefers-color-scheme: dark)").matches,
+    innerWidth, innerHeight,
+    screenWidth: screen.width, screenHeight: screen.height,
+  };
+  document.title = "fp:" + JSON.stringify(o);
+</script>

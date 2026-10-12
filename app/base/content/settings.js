@@ -17,13 +17,16 @@ window.addEventListener("DOMContentLoaded", () => {
     toggles: document.getElementById("toggles"),
     toggleIds: [
       "httpsOnly",
-      "hideDeviceDetails",
       "blockSocial",
       "jit",
       "webrtc",
       "noStorageHeuristics",
-      "utcTimezone",
       "webrtcOff",
+      "resistFingerprinting",
+      "utcTimezone",
+      "spoofEnglish",
+      "letterboxing",
+      "hideReferrer",
     ],
     live: true,
     onChange(mode, pendingRestart) {

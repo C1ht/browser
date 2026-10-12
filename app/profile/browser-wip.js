@@ -6,8 +6,8 @@
 //
 // These ARE the Standard privacy mode: a profile that never changes a setting
 // runs exactly these values, so a skipped or crashed first run still lands on
-// Standard. Strict Privacy and the Advanced toggles are applied as user prefs
-// on top of these by PrivacyModes.sys.mjs.
+// Standard. Strict Privacy, Anonymous and the Advanced toggles are applied as
+// user prefs on top of these by PrivacyModes.sys.mjs.
 //
 // Toolkit's own defaults (modules/libpref/init/all.js) are weaker than
 // Firefox's, which sets most protections in browser/app/profile/firefox.js.
@@ -119,14 +119,24 @@ pref("urlclassifier.features.harmfuladdon.blocklistTables", "");
 // Element hiding for leftover ad slots (ContentBlockingChild.sys.mjs).
 pref("browserwip.contentblocking.cosmetic.enabled", true);
 
-// Fingerprinting Protection with Gecko's default target set: canvas
+// Fingerprinting Protection: Gecko's default target set (canvas
 // randomization, language-pack-only fonts, tiered hardware concurrency,
-// fdlibm math, screen and touch normalization. Not resistFingerprinting,
-// which breaks dark mode, time zones and locale.
+// fdlibm math, screen and touch normalization), plus everything that only
+// changes what pages can measure about the device: graphics card, installed
+// fonts, screen and window geometry, media devices, audio, network type,
+// timer precision, speech voices, gamepads, sensors and WebGPU limits.
+// Time zone, language and color scheme stay real; the Anonymous mode
+// (resistFingerprinting) hides those too. PrivacyModes.sys.mjs writes this
+// list sorted, so keep it sorted for a return to Standard to clear the pref.
 pref("privacy.fingerprintingProtection", true);
 pref("privacy.fingerprintingProtection.pbmode", true);
-pref("privacy.fingerprintingProtection.overrides", "");
+pref("privacy.fingerprintingProtection.overrides", "+AudioSampleRate,+DeviceSensors,+FontVisibilityBaseSystem,+Gamepad,+MediaCapabilities,+MediaDevices,+NetworkConnection,+ReduceTimerPrecision,+ScreenAvailRect,+ScreenPixelDepth,+ScreenRect,+SpeechSynthesis,+WebGLRendererConstant,+WebGLVendorSanitize,+WebGPULimits,+WindowOuterSize,+WindowScreenXY");
 pref("privacy.resistFingerprinting", false);
+pref("privacy.resistFingerprinting.pbmode", false);
+pref("privacy.spoof_english", 0);
+// Margins around pages so their size comes in steps (letterbox.js). Only
+// the Anonymous mode turns it on.
+pref("privacy.resistFingerprinting.letterboxing", false);
 
 // WebRTC on, for calls. Gecko already hides LAN addresses behind mDNS names
 // and offers no host candidates until camera or microphone is granted.
@@ -136,12 +146,101 @@ pref("media.peerconnection.ice.default_address_only", false);
 pref("media.peerconnection.ice.no_host", false);
 pref("media.peerconnection.ice.proxy_only_if_behind_proxy", true);
 
+// Fonts (Windows): pages see only the fonts bundled in <appdir>/fonts and a
+// fixed list of Windows system fonts, the same set as Mullvad Browser and
+// Tor Browser, so the font list matches theirs. The list and fallbacks are
+// copied from Mullvad Browser 16 (browser/app/profile/001-base-profile.js,
+// MPL-2.0); tools/update-fonts.py fetches the matching font files.
+#ifdef XP_WIN
+pref("gfx.bundled-fonts.activate", 1);
+pref("font.system.whitelist", "Arial, Cambria Math, Consolas, Courier New, Georgia, Lucida Console, MS Gothic, ＭＳ ゴシック, MS PGothic, ＭＳ Ｐゴシック, MV Boli, Malgun Gothic, Microsoft Himalaya, Microsoft JhengHei, Microsoft YaHei, 微软雅黑, Segoe MDL2 Assets, Segoe UI, SimSun, 宋体, Sylfaen, Tahoma, Times New Roman, Verdana, Noto Sans Adlam, Noto Sans Balinese, Noto Sans Bamum, Noto Sans Bassa Vah, Noto Sans Batak, Noto Sans Bengali, Noto Sans Buginese, Noto Sans Buhid, Noto Sans Canadian Aboriginal, Noto Sans Chakma, Noto Sans Cham, Noto Sans Cherokee, Noto Sans Coptic, Noto Sans Deseret, Noto Sans Devanagari, Noto Sans Elbasan, Noto Sans Ethiopic, Noto Sans Georgian, Noto Sans Grantha, Noto Sans Gujarati, Noto Sans Gunjala Gondi, Noto Sans Gurmukhi, Noto Sans Hanifi Rohingya, Noto Sans Hanunoo, Noto Sans Kannada, Noto Sans Khmer, Noto Sans Javanese, Noto Sans Kayah Li, Noto Sans Khojki, Noto Sans Khudawadi, Noto Sans Lao, Noto Sans Lepcha, Noto Sans Limbu, Noto Sans Lisu, Noto Sans Mahajani, Noto Sans Malayalam, Noto Sans Mandaic, Noto Sans Masaram Gondi, Noto Sans Medefaidrin, Noto Sans Meetei Mayek, Noto Sans Mende Kikakui, Noto Sans Miao, Noto Sans Modi, Noto Sans Mongolian, Noto Sans Mro, Noto Sans Multani, Noto Sans Newa, Noto Sans New Tai Lue, Noto Sans NKo, Noto Sans Ol Chiki, Noto Sans Oriya, Noto Sans Osage, Noto Sans Osmanya, Noto Sans Pahawh Hmong, Noto Sans Pau Cin Hau, Noto Sans Rejang, Noto Sans Runic, Noto Sans Samaritan, Noto Sans Saurashtra, Noto Sans Sharada, Noto Sans Shavian, Noto Sans Sinhala, Noto Sans Sora Sompeng, Noto Sans Soyombo, Noto Sans Sundanese, Noto Sans Syloti Nagri, Noto Sans Symbols 2, Noto Sans Symbols, Noto Sans Syriac, Noto Sans Tagalog, Noto Sans Tagbanwa, Noto Sans Tai Le, Noto Sans Tai Tham, Noto Sans Tai Viet, Noto Sans Takri, Noto Sans Tamil, Noto Sans Telugu, Noto Sans Thaana, Noto Sans Tifinagh Adrar, Noto Sans Tifinagh Agraw Imazighen, Noto Sans Tifinagh Ahaggar, Noto Sans Tifinagh Air, Noto Sans Tifinagh APT, Noto Sans Tifinagh Azawagh, Noto Sans Tifinagh Ghat, Noto Sans Tifinagh Hawad, Noto Sans Tifinagh, Noto Sans Tifinagh Rhissa Ixa, Noto Sans Tifinagh SIL, Noto Sans Tifinagh Tawellemmet, Noto Sans Tirhuta, Noto Sans Vai, Noto Sans Wancho, Noto Sans Warang Citi, Noto Sans Yi, Noto Sans Zanabazar Square, Noto Serif Balinese, Noto Serif Bengali, Noto Serif Devanagari, Noto Serif Dogra, Noto Serif Ethiopic, Noto Serif Georgian, Noto Serif Grantha, Noto Serif Gujarati, Noto Serif Gurmukhi, Noto Serif Kannada, Noto Serif Khmer, Noto Serif Khojki, Noto Serif Lao, Noto Serif Malayalam, Noto Serif Myanmar, Noto Serif NP Hmong, Noto Serif Sinhala, Noto Serif Tamil, Noto Serif Telugu, Noto Serif Tibetan, Noto Serif Yezidi, Noto Naskh Arabic, Noto Sans, Noto Serif, Pyidaungsu, Twemoji Mozilla");
+
+pref("font.name-list.emoji", "Twemoji Mozilla");
+// Arabic
+pref("font.name-list.serif.ar", "Times New Roman, Noto Naskh Arabic");
+pref("font.name-list.sans-serif.ar", "Segoe UI, Tahoma, Arial, Noto Naskh Arabic");
+pref("font.name-list.monospace.ar", "Consolas, Noto Naskh Arabic");
+// Bengali
+pref("font.name-list.serif.x-beng", "Noto Serif Bengali, Times New Roman");
+pref("font.name-list.sans-serif.x-beng", "Noto Sans Bengali, Arial");
+pref("font.name-list.monospace.x-beng", "Noto Sans Bengali, Consolas");
+// Canadian Aboriginal
+pref("font.name-list.serif.x-cans", "Noto Serif Canadian Aboriginal, Times New Roman");
+pref("font.name-list.sans-serif.x-cans", "Noto Sans Canadian Aboriginal, Arial");
+pref("font.name-list.monospace.x-cans", "Noto Sans Canadian Aboriginal, Consolas");
+// Cyrillic (we use Noto only for fallback, system fonts have a good coverage)
+pref("font.name-list.serif.x-cyrillic", "Times New Roman, Noto Serif");
+pref("font.name-list.sans-serif.x-cyrillic", "Arial, Noto Sans");
+// Devanagari
+pref("font.name-list.serif.x-devanagari", "Noto Serif Devanagari, Times New Roman");
+pref("font.name-list.sans-serif.x-devanagari", "Noto Sans Devanagari, Arial");
+pref("font.name-list.monospace.x-devanagari", "Noto Sans Devanagari, Consolas");
+// Ethiopic
+pref("font.name-list.serif.x-ethi", "Noto Serif Ethiopic, Times New Roman");
+pref("font.name-list.sans-serif.x-ethi", "Noto Sans Ethiopic, Arial");
+pref("font.name-list.monospace.x-ethi", "Noto Sans Ethiopic, Consolas");
+// Georgian
+pref("font.name-list.serif.x-geor", "Noto Serif Georgian, Times New Roman");
+pref("font.name-list.sans-serif.x-geor", "Noto Sans Georgian, Arial");
+pref("font.name-list.monospace.x-geor", "Noto Sans Georgian, Consolas");
+// Gujarati
+pref("font.name-list.serif.x-gujr", "Noto Serif Gujarati, Times New Roman");
+pref("font.name-list.sans-serif.x-gujr", "Noto Sans Gujarati, Arial");
+pref("font.name-list.monospace.x-gujr", "Noto Sans Gujarati, Consolas");
+// Gurmukhi
+pref("font.name-list.serif.x-guru", "Noto Serif Gurmukhi, Times New Roman");
+pref("font.name-list.sans-serif.x-guru", "Noto Sans Gurmukhi, Arial");
+pref("font.name-list.monospace.x-guru", "Noto Sans Gurmukhi, Consolas");
+// Kannada
+pref("font.name-list.serif.x-knda", "Noto Serif Kannada, Times New Roman");
+pref("font.name-list.sans-serif.x-knda", "Noto Sans Kannada, Arial");
+pref("font.name-list.monospace.x-knda", "Noto Sans Kannada, Consolas");
+// Khmer
+pref("font.name-list.serif.x-khmr", "Noto Serif Khmer, Times New Roman");
+pref("font.name-list.sans-serif.x-khmr", "Noto Sans Khmer, Arial");
+pref("font.name-list.monospace.x-khmr", "Noto Sans Khmer, Consolas");
+// Malayalam
+pref("font.name-list.serif.x-mlym", "Noto Serif Malayalam, Times New Roman");
+pref("font.name-list.sans-serif.x-mlym", "Noto Sans Malayalam, Arial");
+pref("font.name-list.monospace.x-mlym", "Noto Sans Malayalam, Consolas");
+// Oriya
+pref("font.name-list.serif.x-orya", "Noto Sans Oriya, Times New Roman");
+pref("font.name-list.sans-serif.x-orya", "Noto Sans Oriya, Arial");
+pref("font.name-list.monospace.x-orya", "Noto Sans Oriya, Consolas");
+// Sinhala
+pref("font.name-list.serif.x-sinh", "Noto Serif Sinhala, Times New Roman");
+pref("font.name-list.sans-serif.x-sinh", "Noto Sans Sinhala, Arial");
+pref("font.name-list.monospace.x-sinh", "Noto Sans Sinhala, Consolas");
+// Tamil
+pref("font.name-list.serif.x-tamil", "Noto Serif Tamil, Times New Roman");
+pref("font.name-list.sans-serif.x-tamil", "Noto Sans Tamil, Arial");
+pref("font.name-list.monospace.x-tamil", "Noto Sans Tamil, Consolas");
+// Telugu
+pref("font.name-list.serif.x-telu", "Noto Serif Telugu, Times New Roman");
+pref("font.name-list.sans-serif.x-telu", "Noto Sans Telugu, Arial");
+pref("font.name-list.monospace.x-telu", "Noto Sans Telugu, Consolas");
+// Tibetan
+pref("font.name-list.serif.x-tibt", "Microsoft Himalaya, Noto Serif Tibetan, Times New Roman");
+pref("font.name-list.sans-serif.x-tibt", "Microsoft Himalaya, Noto Serif Tibetan, Arial");
+pref("font.name-list.monospace.x-tibt", "Microsoft Himalaya, Noto Serif Tibetan, Consolas");
+// Others (Balinese, Grantha, Khojki, Lao, Myanmar)
+pref("font.name-list.serif.x-unicode", "Times New Roman, Noto Serif Balinese, Noto Serif Grantha, Noto Serif Khojki, Noto Serif Lao, Noto Serif Myanmar");
+pref("font.name-list.sans-serif.x-unicode", "Arial, Noto Sans Balinese, Noto Sans Grantha, Noto Sans Khojki, Noto Sans Lao, Pyidaungsu");
+pref("font.name-list.monospace.x-unicode", "Consolas, Noto Sans Balinese, Noto Sans Grantha, Noto Sans Khojki, Noto Sans Lao, Pyidaungsu");
+// The rest are not customized, because they are covered only by one font
+#endif
+
 // JIT on. Strict turns it off for web content; the browser's own UI keeps it.
 pref("javascript.options.jit_trustedprincipals", true);
 
-// Referrers: send only the origin cross-site (Gecko default, stated here).
+// Referrers: another site only ever learns the site you came from, never
+// the page, even if a site asks for more with its own Referrer-Policy (as
+// Tor Browser and Mullvad Browser do). "Hide where you came from" in
+// Advanced (XOriginPolicy) drops it for other sites entirely.
 pref("network.http.referer.defaultPolicy", 2);
 pref("network.http.referer.defaultPolicy.pbmode", 2);
+pref("network.http.referer.XOriginTrimmingPolicy", 2);
+pref("network.http.referer.XOriginPolicy", 0);
 
 // Hyperlink auditing pings.
 pref("browser.send_pings", false);

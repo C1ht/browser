@@ -1,4 +1,7 @@
-# Firefox release this build tracks. Bump with tools/fetch-gecko.sh --update.
-tag=release
-version=157.0.2
-commit=649ad53f32558752d0d8b630ac1411f324c99272
+# Firefox ESR this build tracks: the same engine as Mullvad Browser and Tor
+# Browser, so pages see the same version as their users. Bump with
+# tools/fetch-gecko.sh --update (head of the esr153 branch; check that it is a
+# released version first).
+tag=esr153
+version=153.4.0
+commit=508788b6f8314edb3c33905f6d56c3fe6b087670

@@ -117,7 +117,7 @@ app-menu-quit =
 # $host (String) - the site, e.g. "example.com"
 protections-title = Protections for { $host }
 # $count (Number) - trackers and ads blocked on this page
-# $mode (String) - "standard", "strict" or "custom"
+# $mode (String) - "standard", "strict", "anonymous" or "custom"
 protections-summary-on =
     { $count ->
         [0] Nothing to block on this page so far.
@@ -125,6 +125,7 @@ protections-summary-on =
        *[other] Blocked { $count } trackers and ads on this page.
     } { $mode ->
         [strict] Strict Privacy is on.
+        [anonymous] Anonymous mode is on.
         [custom] You’re using custom privacy settings.
        *[standard] Standard privacy is on.
     }

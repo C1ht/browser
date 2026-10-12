@@ -4,7 +4,7 @@
 
 welcome-page-title = Welcome to { -brand-short-name }
 welcome-heading = How much privacy do you want?
-welcome-intro = Both choices block trackers and ads, stop sites from following you with cookies, and never send your browsing to us or anyone else.
+welcome-intro = Every choice blocks trackers and ads, stops sites from following you with cookies, and never sends your browsing to us or anyone else.
 welcome-advanced = Advanced
 welcome-change-later = You can change this any time in Settings.
 welcome-continue = Continue

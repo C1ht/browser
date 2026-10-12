@@ -24,6 +24,7 @@ var BrowserWip = {
     this._setUpTitlebar();
     gBrowser = new TabBrowser(window);
     gURLBar = new URLBar(window, gBrowser);
+    Letterbox.init(window);
     // Gecko asks this object where to open links and window.open() calls.
     window.browserDOMWindow = gBrowser.browserDOMWindow;
 

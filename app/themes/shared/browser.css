@@ -642,6 +642,19 @@ browser:focus-visible {
   visibility: hidden;
 }
 
+/* Letterboxing (letterbox.js): pages are sized in fixed steps, centered at
+   the top, with the strip color around them. */
+#browsers[letterboxing] {
+  background-color: var(--chrome-bg);
+  justify-items: center;
+  align-items: start;
+}
+
+#browsers[letterboxing] > browser {
+  width: var(--letterbox-width);
+  height: var(--letterbox-height);
+}
+
 /* ---------- Panels ---------- */
 
 panel.wip-panel {

@@ -3,12 +3,12 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
-# Fetch the pinned Firefox release source and mount app/ into it as the
+# Fetch the pinned Firefox source and mount app/ into it as the
 # browser-wip project directory. mozilla-central itself is never modified:
 # the mount is an untracked symlink, hidden through .git/info/exclude.
 #
 #   tools/fetch-gecko.sh            fetch the commit in GECKO_REVISION
-#   tools/fetch-gecko.sh --update   move the pin to the head of the release branch
+#   tools/fetch-gecko.sh --update   move the pin to the head of the branch in GECKO_REVISION
 #
 # GECKO_DIR overrides the checkout location (default: ../mozilla-central).
 set -euo pipefail

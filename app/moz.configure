@@ -13,6 +13,10 @@ imply_option("MOZ_APP_ID", "{b91e6eea-59c2-49c6-9a5f-155294362e18}")
 imply_option("MOZ_APP_PROFILE", "browser-wip")
 imply_option("MOZ_APP_REMOTINGNAME", "browser-wip")
 imply_option("BROWSER_CHROME_URL", "chrome://browser-wip/content/browser.xhtml")
+# Sites see Firefox: the user agent ends in "Firefox/<version>" exactly as
+# Firefox's does. Without this Gecko appends "browser-wip/<version>", which
+# would single out every user of this browser.
+imply_option("MOZ_APP_UA_NAME", "Firefox")
 
 # Toolkit features the app is built on.
 imply_option("MOZ_PLACES", True)
@@ -66,3 +70,21 @@ def wip_llvm_dlltool_flags(target):
 
 
 set_config("WIP_LLVM_DLLTOOL_FLAGS", wip_llvm_dlltool_flags)
+
+
+# Bundled fonts (Windows)
+# ==============================================================
+# Gecko loads fonts from <appdir>/fonts when built with MOZ_BUNDLED_FONTS, but
+# toolkit only offers --enable-bundled-fonts to Firefox and Thunderbird. The
+# Pages on Windows see the same fonts as Mullvad Browser users (app/fonts/).
+# Toolkit's own set_define for this name resolves to nothing for this app, so
+# this one does not collide with it.
+
+
+@depends(target)
+def wip_bundled_fonts(target):
+    if target.os == "WINNT":
+        return True
+
+
+set_define("MOZ_BUNDLED_FONTS", wip_bundled_fonts)
