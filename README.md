@@ -20,14 +20,14 @@ with no changes to mozilla-central. `browser-wip` is a codename;
 | `app/components/contentblocking/lists/` | Vendored filter lists (`tools/update-blocklists.py` refreshes them) |
 | `app/policies/` | Bundled enterprise policy that disables Remote Settings |
 | `app/themes/shared/` | Folio styles, icons, Instrument Sans |
-| `GECKO_REVISION` | The Firefox ESR this tracks (the same as Mullvad Browser and Tor Browser) |
+| `GECKO_REVISION` | The Firefox release this tracks |
 | `tools/` | Gecko checkout, toolchain setup, rename, network-silence test, screenshots |
 | `tests/unit/` | Tests that run in Node without a Gecko build |
 
 ## Build (Linux)
 
 ```sh
-tools/fetch-gecko.sh                 # pinned Firefox ESR in ../mozilla-central
+tools/fetch-gecko.sh                 # pinned Firefox release in ../mozilla-central
 sudo tools/setup-system-toolchain.sh # or: (cd ../mozilla-central && ./mach bootstrap)
 cd ../mozilla-central
 MOZCONFIG=$PWD/../browser/mozconfigs/dev ./mach build

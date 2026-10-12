@@ -165,7 +165,7 @@ jobs:
           ls -la assets
           gecko=$(sed -n 's/^version=//p' GECKO_REVISION)
           cat > notes.md <<EOF
-          Early test build of browser-wip, built from ${GITHUB_SHA::12} on Gecko ${gecko} (Firefox ESR).
+          Early test build of browser-wip, built from ${GITHUB_SHA::12} on Gecko ${gecko} (Firefox Release).
 
           | Platform | Download |
           |---|---|

@@ -71,20 +71,3 @@ def wip_llvm_dlltool_flags(target):
 
 set_config("WIP_LLVM_DLLTOOL_FLAGS", wip_llvm_dlltool_flags)
 
-
-# Bundled fonts (Windows)
-# ==============================================================
-# Gecko loads fonts from <appdir>/fonts when built with MOZ_BUNDLED_FONTS, but
-# toolkit only offers --enable-bundled-fonts to Firefox and Thunderbird. The
-# Pages on Windows see the same fonts as Mullvad Browser users (app/fonts/).
-# Toolkit's own set_define for this name resolves to nothing for this app, so
-# this one does not collide with it.
-
-
-@depends(target)
-def wip_bundled_fonts(target):
-    if target.os == "WINNT":
-        return True
-
-
-set_define("MOZ_BUNDLED_FONTS", wip_bundled_fonts)

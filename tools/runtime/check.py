@@ -275,12 +275,6 @@ def part2(bindir, base):
         record(2, "Anonymous: UTC, English, light colors",
                anon["timeZone"] in ("UTC", "Atlantic/Reykjavik") and anon["languages"] == ["en-US", "en"]
                and anon["locale"] == "en-US" and anon["dark"] is False, anon)
-        if sys.platform == "win32":
-            fonts = b.js("""return Cc["@mozilla.org/gfx/fontenumerator;1"].getService(Ci.nsIFontEnumerator)
-              .EnumerateAllFontsAsync().then(list => [list.includes("Noto Sans Adlam"),
-                list.includes("Twemoji Mozilla"), list.includes("Calibri"), list.length]);""")
-            record(2, "Windows: pages get Mullvad Browser's fonts (bundled Noto, no Calibri)",
-                   fonts[0] and fonts[1] and not fonts[2], fonts)
         record(2, "Anonymous: the page size comes in letterbox steps",
                anon["innerWidth"] % 200 == 0 and anon["innerHeight"] % 100 == 0 and anon["innerWidth"] > 0
                and anon["innerHeight"] > 0, anon)
