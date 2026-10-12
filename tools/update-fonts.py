@@ -107,7 +107,9 @@ def main():
 
 
 def write_moz_build():
-    names = sorted(p.name for p in OUT.glob("*.[ot]tf"))
+    # mozbuild wants file lists sorted, ignoring case.
+    names = ["/browser/fonts/TwemojiMozilla.ttf", "OFL.txt", *(p.name for p in OUT.glob("*.[ot]tf"))]
+    names.sort(key=str.lower)
     lines = [
         "# This Source Code Form is subject to the terms of the Mozilla Public",
         "# License, v. 2.0. If a copy of the MPL was not distributed with this",
@@ -118,9 +120,7 @@ def write_moz_build():
         "# Firefox's emoji font from the Gecko tree.",
         "",
         "FINAL_TARGET_FILES.fonts += [",
-        '    "OFL.txt",',
         *[f'    "{n}",' for n in names],
-        '    "/browser/fonts/TwemojiMozilla.ttf",',
         "]",
         "",
     ]
