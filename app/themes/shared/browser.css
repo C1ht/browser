@@ -594,8 +594,8 @@ browser:focus-visible {
   height: 12px;
 }
 
+/* Only the tab under the pointer shows its close button. */
 .tab:hover .tab-close,
-.tab[selected] .tab-close,
 .tab-close:focus-visible {
   opacity: 0.75;
 }

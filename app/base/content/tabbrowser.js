@@ -207,10 +207,19 @@ class TabBrowser {
       <span class="tab-label"></span>
       <img class="tab-state sharing icon" src="chrome://browser-wip/skin/icons/camera.svg" alt=""/>
       <img class="tab-state audio icon" src="chrome://browser-wip/skin/icons/audio.svg" alt=""/>
-      <button class="tab-close" tabindex="-1" data-l10n-id="tab-close-button">
-        <img class="icon" src="chrome://browser-wip/skin/icons/close.svg" alt=""/>
-      </button>
       <i class="tab-shoulder end"></i>`;
+    // innerHTML in a chrome document runs Gecko's sanitizer, which drops
+    // form controls, so the close button has to be built by hand.
+    let close = this.document.createElement("button");
+    close.className = "tab-close";
+    close.setAttribute("tabindex", "-1");
+    close.setAttribute("data-l10n-id", "tab-close-button");
+    let closeIcon = this.document.createElement("img");
+    closeIcon.className = "icon";
+    closeIcon.setAttribute("src", "chrome://browser-wip/skin/icons/close.svg");
+    closeIcon.setAttribute("alt", "");
+    close.append(closeIcon);
+    tab.querySelector(".tab-shoulder.end").before(close);
     tab.blockedTrackers = 0;
     tab.securityState = 0;
     return tab;
