@@ -97,22 +97,26 @@
 
     <xul:panel id="protections-panel" class="wip-panel" type="arrow" role="dialog"
                aria-labelledby="protections-title">
-      <h2 id="protections-title" class="panel-title"></h2>
-      <p id="protections-summary" class="panel-text"></p>
-      <div class="panel-row">
-        <label id="protections-toggle-label" for="protections-toggle"
-               data-l10n-id="protections-toggle-label"></label>
-        <button id="protections-toggle" class="switch" role="switch" aria-checked="true"/>
+      <div class="panel-body">
+        <h2 id="protections-title" class="panel-title"></h2>
+        <p id="protections-summary" class="panel-text"></p>
+        <div class="panel-row">
+          <label id="protections-toggle-label" for="protections-toggle"
+                 data-l10n-id="protections-toggle-label"></label>
+          <button id="protections-toggle" class="switch" role="switch" aria-checked="true"/>
+        </div>
+        <p class="panel-text" data-l10n-id="protections-toggle-help"></p>
+        <button class="panel-link" data-l10n-id="protections-open-settings"
+                data-command="cmd_settings"/>
       </div>
-      <p class="panel-text" data-l10n-id="protections-toggle-help"></p>
-      <button class="panel-link" data-l10n-id="protections-open-settings"
-              data-command="cmd_settings"/>
     </xul:panel>
 
     <xul:panel id="identity-panel" class="wip-panel" type="arrow" role="dialog"
                aria-labelledby="identity-title">
-      <h2 id="identity-title" class="panel-title"></h2>
-      <p id="identity-summary" class="panel-text"></p>
+      <div class="panel-body">
+        <h2 id="identity-title" class="panel-title"></h2>
+        <p id="identity-summary" class="panel-text"></p>
+      </div>
     </xul:panel>
   </xul:popupset>
 

@@ -642,17 +642,18 @@ browser:focus-visible {
   visibility: hidden;
 }
 
-/* Letterboxing (letterbox.js): pages are sized in fixed steps, centered at
-   the top, with the strip color around them. */
+/* Letterboxing (letterbox.js): pages are sized in fixed steps, centered,
+   with the strip color around them. */
 #browsers[letterboxing] {
   background-color: var(--chrome-bg);
-  justify-items: center;
-  align-items: start;
 }
 
+/* Auto margins center the page; the grid's own alignment properties don't
+   apply to <browser>. */
 #browsers[letterboxing] > browser {
   width: var(--letterbox-width);
   height: var(--letterbox-height);
+  margin: auto;
 }
 
 /* ---------- Panels ---------- */
@@ -664,8 +665,13 @@ panel.wip-panel {
   --panel-border-radius: 12px;
   --panel-padding: 14px 16px;
   --panel-shadow: var(--panel-shadow);
-  --panel-width: 320px;
   font: 13px/1.4 var(--font-ui);
+}
+
+/* The panel lays out its children in a row; one block holds them all. */
+.panel-body {
+  display: block;
+  width: 288px;
 }
 
 .panel-title {
