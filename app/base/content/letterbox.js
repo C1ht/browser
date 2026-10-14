@@ -22,6 +22,9 @@
 
 const RFP_PREF = "privacy.resistFingerprinting";
 const LETTERBOX_PREF = "privacy.resistFingerprinting.letterboxing";
+// Room kept around a letterboxed page on each side, so it never touches the
+// tab strip or the window edge.
+const GUTTER = 8;
 
 var Letterbox = {
   init(window) {
@@ -66,7 +69,8 @@ var Letterbox = {
 
   _update() {
     let on = this.enabled;
-    this.container.toggleAttribute("letterboxing", on);
+    // On the root, so the tab strip can change its look too (browser.css).
+    this.window.document.documentElement.toggleAttribute("letterboxing", on);
     if (!on) {
       this._observer.disconnect();
       this.container.style.removeProperty("--letterbox-width");
@@ -74,9 +78,10 @@ var Letterbox = {
       return;
     }
     this._observer.observe(this.container);
-    let { clientWidth, clientHeight } = this.container;
-    this.container.style.setProperty("--letterbox-width", `${this.steppedSize(clientWidth, true)}px`);
-    this.container.style.setProperty("--letterbox-height", `${this.steppedSize(clientHeight, false)}px`);
+    let width = this.container.clientWidth - 2 * GUTTER;
+    let height = this.container.clientHeight - 2 * GUTTER;
+    this.container.style.setProperty("--letterbox-width", `${this.steppedSize(width, true)}px`);
+    this.container.style.setProperty("--letterbox-height", `${this.steppedSize(height, false)}px`);
   },
 
   // nsContentUtils::CalcRoundedWindowSizeForResistingFingerprinting, for
@@ -94,6 +99,11 @@ var Letterbox = {
       let frameHeight = win.outerHeight - win.innerHeight;
       let chromeWidth = frameWidth + Math.max(0, win.innerWidth - rect.width);
       let chromeHeight = frameHeight + rect.top + Math.max(0, win.innerHeight - rect.bottom);
+      // Letterboxing keeps a gutter around the page; make room for it so the
+      // page still gets the full rounded size.
+      let gutter = this.enabled ? 2 * GUTTER : 0;
+      chromeWidth += gutter;
+      chromeHeight += gutter;
       let maxWidth = Services.prefs.getIntPref("privacy.window.maxInnerWidth", 1400);
       let maxHeight = Services.prefs.getIntPref("privacy.window.maxInnerHeight", 900);
       let width = Math.min(maxWidth, win.screen.availWidth - chromeWidth);
@@ -101,7 +111,7 @@ var Letterbox = {
       width = Math.max(200, width - (width % 200));
       height = Math.max(100, height - (height % 100));
       win.resizeTo(width + chromeWidth, height + chromeHeight);
-      this._fitPage(width, height, 3);
+      this._fitPage(width + gutter, height + gutter, 3);
     });
   },
 

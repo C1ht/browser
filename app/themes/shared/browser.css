@@ -642,18 +642,36 @@ browser:focus-visible {
   visibility: hidden;
 }
 
-/* Letterboxing (letterbox.js): pages are sized in fixed steps, centered,
-   with the strip color around them. */
-#browsers[letterboxing] {
+/* Letterboxing (letterbox.js): pages are sized in fixed steps and float,
+   centered, as a rounded card on the chrome color. The selected tab can no
+   longer flow into the page, so tabs become rounded pills instead. */
+:root[letterboxing] #browsers {
   background-color: var(--chrome-bg);
 }
 
 /* Auto margins center the page; the grid's own alignment properties don't
    apply to <browser>. */
-#browsers[letterboxing] > browser {
+:root[letterboxing] #browsers > browser {
   width: var(--letterbox-width);
   height: var(--letterbox-height);
   margin: auto;
+  border-radius: var(--tab-radius);
+  overflow: clip;
+  box-shadow: 0 0 0 1px var(--field-border), 0 6px 24px -10px rgba(15, 20, 25, 0.35);
+}
+
+:root[letterboxing] .tab {
+  height: calc(var(--tab-height) - 6px);
+  margin-bottom: 4px;
+  border-radius: var(--tab-radius);
+}
+
+:root[letterboxing] .tab[selected] {
+  box-shadow: 0 0 0 1px var(--field-border);
+}
+
+:root[letterboxing] .tab[selected] .tab-shoulder {
+  display: none;
 }
 
 /* ---------- Panels ---------- */
