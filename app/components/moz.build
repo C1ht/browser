@@ -9,5 +9,6 @@ DIRS += [
     "contextmenu",
     "permissions",
     "privacy",
+    "sessionstore",
     "startup",
 ]

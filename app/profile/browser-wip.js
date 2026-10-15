@@ -46,6 +46,10 @@ pref("browser.download.folderList", 1);
 pref("browser.download.always_ask_before_handling_new_types", false);
 pref("browser.download.manager.addToRecentDocs", false);
 
+// At startup, open a new tab (false) or the previous session's tabs (true).
+// After a crash the previous session always comes back.
+pref("browserwip.startup.restoreSession", false);
+
 // Closing the last tab closes the window.
 pref("browser.tabs.closeWindowWithLastTab", true);
 

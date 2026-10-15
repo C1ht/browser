@@ -156,7 +156,9 @@ class TabBrowser {
    * @param {string|null} url  URL to load, or null for none (the caller loads).
    * @param {object} options
    *   select, index, pinned, openWindowInfo, triggeringPrincipal,
-   *   policyContainer, referrerInfo, name, opener (a tab)
+   *   policyContainer, referrerInfo, name, opener (a tab),
+   *   lazy (a restored tab: load url only when the tab is first selected),
+   *   title (shown until then)
    */
   addTab(url, options = {}) {
     let { select = true, openWindowInfo = null, opener = null, name = null } = options;
@@ -175,7 +177,11 @@ class TabBrowser {
     tab.linkedBrowser = browser;
 
     let index = options.index ?? (opener ? this.tabs.indexOf(opener) + 1 : this.tabs.length);
-    index = Math.max(this._firstUnpinnedIndex(), Math.min(index, this.tabs.length));
+    // Pinned tabs go before the unpinned ones, the rest after.
+    let boundary = this._firstUnpinnedIndex();
+    index = options.pinned
+      ? Math.min(index, boundary)
+      : Math.max(boundary, Math.min(index, this.tabs.length));
     this.tabs.splice(index, 0, tab);
     this.tabContainer.insertBefore(tab, this.tabContainer.children[index] ?? null);
     if (options.pinned) {
@@ -186,13 +192,18 @@ class TabBrowser {
     this.browserContainer.appendChild(browser);
     this._addProgressListener(tab);
     this._registerAudible(tab);
+    if (url && options.lazy) {
+      tab.pendingLoad = { url, title: options.title };
+    }
     this._updateTabIdentity(tab, null, url);
 
-    if (url && !openWindowInfo) {
+    if (url && !openWindowInfo && !options.lazy) {
       this.loadURL(browser, url, options);
     }
     this._notify(tab, "TabOpen");
-    if (select || !this.selectedTab) {
+    // A window's first tab is selected, except a restored one: the restore
+    // selects the right tab next, and only that one should load.
+    if (select || (!this.selectedTab && !options.lazy)) {
       this.selectTab(tab);
     }
     return tab;
@@ -327,7 +338,7 @@ class TabBrowser {
       return;
     }
 
-    let url = browser.currentURI?.spec;
+    let url = tab.pendingLoad?.url ?? browser.currentURI?.spec;
     if (url && url != "about:blank") {
       this._closedTabs.push({ url, index: this.tabs.indexOf(tab) });
       this._closedTabs.splice(0, this._closedTabs.length - MAX_CLOSED_TABS);
@@ -376,6 +387,11 @@ class TabBrowser {
     let browser = tab.linkedBrowser;
     browser.setAttribute("selected", "true");
     browser.docShellIsActive = this.window.windowState != this.window.STATE_MINIMIZED;
+    if (tab.pendingLoad) {
+      let { url } = tab.pendingLoad;
+      delete tab.pendingLoad;
+      this.loadURL(browser, url);
+    }
     tab.scrollIntoView({ block: "nearest", inline: "nearest" });
     this._notify(tab, "TabSelect", { previous });
   }
@@ -440,11 +456,12 @@ class TabBrowser {
 
   _updateTabIdentity(tab, location, pendingURL) {
     let browser = tab.linkedBrowser;
+    pendingURL ??= tab.pendingLoad?.url;
     let uri = location ?? browser.currentURI;
-    let label = browser.contentTitle;
+    let label = browser.contentTitle || tab.pendingLoad?.title;
     let host = "";
     try {
-      host = uri?.host ?? "";
+      host = uri?.host || (tab.pendingLoad ? Services.io.newURI(tab.pendingLoad.url).host : "");
     } catch (e) {
       // about:, data: and friends have no host.
     }

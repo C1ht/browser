@@ -10,7 +10,9 @@ ChromeUtils.defineESModuleGetters(this, {
   AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
   ContentBlockingAllowList: "resource://gre/modules/ContentBlockingAllowList.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
+  SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
 });
+const RESTORE_WINDOW_ARG = "browserwip:restore-window";
 
 const NEW_TAB_URL = "about:newtab";
 const WELCOME_URL = "about:welcome";
@@ -52,18 +54,75 @@ var BrowserWip = {
       this.closeWindow();
     });
 
-    for (let url of this._initialURLs()) {
-      gBrowser.addTab(url, { select: !gBrowser.selectedTab });
+    // Session restore keeps track of the tabs.
+    for (let type of ["TabOpen", "TabClose", "TabSelect", "TabMove", "TabLocationChange", "TabAttrModified"]) {
+      gBrowser.tabContainer.addEventListener(type, () => SessionStore.saveSoon());
     }
-    if (gURLBar.input.value == "" && this._initialURLs()[0] == NEW_TAB_URL) {
+    window.addEventListener("unload", () => SessionStore.windowClosing(window));
+
+    this._openInitialTabs().finally(() => {
+      // Toolkit and the remote agent treat this as "the browser window is
+      // ready", as Firefox's window sends it.
+      Services.tm.idleDispatchToMainThread(() =>
+        Services.obs.notifyObservers(window, "browser-delayed-startup-finished")
+      );
+    });
+  },
+
+  /**
+   * The first tabs: a restored window, the previous session (at startup,
+   * when it should come back), and any addresses from the command line, or
+   * else the start page.
+   */
+  async _openInitialTabs() {
+    if (window.arguments?.[0] == RESTORE_WINDOW_ARG) {
+      let state = SessionStore.takePendingWindow();
+      if (state) {
+        this.restoreWindow(state);
+        return;
+      }
+    }
+    let session = null;
+    try {
+      session = await SessionStore.startupSession();
+    } catch (e) {
+      console.error(e);
+    }
+    let urls = this._initialURLs();
+    if (session) {
+      let [first, ...others] = session;
+      this.restoreWindow(first);
+      SessionStore.openWindows(window, others);
+      // The start page is not needed next to restored tabs; addresses from
+      // the command line are.
+      urls = urls.filter(url => url != NEW_TAB_URL && url != WELCOME_URL);
+    }
+    for (let url of urls) {
+      gBrowser.addTab(url, { select: !gBrowser.selectedTab || !!session });
+    }
+    if (!session && gURLBar.input.value == "" && urls[0] == NEW_TAB_URL) {
       gURLBar.focusAndSelect();
     }
+  },
 
-    // Toolkit and the remote agent treat this as "the browser window is
-    // ready", as Firefox's window sends it.
-    Services.tm.idleDispatchToMainThread(() =>
-      Services.obs.notifyObservers(window, "browser-delayed-startup-finished")
+  /**
+   * Opens a saved window's tabs here; they load when first selected.
+   * replaceBlank: close this window's tab if it is a lone new-tab page.
+   */
+  restoreWindow(state, { replaceBlank = false } = {}) {
+    let blank =
+      replaceBlank &&
+      gBrowser.tabs.length == 1 &&
+      [NEW_TAB_URL, "about:blank"].includes(gBrowser.selectedBrowser.currentURI.spec)
+        ? gBrowser.selectedTab
+        : null;
+    let tabs = state.tabs.map(saved =>
+      gBrowser.addTab(saved.url, { lazy: true, title: saved.title, pinned: saved.pinned, select: false })
     );
+    gBrowser.selectTab(tabs[state.selected] ?? tabs[0]);
+    if (blank) {
+      gBrowser.removeTab(blank, { skipPermitUnload: true });
+    }
   },
 
   /** URLs for the first tabs: command-line arguments, or the start page. */
@@ -85,7 +144,7 @@ var BrowserWip = {
           urls.push(a);
         }
       }
-    } else if (typeof arg == "string") {
+    } else if (typeof arg == "string" && arg != RESTORE_WINDOW_ARG) {
       urls.push(arg);
     }
     if (!urls.length) {
@@ -114,6 +173,7 @@ var BrowserWip = {
     cmd_moveTabPrev: () => gBrowser.moveSelectedTab(-1),
     cmd_settings: () => BrowserWip.openSettings(),
     cmd_downloads: () => DownloadsUI.open(),
+    cmd_restoreSession: () => SessionStore.restorePrevious(window),
     cmd_newWindow: () => BrowserWip.openNewWindow(),
     cmd_closeWindow: () => BrowserWip.closeWindow(),
     cmd_quit: () => Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit),
@@ -163,6 +223,14 @@ var BrowserWip = {
     });
     let menuButton = document.getElementById("app-menu-button");
     let menu = document.getElementById("app-menu");
+    menu.addEventListener("popupshowing", e => {
+      if (e.target == menu) {
+        // On the command: its menu item mirrors its state.
+        document
+          .getElementById("cmd_restoreSession")
+          .toggleAttribute("disabled", !SessionStore.canRestorePrevious);
+      }
+    });
     menuButton.addEventListener("click", () => menu.openPopup(menuButton, "bottomright topright", 0, 4));
     menu.addEventListener("popupshowing", () => menuButton.setAttribute("open", "true"));
     menu.addEventListener("popuphidden", () => menuButton.removeAttribute("open"));

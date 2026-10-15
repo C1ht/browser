@@ -13,6 +13,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ContentBlockingLists: "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs",
   ContentPermissionPrompt: "resource://gre/modules/browserwip/ContentPermissionPrompt.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
+  SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
 });
 
 const JSWINDOWACTORS = {
@@ -147,6 +148,7 @@ BrowserWipGlue.prototype = {
     applyAppearance();
     Services.prefs.addObserver(APPEARANCE_PREF, applyAppearance);
     lazy.PrivacyModes.init();
+    lazy.SessionStore.init();
     lazy.ContentBlockingLists.ensureLoaded().catch(() => {
       // Already reported; pages still load, just without blocking.
     });

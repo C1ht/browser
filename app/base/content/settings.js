@@ -79,6 +79,22 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   syncDownloads();
 
+  // Startup: a new tab, or the previous session.
+  let startup = document.querySelectorAll("#startup [data-value]");
+  let syncStartup = () => {
+    let restore = Services.prefs.getBoolPref("browserwip.startup.restoreSession", false);
+    for (let b of startup) {
+      b.setAttribute("aria-checked", String((b.dataset.value == "restore") == restore));
+    }
+  };
+  for (let b of startup) {
+    b.addEventListener("click", () => {
+      Services.prefs.setBoolPref("browserwip.startup.restoreSession", b.dataset.value == "restore");
+      syncStartup();
+    });
+  }
+  syncStartup();
+
   // Appearance.
   let appearance = document.querySelectorAll("#appearance [data-value]");
   let syncAppearance = () => {

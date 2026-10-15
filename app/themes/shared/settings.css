@@ -17,7 +17,7 @@
   gap: 16px;
 }
 
-.inline-row {
+.inline-row:not([hidden]) {
   display: flex;
   align-items: center;
   justify-content: space-between;

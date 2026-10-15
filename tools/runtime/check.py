@@ -529,8 +529,10 @@ def part4(bindir, base, shots):
 
         tabs = b.js("return gBrowser.tabs.length;")
         context_menu(25, 28, "context-openlink-tab")
-        opened = b.wait("""return gBrowser.tabs.length == arguments[0] + 1 &&
-          gBrowser.tabs[gBrowser.tabs.indexOf(gBrowser.selectedTab) + 1].linkedBrowser.currentURI.spec;""", tabs)
+        opened = b.wait("""let [count, expected] = arguments;
+          let spec = gBrowser.tabs.length == count + 1 &&
+            gBrowser.tabs[gBrowser.tabs.indexOf(gBrowser.selectedTab) + 1].linkedBrowser.currentURI.spec;
+          return spec == expected && spec;""", tabs, f"{base}/target.html", timeout=15)
         record(4, "Open link in new tab opens it next to the page, in the background",
                opened == f"{base}/target.html", opened)
 
@@ -635,17 +637,93 @@ def part4(bindir, base, shots):
         b.quit()
 
 
+# ---------------------------------------------------------------------------
+# Part 5: session restore
+
+# The tabs of the window with the most tabs (Marionette may be attached to
+# another one).
+TABS = """let win = [...Services.wm.getEnumerator("navigator:browser")]
+  .sort((a, b) => b.gBrowser.tabs.length - a.gBrowser.tabs.length)[0];
+return win.gBrowser.tabs.map(t => ({
+  url: t.pendingLoad?.url ?? t.linkedBrowser.currentURI.spec, pending: !!t.pendingLoad,
+  pinned: t.hasAttribute("pinned"), selected: t == win.gBrowser.selectedTab }));"""
+WINDOWS = """return [...Services.wm.getEnumerator("navigator:browser")].map(w => w.gBrowser.tabs.length);"""
+
+
+def part5(bindir, base):
+    profile = tempfile.mkdtemp(prefix="wip-session-")
+
+    def start(**prefs):
+        b = Browser(bindir, profile=profile, prefs={"browserwip.firstrun.completed": True, **prefs})
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.wait(WINDOWS.replace("return", "let n =") + " return n.length && n.every(c => c > 0);", timeout=15)
+        return b
+
+    # A session: a pinned tab, two others, and a second window.
+    b = start(**{"browserwip.startup.restoreSession": True})
+    b.js("""let [base] = arguments;
+      let load = (browser, url) => browser.loadURI(Services.io.newURI(url),
+        { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });
+      load(gBrowser.selectedBrowser, base + "/target.html");
+      gBrowser.addTab(base + "/contextmenu.html", { pinned: true });
+      gBrowser.addTab(base + "/permissions.html");
+      BrowserWip.openNewWindow(base + "/target.html");""", base)
+    b.wait("""let wins = [...Services.wm.getEnumerator("navigator:browser")];
+      return wins.length == 2 && wins.every(w => w.gBrowser?.tabs.every(t => t.linkedBrowser.contentTitle));""",
+           timeout=20)
+    b.quit()
+    saved = json.loads(Path(profile, "sessionstore.json").read_text())
+    record(5, "quitting saves every window's tabs as a clean exit",
+           saved["cleanExit"] and sorted(len(w["tabs"]) for w in saved["windows"]) == [1, 3], saved)
+
+    b = start()
+    tabs = b.js(TABS)
+    windows = b.wait(WINDOWS.replace("return", "let n =") + " return n.length == 2 && n;", timeout=15)
+    record(5, "Continue where you left off brings back windows, tabs, pinning and selection",
+           [t["url"] for t in tabs] == [f"{base}/contextmenu.html", f"{base}/target.html", f"{base}/permissions.html"]
+           and tabs[0]["pinned"] and tabs[2]["selected"] and sorted(windows or []) == [1, 3], [tabs, windows])
+    record(5, "only the selected tab loads; the others wait",
+           [t["pending"] for t in tabs] == [True, True, False], tabs)
+    b.js(TABS.split("return")[0] + "win.gBrowser.selectTab(win.gBrowser.tabs[1]);")
+    loaded = b.wait(TABS.split("return")[0] + "let tab = win.gBrowser.selectedTab; "
+                    "return tab.linkedBrowser.contentTitle.startsWith('target') && !tab.pendingLoad;", timeout=15)
+    record(5, "a waiting tab loads when selected", bool(loaded))
+    b.quit()
+
+    b = start(**{"browserwip.startup.restoreSession": False})
+    first = b.js(TABS)
+    enabled = b.js("""let menu = document.getElementById("app-menu"); menu.openPopup();
+      return new Promise(r => setTimeout(() => {
+        let enabled = !document.getElementById("cmd_restoreSession").hasAttribute("disabled");
+        menu.hidePopup(); r(enabled); }, 300));""")
+    b.js("document.getElementById('cmd_restoreSession').doCommand();")
+    restored = b.wait(WINDOWS.replace("return", "let n =") + " return n.length == 2 && n;", timeout=15)
+    record(5, "Open a new tab starts fresh; Restore previous session brings the tabs back",
+           [t["url"] for t in first] == ["about:newtab"] and enabled and sorted(restored or []) == [1, 3],
+           [first, enabled, restored])
+    time.sleep(4)  # let the restored session be saved
+    b.proc.kill()
+    b.proc.wait()
+
+    b = start()
+    windows = b.wait(WINDOWS.replace("return", "let n =") + " return n.length == 2 && n;", timeout=15)
+    record(5, "after a crash the session comes back even when set to open a new tab",
+           sorted(windows or []) == [1, 3], windows)
+    b.quit()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("bindir")
-    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4])
+    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5])
     parser.add_argument("--shots", help="directory for screenshots")
     args = parser.parse_args()
     if args.shots:
         Path(args.shots).mkdir(parents=True, exist_ok=True)
     base = serve_pages()
     parts = {1: lambda: part1(args.bindir, base), 2: lambda: part2(args.bindir, base),
-             3: lambda: part3(args.bindir, base, args.shots), 4: lambda: part4(args.bindir, base, args.shots)}
+             3: lambda: part3(args.bindir, base, args.shots), 4: lambda: part4(args.bindir, base, args.shots),
+             5: lambda: part5(args.bindir, base)}
     for p in args.part:
         try:
             parts[p]()
