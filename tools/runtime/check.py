@@ -593,6 +593,31 @@ def part4(bindir, base, shots):
         record(4, "Delete closes a tab from the overview; Escape closes the overview",
                closed["after"] == closed["before"] - 1 and closed["focusedCard"] and closed["hidden"], closed)
 
+        b.js("TabOverview.open();")
+        added = b.js("""let before = gBrowser.tabs.length;
+          document.querySelector("#tab-overview-grid .overview-new").click();
+          return { added: gBrowser.tabs.length - before, open: !document.getElementById("tab-overview").hidden,
+                   cards: document.querySelectorAll("#tab-overview-grid .overview-card").length - 1,
+                   tabs: gBrowser.tabs.length };""")
+        b.js("TabOverview.close();")
+        record(4, "adding a tab from the overview keeps it open, with a card for the new tab",
+               added["added"] == 1 and added["open"] and added["cards"] == added["tabs"], added)
+
+        # Site icons: a declared <link rel="icon">, and /favicon.ico otherwise.
+        b.js("let [base] = arguments; gBrowser.addTab(base + '/icon.html'); gBrowser.addTab(base + '/target.html');", base)
+        icons = b.wait("""let tab = name => gBrowser.tabs.find(t => t.linkedBrowser.currentURI.spec.endsWith(name));
+          let declared = tab("/icon.html")?.favicon, fallback = tab("/target.html")?.favicon;
+          return declared && fallback && { declared: declared.slice(0, 22), fallback: fallback.slice(0, 25),
+            shown: tab("/icon.html").querySelector(".tab-icon").hasAttribute("favicon") };""", timeout=15)
+        record(4, "tabs show the page's declared icon, or the site's favicon.ico",
+               bool(icons) and icons["declared"] == "data:image/png;base64," and
+               icons["fallback"].startswith("data:image/") and icons["shown"], icons)
+        cleared = b.js("""let tab = gBrowser.tabs.find(t => t.linkedBrowser.currentURI.spec.endsWith("/icon.html"));
+          tab.linkedBrowser.loadURI(Services.io.newURI("about:blank"),
+            { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });
+          return new Promise(r => setTimeout(() => r(tab.favicon ?? null), 1500));""")
+        record(4, "leaving a page clears its icon", cleared is None, cleared)
+
         # Permission prompts. Buttons are at fixed positions in permissions.html.
         b.js("gBrowser.addTab(arguments[0]);", f"{base}/permissions.html")
         b.wait("return gBrowser.selectedBrowser.contentTitle == 'permissions page';")

@@ -531,6 +531,13 @@ browser:focus-visible {
   font-size: 0;
 }
 
+/* The site's own icon (FaviconChild), in place of the letter tile. */
+.tab-icon[favicon] {
+  background: var(--tab-favicon) center / contain no-repeat;
+  border-radius: 0;
+  font-size: 0;
+}
+
 .tab[busy] .tab-icon {
   background: none;
   border-radius: 50%;
@@ -883,6 +890,11 @@ panel.wip-panel {
 
 .overview-thumb .overview-tile[internal] {
   background-size: 40px;
+}
+
+.overview-thumb .overview-tile[favicon] {
+  width: 40px;
+  height: 40px;
 }
 
 .overview-info {

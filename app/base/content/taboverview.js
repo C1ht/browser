@@ -11,7 +11,8 @@
  * page, over the page area. Opened from the button at the end of the tab
  * strip or Ctrl+Shift+A.
  *
- * Click a card (or Enter) to switch to its tab, × (or Delete) to close it.
+ * Click a card (or Enter) to switch to its tab, × (or Delete) to close it,
+ * the last card to add a tab (the overview stays open).
  * Typing filters by title and address. Escape, or a click on empty space,
  * closes the overview. Snapshots are taken fresh each time it opens; tabs
  * that have not loaded yet (restored ones) show their site's tile instead.
@@ -94,9 +95,10 @@ var TabOverview = {
     plus.src = "chrome://browser-wip/skin/icons/plus.svg";
     plus.alt = "";
     add.append(plus);
+    // The overview stays open; the new tab shows up as a card.
     add.addEventListener("click", () => {
-      this.close();
-      BrowserWip.openNewTab();
+      gBrowser.addTab(NEW_TAB_URL, { select: false });
+      this.grid.querySelector(".overview-new")?.focus();
     });
     this.grid.append(add);
     this._filter();

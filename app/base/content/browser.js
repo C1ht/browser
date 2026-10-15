@@ -118,7 +118,13 @@ var BrowserWip = {
         ? gBrowser.selectedTab
         : null;
     let tabs = state.tabs.map(saved =>
-      gBrowser.addTab(saved.url, { lazy: true, title: saved.title, pinned: saved.pinned, select: false })
+      gBrowser.addTab(saved.url, {
+        lazy: true,
+        title: saved.title,
+        icon: saved.icon,
+        pinned: saved.pinned,
+        select: false,
+      })
     );
     gBrowser.selectTab(tabs[state.selected] ?? tabs[0]);
     if (blank) {

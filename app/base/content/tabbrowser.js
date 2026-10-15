@@ -87,6 +87,8 @@ class TabProgressListener {
     let sameDocument = flags & Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT;
     if (!sameDocument) {
       this.tab.blockedTrackers = 0;
+      // The new page sends its own icon (FaviconChild).
+      this.tabbrowser.setTabIcon(this.tab, null);
     }
     this.tabbrowser._updateTabIdentity(this.tab, location);
     this.tabbrowser._notify(this.tab, "TabLocationChange", { sameDocument: !!sameDocument });
@@ -160,7 +162,7 @@ class TabBrowser {
    *   select, index, pinned, openWindowInfo, triggeringPrincipal,
    *   policyContainer, referrerInfo, name, opener (a tab),
    *   lazy (a restored tab: load url only when the tab is first selected),
-   *   title (shown until then)
+   *   title (shown until then), icon (a data: URL for its site icon)
    */
   addTab(url, options = {}) {
     let { select = true, openWindowInfo = null, opener = null, name = null } = options;
@@ -196,6 +198,9 @@ class TabBrowser {
     this._registerAudible(tab);
     if (url && options.lazy) {
       tab.pendingLoad = { url, title: options.title };
+    }
+    if (options.icon) {
+      this.setTabIcon(tab, options.icon);
     }
     this._updateTabIdentity(tab, null, url);
 
@@ -491,6 +496,29 @@ class TabBrowser {
     let tile = tileFor(host || label || "");
     icon.textContent = internal ? "" : tile.letter;
     icon.style.setProperty("--tab-tile", tile.color);
+    this._notify(tab, "TabAttrModified");
+  }
+
+  /** A page's site icon (FaviconParent), as a data: URL; null for none. */
+  setIcon(browser, dataURL) {
+    let tab = this.getTabForBrowser(browser);
+    if (tab) {
+      this.setTabIcon(tab, dataURL);
+    }
+  }
+
+  setTabIcon(tab, dataURL) {
+    if ((tab.favicon ?? null) == dataURL) {
+      return;
+    }
+    tab.favicon = dataURL;
+    let icon = tab.querySelector(".tab-icon");
+    icon.toggleAttribute("favicon", !!dataURL);
+    if (dataURL) {
+      icon.style.setProperty("--tab-favicon", `url("${dataURL}")`);
+    } else {
+      icon.style.removeProperty("--tab-favicon");
+    }
     this._notify(tab, "TabAttrModified");
   }
 

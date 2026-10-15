@@ -46,6 +46,22 @@ const JSWINDOWACTORS = {
     allFrames: true,
     safeForUntrustedWebProcess: true,
   },
+  // Site icons on tabs (FaviconChild.sys.mjs).
+  Favicon: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/FaviconParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/FaviconChild.sys.mjs",
+      events: {
+        DOMLinkAdded: {},
+        DOMLinkChanged: {},
+        pageshow: {},
+      },
+    },
+    matches: ["http://*/*", "https://*/*"],
+    safeForUntrustedWebProcess: true,
+  },
   // Camera, microphone and screen sharing (WebRTCChild.sys.mjs).
   WebRTC: {
     parent: {

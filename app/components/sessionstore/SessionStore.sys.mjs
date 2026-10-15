@@ -11,9 +11,9 @@
  * exit). Otherwise it stays available from the menu ("Restore previous
  * session") for as long as this run lasts.
  *
- * Saved per tab: address, title and pinned state; per window, the selected
- * tab. Restored tabs load when first selected. Back/forward history is not
- * kept.
+ * Saved per tab: address, title, pinned state and site icon (if small); per
+ * window, the selected tab. Restored tabs load when first selected.
+ * Back/forward history is not kept.
  */
 
 import { clearTimeout, setTimeout } from "resource://gre/modules/Timer.sys.mjs";
@@ -21,6 +21,8 @@ import { clearTimeout, setTimeout } from "resource://gre/modules/Timer.sys.mjs";
 const FILE_NAME = "sessionstore.json";
 const SAVE_DELAY_MS = 3000;
 const RESTORE_PREF = "browserwip.startup.restoreSession";
+// Site icons are kept with the session only when small (most are a few KB).
+const MAX_SAVED_ICON_LENGTH = 16 * 1024;
 // Passed as the new window's argument when it should take a restored window.
 export const RESTORE_WINDOW_ARG = "browserwip:restore-window";
 
@@ -33,10 +35,12 @@ function windowState(win) {
   let tabs = gBrowser.tabs.map(tab => {
     let browser = tab.linkedBrowser;
     let url = tab.pendingLoad?.url ?? browser.currentURI?.spec ?? "about:blank";
+    let icon = tab.favicon?.length <= MAX_SAVED_ICON_LENGTH ? tab.favicon : undefined;
     return {
       url,
       title: tab.pendingLoad?.title ?? browser.contentTitle ?? "",
       pinned: tab.hasAttribute("pinned"),
+      icon,
     };
   });
   return { tabs, selected: gBrowser.tabs.indexOf(gBrowser.selectedTab) };
