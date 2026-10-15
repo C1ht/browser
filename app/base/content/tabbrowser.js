@@ -120,8 +120,10 @@ class TabBrowser {
 
     this.tabContainer.addEventListener("pointerdown", this);
     this.tabContainer.addEventListener("click", this);
-    this.tabContainer.addEventListener("auxclick", this);
-    this.tabContainer.addEventListener("dblclick", this);
+    // On the whole strip: its empty space (beside the tabs, around the
+    // new-tab button) opens a tab on double- or middle-click.
+    this.tabContainer.parentElement.addEventListener("auxclick", this);
+    this.tabContainer.parentElement.addEventListener("dblclick", this);
     this.tabContainer.addEventListener("keydown", this);
     this.browserContainer.addEventListener("WillChangeBrowserRemoteness", this);
     this.browserContainer.addEventListener("pagetitlechanged", this);
@@ -536,14 +538,14 @@ class TabBrowser {
           let tab = event.target.closest(".tab");
           if (tab) {
             this.removeTab(tab);
-          } else {
+          } else if (!event.target.closest("button")) {
             BrowserWip.openNewTab();
           }
           event.preventDefault();
         }
         break;
       case "dblclick":
-        if (!event.target.closest(".tab")) {
+        if (!event.target.closest(".tab, button")) {
           BrowserWip.openNewTab();
         }
         break;

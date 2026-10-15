@@ -408,10 +408,13 @@ browser:focus-visible {
   position: relative;
 }
 
+/* The tabs take the room they need and the new-tab button follows the last
+   one; once the strip is full, the tabs shrink and the button keeps its
+   place at the end, as in Firefox. */
 #tabs {
   display: flex;
   align-items: flex-end;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   /* Room for the shoulders of a selected tab at either end. */
   padding-inline: 10px;
@@ -424,9 +427,10 @@ browser:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1 1 0;
+  /* A width, not just a flex basis, so the tab area sizes to its tabs. */
+  width: 230px;
+  flex: 0 1 auto;
   min-width: 96px;
-  max-width: 230px;
   height: var(--tab-height);
   padding-inline: 12px 8px;
   box-sizing: border-box;
@@ -617,6 +621,8 @@ browser:focus-visible {
 
 #new-tab-button {
   margin-bottom: 3px;
+  /* Clear of the selected tab's shoulder when it is the last tab. */
+  margin-inline-start: 6px;
 }
 
 /* ---------- Content ---------- */

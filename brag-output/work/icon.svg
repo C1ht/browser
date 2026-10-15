@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Placeholder mark for the browser-wip codename: an address bar over a
+       folder tab that joins the page, the Folio chrome in miniature. -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#15191C"/>
+  <rect x="20" y="18" width="88" height="12" rx="6" fill="#5EC4BE"/>
+  <path fill="#E3E8EB" d="M20 70A10 10 0 0 1 30 60H31A9 9 0 0 0 40 51V49A9 9 0 0 1 49 40H75A9 9 0 0 1 84 49V51A9 9 0 0 0 93 60H98A10 10 0 0 1 108 70V98A10 10 0 0 1 98 108H30A10 10 0 0 1 20 98Z"/>
+</svg>

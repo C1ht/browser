@@ -1,0 +1,1 @@
+browser-wip: a standalone Gecko browser that never sends your browsing to us or anyone else. Ad and tracker blocking is compiled in, and a test fails the build if it makes a single outbound connection. Name pending. Privacy isn't.
