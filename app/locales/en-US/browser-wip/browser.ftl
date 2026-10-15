@@ -211,6 +211,30 @@ sharing-screen-camera = { $host } can see your screen and is using your camera.
 sharing-screen-camera-microphone = { $host } can see your screen and is using your camera and microphone.
 sharing-stop = Stop sharing
 
+## Tab overview
+
+tab-overview-button =
+    .title = All tabs (Ctrl+Shift+A)
+    .aria-label = All tabs
+tab-overview-search =
+    .placeholder = Search tabs
+    .aria-label = Search tabs
+# $count (Number) - tabs in the window; $shown (Number) - tabs matching the search;
+# $filtered (String) - "yes" while searching
+tab-overview-count =
+    { $filtered ->
+        [yes] { $shown } of { $count } tabs
+       *[no] { $count ->
+            [one] 1 tab
+           *[other] { $count } tabs
+        }
+    }
+tab-overview-new =
+    .aria-label = New tab
+tab-overview-close =
+    .title = Close tab
+    .aria-label = Close tab
+
 ## Downloads panel
 
 downloads-title = Downloads

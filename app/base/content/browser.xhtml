@@ -24,6 +24,7 @@
   <script src="chrome://browser-wip/content/downloads.js"/>
   <script src="chrome://browser-wip/content/contextmenu.js"/>
   <script src="chrome://browser-wip/content/permissions.js"/>
+  <script src="chrome://browser-wip/content/taboverview.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
   <script src="chrome://browser-wip/content/browser.js"/>
 </head>
@@ -44,6 +45,7 @@
     <xul:command id="cmd_settings"/>
     <xul:command id="cmd_downloads"/>
     <xul:command id="cmd_restoreSession"/>
+    <xul:command id="cmd_tabOverview"/>
     <xul:command id="cmd_newWindow"/>
     <xul:command id="cmd_closeWindow"/>
     <xul:command id="cmd_quit"/>
@@ -73,6 +75,7 @@
     <xul:key id="key_moveTabNext" keycode="VK_PAGE_DOWN" modifiers="accel,shift" command="cmd_moveTabNext"/>
     <xul:key id="key_moveTabPrev" keycode="VK_PAGE_UP" modifiers="accel,shift" command="cmd_moveTabPrev"/>
     <xul:key id="key_downloads" key="j" modifiers="accel" command="cmd_downloads"/>
+    <xul:key id="key_tabOverview" key="a" modifiers="accel,shift" command="cmd_tabOverview"/>
     <xul:key id="key_find" key="f" modifiers="accel" command="cmd_find"/>
     <xul:key id="key_findAgain" key="g" modifiers="accel" command="cmd_findAgain"/>
     <xul:key id="key_findPrevious" key="g" modifiers="accel,shift" command="cmd_findPrevious"/>
@@ -270,9 +273,21 @@
     <button id="new-tab-button" class="toolbar-button" data-l10n-id="new-tab-button" data-command="cmd_newTab">
       <img class="icon" src="chrome://browser-wip/skin/icons/plus.svg" alt=""/>
     </button>
+    <button id="tab-overview-button" class="toolbar-button" data-l10n-id="tab-overview-button" data-command="cmd_tabOverview">
+      <img class="icon" src="chrome://browser-wip/skin/icons/tabs.svg" alt=""/>
+    </button>
   </div>
 
   <div id="browsers"></div>
   <xul:findbar id="findbar" hidden="true"/>
+
+  <!-- Tab overview (taboverview.js), over the page area. -->
+  <div id="tab-overview" role="dialog" aria-labelledby="tab-overview-count" hidden="true">
+    <div class="overview-header">
+      <input id="tab-overview-search" type="search" data-l10n-id="tab-overview-search"/>
+      <span id="tab-overview-count"></span>
+    </div>
+    <div id="tab-overview-grid"></div>
+  </div>
 </body>
 </html>

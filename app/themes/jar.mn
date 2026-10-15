@@ -30,4 +30,5 @@ browser-wip.jar:
   skin/browser-wip/icons/shield.svg             (shared/icons/shield.svg)
   skin/browser-wip/icons/site-info.svg          (shared/icons/site-info.svg)
   skin/browser-wip/icons/stop.svg               (shared/icons/stop.svg)
+  skin/browser-wip/icons/tabs.svg               (shared/icons/tabs.svg)
   skin/browser-wip/icons/warning.svg            (shared/icons/warning.svg)

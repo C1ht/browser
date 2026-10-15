@@ -560,6 +560,39 @@ def part4(bindir, base, shots):
         record(4, "Save link saves through the downloads manager",
                bool(saved) and Path(saved_dir, "target.html").exists(), sorted(os.listdir(saved_dir)))
 
+        # Tab overview.
+        b.js("document.getElementById('cmd_tabOverview').doCommand();")
+        overview = b.wait("""let cards = [...document.querySelectorAll("#tab-overview-grid .overview-card")];
+          let tabCards = cards.filter(c => c.tab);
+          return !document.getElementById("tab-overview").hidden && tabCards.length == gBrowser.tabs.length &&
+            tabCards.every(c => c.querySelector("canvas") || c.tab.pendingLoad) && {
+              cards: cards.length, tabs: gBrowser.tabs.length,
+              selected: tabCards.find(c => c.hasAttribute("selected"))?.tab == gBrowser.selectedTab };""", timeout=15)
+        record(4, "the tab overview shows every tab with a snapshot, and the current one marked",
+               bool(overview) and overview["cards"] == overview["tabs"] + 1 and overview["selected"], overview)
+        chosen = b.js("""let search = document.getElementById("tab-overview-search");
+          search.value = "contextmenu.html"; search.dispatchEvent(new Event("input"));
+          let shown = [...document.querySelectorAll("#tab-overview-grid .overview-card:not([hidden])")].filter(c => c.tab).length;
+          search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+          return { shown, closed: document.getElementById("tab-overview").hidden,
+                   url: gBrowser.selectedBrowser.currentURI.spec };""")
+        record(4, "searching the overview and pressing Enter switches to the match",
+               chosen["shown"] == 1 and chosen["closed"]
+               and chosen["url"].endswith("/contextmenu.html"), chosen)
+        closed = b.js("""document.getElementById("cmd_tabOverview").doCommand();
+          let before = gBrowser.tabs.length;
+          let card = [...document.querySelectorAll("#tab-overview-grid .overview-card")].find(c => c.tab && !c.hasAttribute("selected"));
+          card.focus();
+          card.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+          return new Promise(resolve => setTimeout(() => {
+            let after = gBrowser.tabs.length;
+            let focusedCard = !!document.activeElement?.closest(".overview-card");
+            document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+            resolve({ before, after, focusedCard, hidden: document.getElementById("tab-overview").hidden });
+          }, 1000));""")
+        record(4, "Delete closes a tab from the overview; Escape closes the overview",
+               closed["after"] == closed["before"] - 1 and closed["focusedCard"] and closed["hidden"], closed)
+
         # Permission prompts. Buttons are at fixed positions in permissions.html.
         b.js("gBrowser.addTab(arguments[0]);", f"{base}/permissions.html")
         b.wait("return gBrowser.selectedBrowser.contentTitle == 'permissions page';")

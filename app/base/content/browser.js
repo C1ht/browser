@@ -30,6 +30,7 @@ var BrowserWip = {
     DownloadsUI.init(window).catch(console.error);
     BrowserContextMenu.init(window);
     PermissionPrompts.init(window);
+    TabOverview.init(window);
     // Gecko asks this object where to open links and window.open() calls.
     window.browserDOMWindow = gBrowser.browserDOMWindow;
 
@@ -174,6 +175,7 @@ var BrowserWip = {
     cmd_settings: () => BrowserWip.openSettings(),
     cmd_downloads: () => DownloadsUI.open(),
     cmd_restoreSession: () => SessionStore.restorePrevious(window),
+    cmd_tabOverview: () => TabOverview.toggle(),
     cmd_newWindow: () => BrowserWip.openNewWindow(),
     cmd_closeWindow: () => BrowserWip.closeWindow(),
     cmd_quit: () => Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit),
