@@ -11,6 +11,7 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   ActorManagerParent: "resource://gre/modules/ActorManagerParent.sys.mjs",
   ContentBlockingLists: "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs",
+  ContentPermissionPrompt: "resource://gre/modules/browserwip/ContentPermissionPrompt.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
 });
 
@@ -44,7 +45,55 @@ const JSWINDOWACTORS = {
     allFrames: true,
     safeForUntrustedWebProcess: true,
   },
+  // Camera, microphone and screen sharing (WebRTCChild.sys.mjs).
+  WebRTC: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/WebRTCParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/WebRTCChild.sys.mjs",
+    },
+    allFrames: true,
+    safeForUntrustedWebProcess: true,
+  },
 };
+
+// Gecko asks for camera and microphone access, and for permission to make a
+// WebRTC connection, through observer notifications in each content process.
+const JSPROCESSACTORS = {
+  WebRTCProcess: {
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/WebRTCChild.sys.mjs",
+      observers: [
+        "getUserMedia:request",
+        "PeerConnection:request",
+        "recording-device-events",
+        "recording-window-ended",
+      ],
+    },
+    safeForUntrustedWebProcess: true,
+  },
+};
+
+// The permission prompt Gecko asks for location, notifications and other
+// site permissions. Registered here rather than in components.conf so it
+// stays with the rest of the app's front end.
+const CONTENT_PERMISSION_PROMPT_CID = Components.ID("{5d0b7e8c-3f41-4b6e-9a2d-7c1e8f4a6b93}");
+
+function registerPermissionPrompt() {
+  Components.manager
+    .QueryInterface(Ci.nsIComponentRegistrar)
+    .registerFactory(
+      CONTENT_PERMISSION_PROMPT_CID,
+      "browser-wip content permission prompt",
+      "@mozilla.org/content-permission/prompt;1",
+      {
+        createInstance(iid) {
+          return new lazy.ContentPermissionPrompt().QueryInterface(iid);
+        },
+      }
+    );
+}
 
 /**
  * Appearance: Light, Dark or Auto, applied to the browser and to web pages
@@ -93,6 +142,8 @@ BrowserWipGlue.prototype = {
       console.error("browser-wip: element-hiding rules unavailable", e);
     }
     lazy.ActorManagerParent.addJSWindowActors(JSWINDOWACTORS);
+    lazy.ActorManagerParent.addJSProcessActors(JSPROCESSACTORS);
+    registerPermissionPrompt();
     applyAppearance();
     Services.prefs.addObserver(APPEARANCE_PREF, applyAppearance);
     lazy.PrivacyModes.init();

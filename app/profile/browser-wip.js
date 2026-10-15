@@ -243,8 +243,11 @@ pref("network.captive-portal-service.enabled", false);
 pref("network.connectivity-service.enabled", false);
 pref("captivedetect.canonicalURL", "");
 
-// Geolocation through GeoClue, which the desktop controls; never Google.
+// Geolocation from the operating system, which the user controls there
+// (GeoClue on Linux, Windows' location service); never Google's network
+// lookup. Sites still have to ask (permissions.js).
 pref("geo.provider.use_geoclue", true);
+pref("geo.provider.ms-windows-location", true);
 pref("geo.provider.network.url", "");
 pref("browser.region.network.url", "");
 pref("browser.region.update.enabled", false);

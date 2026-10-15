@@ -177,6 +177,38 @@ context-savepage =
 context-viewsource =
     .label = View page source
 
+## Permission prompts. $host (String) - the site asking, e.g. "meet.example.com"
+
+permission-geolocation = { $host } wants to know your location.
+permission-desktop-notification = { $host } wants to show you notifications.
+permission-persistent-storage = { $host } wants to keep its data on this device until you delete it.
+permission-midi = { $host } wants to use your MIDI devices.
+permission-xr = { $host } wants to use your virtual reality devices.
+# $site (String) - the site the page is open on
+permission-storage-access = { $host } wants to use its cookies and data while you are on { $site }.
+permission-camera = { $host } wants to use your camera.
+permission-microphone = { $host } wants to use your microphone.
+permission-camera-microphone = { $host } wants to use your camera and microphone.
+permission-screen = { $host } wants to see your screen.
+permission-screen-microphone = { $host } wants to see your screen and use your microphone.
+permission-camera-label = Camera
+permission-screen-label = Share
+permission-microphone-label = Microphone
+permission-remember = Remember this decision
+permission-allow = Allow
+permission-block = Block
+
+## Sharing indicator panel. $host (String) - the site
+
+sharing-camera = { $host } is using your camera.
+sharing-microphone = { $host } is using your microphone.
+sharing-camera-microphone = { $host } is using your camera and microphone.
+sharing-screen = { $host } can see your screen.
+sharing-screen-microphone = { $host } can see your screen and is using your microphone.
+sharing-screen-camera = { $host } can see your screen and is using your camera.
+sharing-screen-camera-microphone = { $host } can see your screen and is using your camera and microphone.
+sharing-stop = Stop sharing
+
 ## Downloads panel
 
 downloads-title = Downloads

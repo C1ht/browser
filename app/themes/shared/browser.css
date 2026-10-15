@@ -764,6 +764,76 @@ panel.wip-panel {
   cursor: pointer;
 }
 
+/* ---------- Permission prompts ---------- */
+
+.permission-device {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--chrome-muted);
+}
+
+.permission-device[hidden] {
+  display: none;
+}
+
+.permission-device menulist {
+  margin: 0;
+  font: 13px var(--font-ui);
+}
+
+.permission-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.permission-remember[hidden] {
+  display: none;
+}
+
+.permission-remember input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.permission-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.panel-button {
+  appearance: none;
+  min-width: 80px;
+  padding: 7px 14px;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--chrome-fg);
+  font: inherit;
+  font-weight: 500;
+}
+
+.panel-button:hover {
+  background-color: var(--hover-bg);
+}
+
+.panel-button.primary {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  /* White on the light theme's dark teal, near-black on the dark theme's
+     light teal. */
+  color: var(--field-bg);
+}
+
+.panel-button.primary:hover {
+  filter: brightness(1.1);
+}
+
 /* ---------- Downloads ---------- */
 
 /* While downloads run, a ring around the button fills with their overall

@@ -365,7 +365,11 @@ def part3(bindir, base, shots):
 
 def part4(bindir, base, shots):
     b = Browser(bindir, prefs={"browserwip.firstrun.completed": True,
-                               "dom.disable_open_during_load": False})
+                               "dom.disable_open_during_load": False,
+                               # Gecko's fake camera and microphone; they only
+                               # count as capturing with permission.fake.
+                               "media.navigator.streams.fake": True,
+                               "media.navigator.permission.fake": True})
     try:
         b.wait("return gBrowser.selectedBrowser.currentURI?.spec == 'about:newtab';")
         layout = b.js("""
@@ -553,6 +557,80 @@ def part4(bindir, base, shots):
                        timeout=15)
         record(4, "Save link saves through the downloads manager",
                bool(saved) and Path(saved_dir, "target.html").exists(), sorted(os.listdir(saved_dir)))
+
+        # Permission prompts. Buttons are at fixed positions in permissions.html.
+        b.js("gBrowser.addTab(arguments[0]);", f"{base}/permissions.html")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'permissions page';")
+
+        def click(x, y):
+            b.js("""let [x, y] = arguments; let r = gBrowser.selectedBrowser.getBoundingClientRect();
+              for (let type of ["mousedown", "mouseup"]) {
+                window.synthesizeMouseEvent(type, r.left + x, r.top + y, { button: 0, clickCount: 1 });
+              }""", x, y)
+
+        def page_title(prefix):
+            return b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith(arguments[0]) && t;",
+                          prefix, timeout=15)
+
+        prompt = """let p = document.getElementById("permission-panel"); return p.state == "open" && {
+          message: document.getElementById("permission-message").textContent,
+          video: !document.getElementById("permission-video-row").hidden,
+          audio: !document.getElementById("permission-audio-row").hidden };"""
+        answer = """let [allow, remember] = arguments;
+          document.getElementById("permission-remember").checked = remember;
+          document.getElementById(allow ? "permission-allow" : "permission-block").click();"""
+
+        click(60, 155)
+        record(4, "video calls can connect (WebRTC connections are allowed)", page_title("pc") == "pc offer",
+               b.js("return gBrowser.selectedBrowser.contentTitle;"))
+
+        click(60, 35)
+        shown = b.wait(prompt, timeout=10)
+        b.js(answer, False, False)
+        record(4, "a location request prompts, and Block refuses it",
+               bool(shown) and "location" in shown["message"] and page_title("geo") == "geo error 1", shown)
+
+        click(60, 75)
+        shown = b.wait(prompt, timeout=10)
+        b.js(answer, True, True)
+        granted = page_title("notify")
+        stored = b.js("""return Services.perms.testExactPermissionFromPrincipal(
+          gBrowser.selectedBrowser.contentPrincipal, "desktop-notification") == Services.perms.ALLOW_ACTION;""")
+        click(60, 75)
+        time.sleep(1)
+        again = b.js("return [document.getElementById('permission-panel').state, gBrowser.selectedBrowser.contentTitle];")
+        record(4, "allowing notifications with Remember stores it; the site isn't asked again",
+               bool(shown) and granted == "notify granted" and stored and again == ["closed", "notify granted"],
+               [shown, granted, stored, again])
+        b.js("Services.perms.removeAll();")
+
+        b.js("gBrowser.selectedBrowser.loadURI(Services.io.newURI(arguments[0]), "
+             "{triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()});",
+             f"{base}/permissions.html?spam")
+        spam = page_title("spam")
+        record(4, "notification requests without a click are refused without a prompt",
+               # Gecko itself answers "default" for requests without a click.
+               spam in ("spam default", "spam denied")
+               and b.js("return document.getElementById('permission-panel').state;") == "closed",
+               spam)
+
+        click(60, 115)
+        shown = b.wait(prompt, timeout=10)
+        b.js(answer, True, False)
+        stream = page_title("gum")
+        sharing = b.wait("""return gBrowser.selectedTab.hasAttribute("sharing") &&
+          !document.getElementById("sharing-button").hidden;""", timeout=10)
+        record(4, "camera and microphone: one prompt with both devices, then the sharing indicator",
+               bool(shown) and shown["video"] and shown["audio"] and stream == "gum audio+video" and bool(sharing),
+               [shown, stream, sharing])
+        b.js("document.getElementById('sharing-button').click();")
+        b.wait("return document.getElementById('sharing-panel').state == 'open';", timeout=5)
+        b.js("document.getElementById('sharing-stop').click();")
+        ended = page_title("gum ended")
+        cleared = b.wait("""return !gBrowser.selectedTab.hasAttribute("sharing") &&
+          document.getElementById("sharing-button").hidden;""", timeout=10)
+        record(4, "Stop sharing ends the stream and clears the indicator",
+               ended == "gum ended" and bool(cleared), [ended, cleared])
     finally:
         b.quit()
 

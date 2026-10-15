@@ -1,0 +1,51 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>permissions page</title>
+<!-- Buttons that ask for permissions, at fixed positions (CSS pixels from
+     the page's top left) so tools/runtime/check.py can click them. Each
+     result goes into the title. -->
+<style>
+  body { margin: 0; }
+  button { position: absolute; left: 20px; width: 160px; height: 30px; }
+  #geo { top: 20px; }
+  #notify { top: 60px; }
+  #gum { top: 100px; }
+  #pc { top: 140px; }
+</style>
+<button id="geo">location</button>
+<button id="notify">notifications</button>
+<button id="gum">camera</button>
+<button id="pc">connection</button>
+<script>
+  let report = text => { document.title = text; };
+  document.getElementById("geo").onclick = () =>
+    navigator.geolocation.getCurrentPosition(
+      () => report("geo allowed"),
+      e => report(`geo error ${e.code}`)
+    );
+  document.getElementById("notify").onclick = () =>
+    Notification.requestPermission().then(p => report(`notify ${p}`));
+  document.getElementById("gum").onclick = () =>
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(
+      stream => {
+        window.stream = stream;
+        stream.getVideoTracks()[0].onended = () => report("gum ended");
+        report(`gum ${stream.getTracks().map(t => t.kind).sort().join("+")}`);
+      },
+      e => report(`gum ${e.name}`)
+    );
+  document.getElementById("pc").onclick = async () => {
+    try {
+      let pc = new RTCPeerConnection();
+      pc.createDataChannel("x");
+      let offer = await pc.createOffer();
+      report(`pc ${offer.type}`);
+    } catch (e) {
+      report(`pc ${e.name}`);
+    }
+  };
+  // A notification request without a click: should be refused without a prompt.
+  if (location.search == "?spam") {
+    Notification.requestPermission().then(p => report(`spam ${p}`));
+  }
+</script>

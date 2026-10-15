@@ -27,6 +27,7 @@ var BrowserWip = {
     Letterbox.init(window);
     DownloadsUI.init(window).catch(console.error);
     BrowserContextMenu.init(window);
+    PermissionPrompts.init(window);
     // Gecko asks this object where to open links and window.open() calls.
     window.browserDOMWindow = gBrowser.browserDOMWindow;
 

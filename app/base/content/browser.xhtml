@@ -23,6 +23,7 @@
   <script src="chrome://browser-wip/content/letterbox.js"/>
   <script src="chrome://browser-wip/content/downloads.js"/>
   <script src="chrome://browser-wip/content/contextmenu.js"/>
+  <script src="chrome://browser-wip/content/permissions.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
   <script src="chrome://browser-wip/content/browser.js"/>
 </head>
@@ -162,6 +163,41 @@
         <div class="panel-row downloads-footer">
           <button id="downloads-open-folder" class="panel-link" data-l10n-id="downloads-open-folder"/>
           <button id="downloads-clear" class="panel-link" data-l10n-id="downloads-clear"/>
+        </div>
+      </div>
+    </xul:panel>
+
+    <!-- Permission prompts (permissions.js). Stays open while the user
+         clicks in the page; answered with Allow, Block or Escape. -->
+    <xul:panel id="permission-panel" class="wip-panel" type="arrow" role="alertdialog"
+               noautohide="true" aria-labelledby="permission-message">
+      <div class="panel-body">
+        <p id="permission-message" class="panel-title"></p>
+        <label id="permission-video-row" class="permission-device" hidden="true">
+          <span></span>
+          <xul:menulist id="permission-video" sizetopopup="none"/>
+        </label>
+        <label id="permission-audio-row" class="permission-device" hidden="true">
+          <span data-l10n-id="permission-microphone-label"></span>
+          <xul:menulist id="permission-audio" sizetopopup="none"/>
+        </label>
+        <label id="permission-remember-row" class="permission-remember">
+          <input id="permission-remember" type="checkbox"/>
+          <span data-l10n-id="permission-remember"></span>
+        </label>
+        <div class="permission-buttons">
+          <button id="permission-block" class="panel-button" data-l10n-id="permission-block"/>
+          <button id="permission-allow" class="panel-button primary" data-l10n-id="permission-allow"/>
+        </div>
+      </div>
+    </xul:panel>
+
+    <xul:panel id="sharing-panel" class="wip-panel" type="arrow" role="dialog"
+               aria-labelledby="sharing-message">
+      <div class="panel-body">
+        <p id="sharing-message" class="panel-title"></p>
+        <div class="permission-buttons">
+          <button id="sharing-stop" class="panel-button" data-l10n-id="sharing-stop"/>
         </div>
       </div>
     </xul:panel>
