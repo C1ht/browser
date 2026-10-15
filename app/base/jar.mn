@@ -8,6 +8,7 @@ browser-wip.jar:
   content/browser-wip/browser.js             (content/browser.js)
   content/browser-wip/tabbrowser.js          (content/tabbrowser.js)
   content/browser-wip/letterbox.js           (content/letterbox.js)
+  content/browser-wip/downloads.js           (content/downloads.js)
   content/browser-wip/urlbar.js              (content/urlbar.js)
   content/browser-wip/privacy-controls.js    (content/privacy-controls.js)
   content/browser-wip/welcome.html           (content/welcome.html)

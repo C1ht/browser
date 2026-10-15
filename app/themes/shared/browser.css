@@ -764,6 +764,138 @@ panel.wip-panel {
   cursor: pointer;
 }
 
+/* ---------- Downloads ---------- */
+
+/* While downloads run, a ring around the button fills with their overall
+   progress; a dot means one finished while the panel was closed. */
+#downloads-button {
+  position: relative;
+}
+
+#downloads-button[active]::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) var(--progress, 0%), var(--active-bg) 0);
+  mask: radial-gradient(circle, transparent 11.5px, black 12px);
+}
+
+#downloads-button[attention]::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  inset-inline-end: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--accent);
+}
+
+#downloads-list {
+  display: grid;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-inline: -8px;
+}
+
+.download {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.download[data-state="done"] {
+  cursor: pointer;
+}
+
+.download:hover {
+  background-color: var(--hover-bg);
+}
+
+.download-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+.download-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.download-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.download:is([data-state="canceled"], [data-state="missing"]) :is(.download-name, .download-icon) {
+  opacity: 0.6;
+}
+
+.download-status {
+  color: var(--chrome-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.download[data-state="failed"] .download-status {
+  color: var(--rec-fg);
+}
+
+.download-progress {
+  display: none;
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background-color: var(--active-bg);
+  overflow: hidden;
+}
+
+.download[data-state="running"] .download-progress {
+  display: block;
+}
+
+.download-progress > div {
+  width: var(--progress, 0%);
+  height: 100%;
+  background-color: var(--accent);
+  transition: width 200ms linear;
+}
+
+/* Size unknown: a sliding segment instead of a bar. */
+.download[indeterminate] .download-progress > div {
+  width: 30%;
+  animation: download-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes download-indeterminate {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(340%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .download-progress > div { transition: none; }
+  .download[indeterminate] .download-progress > div { animation: none; width: 100%; opacity: 0.4; }
+}
+
+.download-action {
+  width: 28px;
+  height: 28px;
+}
+
+.downloads-footer .panel-link {
+  margin-top: 0;
+}
+
 /* XUL menus opened from the toolbar. */
 menupopup.wip-menu {
   --panel-background: var(--panel-bg);

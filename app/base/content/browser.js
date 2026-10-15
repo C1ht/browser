@@ -25,6 +25,7 @@ var BrowserWip = {
     gBrowser = new TabBrowser(window);
     gURLBar = new URLBar(window, gBrowser);
     Letterbox.init(window);
+    DownloadsUI.init(window).catch(console.error);
     // Gecko asks this object where to open links and window.open() calls.
     window.browserDOMWindow = gBrowser.browserDOMWindow;
 
@@ -110,6 +111,7 @@ var BrowserWip = {
     cmd_moveTabNext: () => gBrowser.moveSelectedTab(1),
     cmd_moveTabPrev: () => gBrowser.moveSelectedTab(-1),
     cmd_settings: () => BrowserWip.openSettings(),
+    cmd_downloads: () => DownloadsUI.open(),
     cmd_newWindow: () => BrowserWip.openNewWindow(),
     cmd_closeWindow: () => BrowserWip.closeWindow(),
     cmd_quit: () => Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit),

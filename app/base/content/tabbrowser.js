@@ -125,6 +125,9 @@ class TabBrowser {
     this.tabContainer.addEventListener("keydown", this);
     this.browserContainer.addEventListener("WillChangeBrowserRemoteness", this);
     this.browserContainer.addEventListener("pagetitlechanged", this);
+    // A page's window.close(), and a tab Gecko opened only for a link that
+    // turned out to be a download (toolkit's BrowserElementParent sends it).
+    this.browserContainer.addEventListener("DOMWindowClose", this);
     this.window.addEventListener(
       "unload",
       () => this.tabs.forEach(t => this._unregisterAudible(t)),
@@ -527,6 +530,14 @@ class TabBrowser {
           BrowserWip.openNewTab();
         }
         break;
+      case "DOMWindowClose": {
+        let tab = this.getTabForBrowser(event.target);
+        if (tab) {
+          event.preventDefault();
+          this.removeTab(tab, { skipPermitUnload: true });
+        }
+        break;
+      }
       case "keydown":
         this._onTabKeydown(event);
         break;

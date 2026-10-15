@@ -21,6 +21,7 @@
   <link rel="localization" href="browser-wip/browser.ftl"/>
   <script src="chrome://browser-wip/content/tabbrowser.js"/>
   <script src="chrome://browser-wip/content/letterbox.js"/>
+  <script src="chrome://browser-wip/content/downloads.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
   <script src="chrome://browser-wip/content/browser.js"/>
 </head>
@@ -39,6 +40,7 @@
     <xul:command id="cmd_moveTabNext"/>
     <xul:command id="cmd_moveTabPrev"/>
     <xul:command id="cmd_settings"/>
+    <xul:command id="cmd_downloads"/>
     <xul:command id="cmd_newWindow"/>
     <xul:command id="cmd_closeWindow"/>
     <xul:command id="cmd_quit"/>
@@ -67,6 +69,7 @@
     <xul:key id="key_prevTab2" keycode="VK_PAGE_UP" modifiers="accel" command="cmd_prevTab" reserved="true"/>
     <xul:key id="key_moveTabNext" keycode="VK_PAGE_DOWN" modifiers="accel,shift" command="cmd_moveTabNext"/>
     <xul:key id="key_moveTabPrev" keycode="VK_PAGE_UP" modifiers="accel,shift" command="cmd_moveTabPrev"/>
+    <xul:key id="key_downloads" key="j" modifiers="accel" command="cmd_downloads"/>
     <xul:key id="key_find" key="f" modifiers="accel" command="cmd_find"/>
     <xul:key id="key_findAgain" key="g" modifiers="accel" command="cmd_findAgain"/>
     <xul:key id="key_findPrevious" key="g" modifiers="accel,shift" command="cmd_findPrevious"/>
@@ -79,6 +82,7 @@
       <xul:menuitem data-l10n-id="app-menu-new-tab" key="key_newTab" command="cmd_newTab"/>
       <xul:menuitem data-l10n-id="app-menu-new-window" key="key_newWindow" command="cmd_newWindow"/>
       <xul:menuseparator/>
+      <xul:menuitem data-l10n-id="app-menu-downloads" key="key_downloads" command="cmd_downloads"/>
       <xul:menuitem data-l10n-id="app-menu-settings" command="cmd_settings"/>
       <xul:menuseparator/>
       <xul:menuitem data-l10n-id="app-menu-quit" command="cmd_quit"/>
@@ -108,6 +112,19 @@
         <p class="panel-text" data-l10n-id="protections-toggle-help"></p>
         <button class="panel-link" data-l10n-id="protections-open-settings"
                 data-command="cmd_settings"/>
+      </div>
+    </xul:panel>
+
+    <xul:panel id="downloads-panel" class="wip-panel" type="arrow" role="dialog"
+               aria-labelledby="downloads-title">
+      <div class="panel-body">
+        <h2 id="downloads-title" class="panel-title" data-l10n-id="downloads-title"></h2>
+        <div id="downloads-list" role="list" aria-labelledby="downloads-title"></div>
+        <p id="downloads-empty" class="panel-text" data-l10n-id="downloads-empty"></p>
+        <div class="panel-row downloads-footer">
+          <button id="downloads-open-folder" class="panel-link" data-l10n-id="downloads-open-folder"/>
+          <button id="downloads-clear" class="panel-link" data-l10n-id="downloads-clear"/>
+        </div>
       </div>
     </xul:panel>
 
@@ -154,6 +171,9 @@
     </div>
 
     <div id="tool-buttons">
+      <button id="downloads-button" class="toolbar-button" data-l10n-id="downloads-button" hidden="true">
+        <img class="icon" src="chrome://browser-wip/skin/icons/download.svg" alt=""/>
+      </button>
       <button id="app-menu-button" class="toolbar-button" data-l10n-id="app-menu-button">
         <img class="icon" src="chrome://browser-wip/skin/icons/menu.svg" alt=""/>
       </button>

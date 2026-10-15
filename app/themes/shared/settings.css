@@ -25,6 +25,16 @@
   flex-wrap: wrap;
 }
 
+#downloads .folder {
+  display: grid;
+  min-width: 0;
+}
+
+#downloads-folder {
+  overflow-wrap: anywhere;
+  font-size: 13.5px;
+}
+
 #restart-row {
   padding: 12px 14px;
   border-radius: 10px;

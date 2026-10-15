@@ -27,6 +27,9 @@ stop-button =
 app-menu-button =
     .title = Menu
     .aria-label = Menu
+downloads-button =
+    .title = Downloads (Ctrl+J)
+    .aria-label = Downloads
 
 ## Window controls (Windows)
 
@@ -107,10 +110,38 @@ app-menu-new-tab =
     .label = New tab
 app-menu-new-window =
     .label = New window
+app-menu-downloads =
+    .label = Downloads
 app-menu-settings =
     .label = Settings
 app-menu-quit =
     .label = Quit
+
+## Downloads panel
+
+downloads-title = Downloads
+downloads-empty = No downloads yet.
+downloads-open-folder = Open downloads folder
+downloads-clear = Clear list
+# $current, $total, $speed (String) - sizes such as "4.2 MB"
+download-status-progress = { $current } of { $total }
+download-status-progress-speed = { $current } of { $total } · { $speed }/s
+download-status-unknown = { $current }
+# $size (String) - e.g. "4.2 MB"; $host (String) - the site it came from
+download-status-done = { $size }
+download-status-done-host = { $size } · { $host }
+download-status-failed = Failed
+download-status-canceled = Canceled
+download-status-missing = File moved or deleted
+download-action-cancel =
+    .title = Cancel
+    .aria-label = Cancel download
+download-action-retry =
+    .title = Try again
+    .aria-label = Try download again
+download-action-show =
+    .title = Show in folder
+    .aria-label = Show in folder
 
 ## Protections panel
 

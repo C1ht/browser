@@ -44,6 +44,41 @@ window.addEventListener("DOMContentLoaded", () => {
     Services.prefs.setStringPref("browserwip.search.engine", engine.value);
   });
 
+  // Downloads: the folder files are saved to, or ask each time.
+  let { Downloads } = ChromeUtils.importESModule("resource://gre/modules/Downloads.sys.mjs");
+  let folder = document.getElementById("downloads-folder");
+  let ask = document.getElementById("downloads-ask");
+  let syncDownloads = async () => {
+    folder.textContent = await Downloads.getPreferredDownloadsDirectory();
+    let asking = !Services.prefs.getBoolPref("browser.download.useDownloadDir", true);
+    ask.setAttribute("aria-checked", String(asking));
+  };
+  ask.addEventListener("click", () => {
+    let asking = ask.getAttribute("aria-checked") == "true";
+    Services.prefs.setBoolPref("browser.download.useDownloadDir", asking);
+    syncDownloads();
+  });
+  document.getElementById("downloads-ask-label").addEventListener("click", e => {
+    e.preventDefault();
+    ask.click();
+  });
+  document.getElementById("downloads-change").addEventListener("click", async () => {
+    let picker = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
+    let [title] = await document.l10n.formatValues(["settings-downloads-picker-title"]);
+    picker.init(window.browsingContext, title, Ci.nsIFilePicker.modeGetFolder);
+    let current = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+    current.initWithPath(await Downloads.getPreferredDownloadsDirectory());
+    picker.displayDirectory = current;
+    let result = await new Promise(resolve => picker.open(resolve));
+    if (result == Ci.nsIFilePicker.returnOK) {
+      // 2: a folder of the user's choosing (browser.download.dir).
+      Services.prefs.setComplexValue("browser.download.dir", Ci.nsIFile, picker.file);
+      Services.prefs.setIntPref("browser.download.folderList", 2);
+      syncDownloads();
+    }
+  });
+  syncDownloads();
+
   // Appearance.
   let appearance = document.querySelectorAll("#appearance [data-value]");
   let syncAppearance = () => {

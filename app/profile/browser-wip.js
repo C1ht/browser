@@ -37,6 +37,15 @@ pref("accessibility.typeaheadfind.timeout", 5000);
 pref("accessibility.typeaheadfind.flashBar", 1);
 pref("accessibility.typeaheadfind.linksonly", false);
 
+// Downloads go straight to the Downloads folder, as in Firefox, and show in
+// the downloads panel (downloads.js). Settings can pick another folder or ask
+// each time. Toolkit's defaults would ask with a bare file picker. Downloads
+// are kept out of Windows' recent documents.
+pref("browser.download.useDownloadDir", true);
+pref("browser.download.folderList", 1);
+pref("browser.download.always_ask_before_handling_new_types", false);
+pref("browser.download.manager.addToRecentDocs", false);
+
 // Closing the last tab closes the window.
 pref("browser.tabs.closeWindowWithLastTab", true);
 

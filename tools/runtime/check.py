@@ -450,6 +450,44 @@ def part4(bindir, base, shots):
                 time.sleep(1)
                 b.m.screenshot(str(Path(shots) / f"chrome-{mode}.png"))
         b.js("Services.prefs.clearUserPref('browserwip.appearance');")
+
+        # Downloads: straight to the chosen folder, listed in the panel.
+        target = tempfile.mkdtemp(prefix="wip-downloads-")
+        tabs_before = b.js("""
+          window.__tabEvents = { opened: 0, closed: 0 };
+          gBrowser.tabContainer.addEventListener("TabOpen", () => window.__tabEvents.opened++);
+          gBrowser.tabContainer.addEventListener("TabClose", () => window.__tabEvents.closed++);
+          return gBrowser.tabs.length;""")
+        b.js("""
+          let dir = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+          dir.initWithPath(arguments[0]);
+          Services.prefs.setComplexValue("browser.download.dir", Ci.nsIFile, dir);
+          Services.prefs.setIntPref("browser.download.folderList", 2);
+          gBrowser.addTab(arguments[1]);""", target, f"{base}/download.html")
+        item = b.wait("""
+          let item = document.querySelector("#downloads-list .download");
+          return item?.dataset.state == "done" && {
+            button: !document.getElementById("downloads-button").hidden,
+            panel: document.getElementById("downloads-panel").state,
+            name: item.querySelector(".download-name").textContent,
+            status: item.querySelector(".download-status").textContent };""", timeout=30)
+        saved = Path(target, "download.bin")
+        record(4, "a download is saved without asking and listed in the panel",
+               bool(item) and item["button"] and item["name"] == "download.bin"
+               and saved.exists() and saved.stat().st_size == 100000, item)
+        # The page's own tab stays; the one its link opened for the file closes.
+        tabs_after = b.wait("return gBrowser.tabs.length == arguments[0] && arguments[0];", tabs_before + 1, timeout=10)
+        events = b.js("return window.__tabEvents;")
+        record(4, "the tab opened only for the download closes",
+               tabs_after == tabs_before + 1 and events == {"opened": 2, "closed": 1}, events)
+        cleared = b.js("""
+          document.getElementById("downloads-clear").click();
+          document.getElementById("downloads-panel").hidePopup();
+          return new Promise(r => setTimeout(() => r({
+            items: document.querySelectorAll("#downloads-list .download").length,
+            button: document.getElementById("downloads-button").hidden }), 1000));""")
+        record(4, "clearing the list empties it and hides the button",
+               cleared["items"] == 0 and cleared["button"], cleared)
     finally:
         b.quit()
 
