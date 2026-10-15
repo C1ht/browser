@@ -1,3 +1,4 @@
 # Pinned mozilla-central checkout and build output live outside version control
 /gecko/
 /obj-*/
+__pycache__/
