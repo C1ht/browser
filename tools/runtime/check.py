@@ -488,6 +488,71 @@ def part4(bindir, base, shots):
             button: document.getElementById("downloads-button").hidden }), 1000));""")
         record(4, "clearing the list empties it and hides the button",
                cleared["items"] == 0 and cleared["button"], cleared)
+
+        # Right-click menu on pages. Positions are fixed in contextmenu.html.
+        b.js("gBrowser.addTab(arguments[0]);", f"{base}/contextmenu.html")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'context menu page';")
+        b.js("gBrowser.selectedBrowser.focus();")
+        visible = """let m = document.getElementById("content-context-menu");
+          return m.state == "open" && [...m.children].filter(i => !i.hidden && i.id).map(i => i.id);"""
+        def context_menu(x, y, command=None):
+            b.m.right_click(x, y)
+            items = b.wait(visible, timeout=5)
+            if command:
+                b.js("document.getElementById(arguments[0]).doCommand();", command)
+            b.js("document.getElementById('content-context-menu').hidePopup();")
+            time.sleep(0.3)
+            return items
+        menus = {name: context_menu(x, y) for name, (x, y) in
+                 {"link": (25, 28), "image": (40, 90), "field": (30, 160), "page": (60, 350)}.items()}
+        expected = {
+            "link": ["context-openlink-tab", "context-openlink-window", "context-copylink", "context-savelink"],
+            "image": ["context-openimage", "context-copyimage", "context-copyimage-link", "context-saveimage"],
+            "field": ["context-undo", "context-cut", "context-copy-edit", "context-paste", "context-delete",
+                      "context-selectall"],
+            "page": ["context-back", "context-forward", "context-reload", "context-selectall",
+                     "context-savepage", "context-viewsource"],
+        }
+        record(4, "right-click menus fit what was clicked (link, image, field, page)", menus == expected, menus)
+
+        context_menu(25, 28, "context-copylink")
+        copied = b.js("""let t = Cc["@mozilla.org/widget/transferable;1"].createInstance(Ci.nsITransferable);
+          t.init(null); t.addDataFlavor("text/plain");
+          Services.clipboard.getData(t, Ci.nsIClipboard.kGlobalClipboard);
+          let d = {}; t.getTransferData("text/plain", d);
+          return d.value.QueryInterface(Ci.nsISupportsString).data;""")
+        record(4, "Copy link copies the link's address", copied == f"{base}/target.html", copied)
+
+        tabs = b.js("return gBrowser.tabs.length;")
+        context_menu(25, 28, "context-openlink-tab")
+        opened = b.wait("""return gBrowser.tabs.length == arguments[0] + 1 &&
+          gBrowser.tabs[gBrowser.tabs.indexOf(gBrowser.selectedTab) + 1].linkedBrowser.currentURI.spec;""", tabs)
+        record(4, "Open link in new tab opens it next to the page, in the background",
+               opened == f"{base}/target.html", opened)
+
+        b.js("""Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper).copyString("pasted");""")
+        context_menu(30, 160, "context-paste")
+        title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith('field') && t;", timeout=5)
+        record(4, "Paste puts the clipboard into the field", bool(title) and "pasted" in title, title)
+
+        # Saving, without the file picker the menu would show.
+        saved_dir = tempfile.mkdtemp(prefix="wip-save-")
+        b.js("""
+          let dir = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+          dir.initWithPath(arguments[0]);
+          Services.prefs.setComplexValue("browser.download.dir", Ci.nsIFile, dir);""", saved_dir)
+        b.m.right_click(25, 28)
+        b.wait(visible, timeout=5)
+        b.js("""let { data } = BrowserContextMenu;
+          ContentAreaUtilsScope.saveURL(data.linkURL, null, null, "SaveLinkTitle", false, true,
+            E10SUtils.deserializeReferrerInfo(data.referrerInfo),
+            E10SUtils.deserializeCookieJarSettings(data.cookieJarSettings), null, false, data.principal);
+          document.getElementById("content-context-menu").hidePopup();""")
+        saved = b.wait("""return [...document.querySelectorAll("#downloads-list .download")]
+          .some(d => d.dataset.state == "done" && d.querySelector(".download-name").textContent == "target.html");""",
+                       timeout=15)
+        record(4, "Save link saves through the downloads manager",
+               bool(saved) and Path(saved_dir, "target.html").exists(), sorted(os.listdir(saved_dir)))
     finally:
         b.quit()
 

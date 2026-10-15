@@ -29,6 +29,21 @@ const JSWINDOWACTORS = {
     // stylesheets and never messages the parent.
     safeForUntrustedWebProcess: true,
   },
+  // The right-click menu on pages (contextmenu.js). As Firefox's: safe in
+  // web processes because the parent trusts nothing it sends.
+  ContextMenu: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/ContextMenuParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/ContextMenuChild.sys.mjs",
+      events: {
+        contextmenu: { mozSystemGroup: true },
+      },
+    },
+    allFrames: true,
+    safeForUntrustedWebProcess: true,
+  },
 };
 
 /**

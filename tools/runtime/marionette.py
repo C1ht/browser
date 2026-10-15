@@ -75,6 +75,19 @@ class Marionette:
         )
         return result.get("value") if isinstance(result, dict) else result
 
+    def right_click(self, x, y):
+        """Right-click the selected tab's page at (x, y) CSS pixels from its
+        top left. The event is synthesized in the browser window and routed
+        to the page like real input, so the page sees a trusted contextmenu
+        event. (Marionette's own actions only know Firefox's tab browser.)"""
+        self.js("""
+          let [x, y] = arguments;
+          let r = gBrowser.selectedBrowser.getBoundingClientRect();
+          // As on Windows: the button goes down and up, then the menu event.
+          for (let type of ["mousedown", "mouseup", "contextmenu"]) {
+            window.synthesizeMouseEvent(type, r.left + x, r.top + y, { button: 2, clickCount: 1 });
+          }""", x, y)
+
     def screenshot(self, path):
         data = self.command("WebDriver:TakeScreenshot", {"full": False, "hash": False})
         import base64

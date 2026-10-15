@@ -26,6 +26,7 @@ var BrowserWip = {
     gURLBar = new URLBar(window, gBrowser);
     Letterbox.init(window);
     DownloadsUI.init(window).catch(console.error);
+    BrowserContextMenu.init(window);
     // Gecko asks this object where to open links and window.open() calls.
     window.browserDOMWindow = gBrowser.browserDOMWindow;
 
@@ -210,12 +211,12 @@ var BrowserWip = {
     gURLBar.focusAndSelect();
   },
 
-  openNewWindow() {
+  openNewWindow(url = NEW_TAB_URL) {
     window.openDialog(
       Services.prefs.getStringPref("browser.chromeURL"),
       "_blank",
       "chrome,all,dialog=no",
-      NEW_TAB_URL
+      url
     );
   },
 

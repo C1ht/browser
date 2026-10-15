@@ -6,6 +6,7 @@ DIRS += [
     "about",
     "compat",
     "contentblocking",
+    "contextmenu",
     "privacy",
     "startup",
 ]

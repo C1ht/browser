@@ -22,6 +22,7 @@
   <script src="chrome://browser-wip/content/tabbrowser.js"/>
   <script src="chrome://browser-wip/content/letterbox.js"/>
   <script src="chrome://browser-wip/content/downloads.js"/>
+  <script src="chrome://browser-wip/content/contextmenu.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
   <script src="chrome://browser-wip/content/browser.js"/>
 </head>
@@ -86,6 +87,43 @@
       <xul:menuitem data-l10n-id="app-menu-settings" command="cmd_settings"/>
       <xul:menuseparator/>
       <xul:menuitem data-l10n-id="app-menu-quit" command="cmd_quit"/>
+    </xul:menupopup>
+
+    <!-- The right-click menu on pages (contextmenu.js). data-show lists the
+         contexts an item belongs to; separators are tidied when it opens. -->
+    <xul:menupopup id="content-context-menu" class="wip-menu">
+      <xul:menuitem id="context-back" data-show="page" data-l10n-id="context-back"/>
+      <xul:menuitem id="context-forward" data-show="page" data-l10n-id="context-forward"/>
+      <xul:menuitem id="context-reload" data-show="page" data-l10n-id="context-reload"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="context-openlink-tab" data-show="link" data-l10n-id="context-openlink-tab"/>
+      <xul:menuitem id="context-openlink-window" data-show="link" data-l10n-id="context-openlink-window"/>
+      <xul:menuitem id="context-copylink" data-show="link" data-l10n-id="context-copylink"/>
+      <xul:menuitem id="context-savelink" data-show="link" data-l10n-id="context-savelink"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="context-openimage" data-show="image" data-l10n-id="context-openimage"/>
+      <xul:menuitem id="context-copyimage" data-show="image" data-l10n-id="context-copyimage"/>
+      <xul:menuitem id="context-copyimage-link" data-show="image" data-l10n-id="context-copyimage-link"/>
+      <xul:menuitem id="context-saveimage" data-show="image" data-l10n-id="context-saveimage"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="context-openmedia" data-show="media" data-l10n-id="context-openmedia"/>
+      <xul:menuitem id="context-copymedia" data-show="media" data-l10n-id="context-copymedia"/>
+      <xul:menuitem id="context-savemedia" data-show="media" data-l10n-id="context-savemedia"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="context-copy" data-show="selection-only" data-l10n-id="context-copy"/>
+      <xul:menuitem id="context-search" data-show="selection" data-l10n-id="context-search"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="context-undo" data-show="editable" data-l10n-id="context-undo"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="context-cut" data-show="editable" data-l10n-id="context-cut"/>
+      <xul:menuitem id="context-copy-edit" data-show="editable" data-l10n-id="context-copy"/>
+      <xul:menuitem id="context-paste" data-show="editable" data-l10n-id="context-paste"/>
+      <xul:menuitem id="context-delete" data-show="editable" data-l10n-id="context-delete"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="context-selectall" data-show="editable page" data-l10n-id="context-selectall"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="context-savepage" data-show="page" data-l10n-id="context-savepage"/>
+      <xul:menuitem id="context-viewsource" data-show="page" data-l10n-id="context-viewsource"/>
     </xul:menupopup>
 
     <xul:menupopup id="tab-context-menu" class="wip-menu">

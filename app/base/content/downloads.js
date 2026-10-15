@@ -19,7 +19,10 @@
  * is closed. A download that starts opens the panel in the active window.
  */
 
-ChromeUtils.defineESModuleGetters(this, {
+// Not a window global: contentAreaUtils.js, loaded into the same window,
+// defines its own `Downloads`.
+const DownloadsLazy = {};
+ChromeUtils.defineESModuleGetters(DownloadsLazy, {
   Downloads: "resource://gre/modules/Downloads.sys.mjs",
 });
 
@@ -68,7 +71,7 @@ var DownloadsUI = {
     $("downloads-clear").addEventListener("click", () => this.list.removeFinished());
     $("downloads-open-folder").addEventListener("click", () => this.openFolder());
 
-    this.list = await Downloads.getList(Downloads.ALL);
+    this.list = await DownloadsLazy.Downloads.getList(DownloadsLazy.Downloads.ALL);
     // Reports the downloads already in the list, oldest first, before
     // resolving; only downloads added after that open the panel.
     await this.list.addView(this);
@@ -84,7 +87,7 @@ var DownloadsUI = {
   },
 
   async openFolder() {
-    let path = await Downloads.getPreferredDownloadsDirectory();
+    let path = await DownloadsLazy.Downloads.getPreferredDownloadsDirectory();
     let dir = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
     dir.initWithPath(path);
     dir.launch();

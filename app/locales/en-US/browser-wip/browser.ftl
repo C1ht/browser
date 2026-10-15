@@ -117,6 +117,66 @@ app-menu-settings =
 app-menu-quit =
     .label = Quit
 
+## Page context menu
+
+context-back =
+    .label = Back
+context-forward =
+    .label = Forward
+context-reload =
+    .label = Reload
+context-openlink-tab =
+    .label = Open link in new tab
+context-openlink-window =
+    .label = Open link in new window
+context-copylink =
+    .label = Copy link
+context-savelink =
+    .label = Save link as…
+context-openimage =
+    .label = Open image in new tab
+context-copyimage =
+    .label = Copy image
+context-copyimage-link =
+    .label = Copy image address
+context-saveimage =
+    .label = Save image as…
+# $type (String) - "video" or "audio"
+context-openmedia =
+    .label = { $type ->
+        [audio] Open audio in new tab
+       *[video] Open video in new tab
+    }
+context-copymedia =
+    .label = { $type ->
+        [audio] Copy audio address
+       *[video] Copy video address
+    }
+context-savemedia =
+    .label = { $type ->
+        [audio] Save audio as…
+       *[video] Save video as…
+    }
+context-copy =
+    .label = Copy
+# $engine (String) - e.g. "Brave Search"; $text (String) - the start of the selected text
+context-search =
+    .label = Search { $engine } for “{ $text }”
+context-undo =
+    .label = Undo
+context-cut =
+    .label = Cut
+context-paste =
+    .label = Paste
+context-delete =
+    .label = Delete
+context-selectall =
+    .label = Select all
+context-savepage =
+    .label = Save page as…
+context-viewsource =
+    .label = View page source
+
 ## Downloads panel
 
 downloads-title = Downloads

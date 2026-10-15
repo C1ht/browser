@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>context menu page</title>
+<!-- Targets for the right-click menu checks in tools/runtime/check.py, at
+     fixed positions (CSS pixels from the page's top left) so the browser
+     window can click them. -->
+<style>
+  body { margin: 0; font: 16px sans-serif; }
+  body > * { position: absolute; left: 20px; margin: 0; }
+  #link { top: 20px; }
+  #image { top: 60px; width: 64px; height: 64px; }
+  #field { top: 150px; }
+  #text { top: 200px; }
+  #page { top: 300px; height: 100px; width: 200px; }
+</style>
+<a id="link" href="target.html">a link</a>
+<img id="image" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='teal'/%3E%3C/svg%3E">
+<input id="field" value="some text">
+<p id="text">Plain text on the page.</p>
+<div id="page"></div>
+<script>
+  // Lets the checks see that the right-click reached the page.
+  addEventListener("contextmenu", e => {
+    document.title = `contextmenu ${e.target.id || e.target.localName} ${e.isTrusted}`;
+  });
+  // And what a Paste put into the field.
+  document.getElementById("field").addEventListener("input", e => {
+    document.title = `field ${e.target.value}`;
+  });
+</script>
