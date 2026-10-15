@@ -594,6 +594,11 @@ def part4(bindir, base, shots):
                closed["after"] == closed["before"] - 1 and closed["focusedCard"] and closed["hidden"], closed)
 
         b.js("TabOverview.open();")
+        ring = b.js("""let other = gBrowser.tabs.find(t => t != gBrowser.selectedTab);
+          gBrowser.selectTab(other);
+          let ringed = [...document.querySelectorAll("#tab-overview-grid .overview-card[selected]")];
+          return ringed.length == 1 && ringed[0].tab == other;""")
+        record(4, "switching tabs in the strip moves the overview's ring", ring is True, ring)
         added = b.js("""let before = gBrowser.tabs.length;
           document.querySelector("#tab-overview-grid .overview-new").click();
           return { added: gBrowser.tabs.length - before, open: !document.getElementById("tab-overview").hidden,

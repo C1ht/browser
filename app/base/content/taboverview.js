@@ -45,6 +45,12 @@ var TabOverview = {
         }
       });
     }
+    // A tab chosen in the strip moves the ring; the cards stay as they are.
+    gBrowser.tabContainer.addEventListener("TabSelect", () => {
+      for (let card of this.grid.querySelectorAll(".overview-card")) {
+        card.toggleAttribute("selected", !!card.tab && card.tab == gBrowser.selectedTab);
+      }
+    });
   },
 
   get isOpen() {
