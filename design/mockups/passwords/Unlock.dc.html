@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Unlock panel</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#5EC4BE}a:hover{color:#8ad8d3}
+</style>
+</helmet>
+<div style="width: 1280px; height: 760px; box-sizing: border-box; position: relative; overflow: hidden; background: #15191C; color: #E3E8EB; font-family: 'Instrument Sans', system-ui, sans-serif; display: flex; flex-direction: column;">
+
+  <div style="height: 48px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px;">
+    <div style="display: flex; gap: 2px;">
+      <button aria-label="Back" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: #96A1AA; display: grid; place-items: center; padding: 0;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
+      <button aria-label="Forward" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: #96A1AA; opacity: 0.45; display: grid; place-items: center; padding: 0;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button>
+      <button aria-label="Reload" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: #96A1AA; display: grid; place-items: center; padding: 0;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></svg></button>
+    </div>
+    <div style="flex: 1; max-width: 720px; height: 34px; margin: 0 auto; box-sizing: border-box; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 4px; background: #22282C; border: 1px solid #2D3439; border-radius: 10px;">
+      <button aria-label="Site information" style="height: 26px; min-width: 26px; border: 0; border-radius: 7px; background: transparent; color: #96A1AA; display: grid; place-items: center; padding: 0 5px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h5M11 5h2M3 11h2M8 11h5"/><circle cx="9.5" cy="5" r="1.5"/><circle cx="6.5" cy="11" r="1.5"/></svg></button>
+      <div style="flex: 1; font-size: 13.5px; color: #96A1AA; white-space: nowrap;"><span style="color: #E3E8EB; font-weight: 600;">accounts.fieldguide.org</span>/signin</div>
+      <button aria-label="Passwords: locked" style="height: 26px; min-width: 26px; border: 0; border-radius: 7px; background: rgba(255,255,255,0.14); color: #E3E8EB; display: grid; place-items: center; padding: 0 5px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="10.5" r="2.75"/><path d="M7.5 8.5 13.5 2.5M11 5l1.75 1.75M9.5 6.5l1.25 1.25"/></svg></button>
+      <button aria-label="Protections: 6 blocked" style="height: 26px; border: 0; border-radius: 7px; background: transparent; color: #96A1AA; display: flex; align-items: center; gap: 5px; padding: 0 7px 0 5px; font: inherit; font-size: 12px; font-weight: 600;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2 3 4v4c0 3 2.2 5 5 6 2.8-1 5-3 5-6V4z"/></svg>6</button>
+    </div>
+    <div style="display: flex; gap: 2px;">
+      <button aria-label="Menu" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: #96A1AA; display: grid; place-items: center; padding: 0;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 4.5h10M3 8h10M3 11.5h10"/></svg></button>
+    </div>
+  </div>
+
+  <div style="height: 40px; flex: none; display: flex; align-items: flex-end; padding: 0 12px;">
+    <div style="height: 34px; width: 220px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: #1D2226; border-radius: 10px 10px 0 0; font-size: 13px; font-weight: 500;"><span style="width: 16px; height: 16px; border-radius: 4px; background: #5EC4BE; color: #15191C; font-size: 10px; font-weight: 700; display: grid; place-items: center;">F</span><span style="white-space: nowrap; overflow: hidden;">Sign in · Field Guide</span></div>
+  </div>
+
+  <div style="flex: 1; background: #1D2226; display: flex; justify-content: center; padding-top: 110px; font-family: system-ui, sans-serif; color: #D8D8D8;">
+    <div style="width: 340px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-family: Georgia, serif; font-size: 26px;">Welcome back</div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">Email<input style="height: 36px; border: 2px solid #7FA383; border-radius: 4px; padding: 0 10px; background: #262B2F; color: #EEE; font: inherit; font-size: 14px;"></label>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">Password<input type="password" style="height: 36px; border: 1px solid #555; border-radius: 4px; padding: 0 10px; background: #262B2F; color: #EEE; font: inherit; font-size: 14px;"></label>
+    </div>
+  </div>
+
+  <div role="dialog" aria-labelledby="unlock-title" style="position: absolute; top: 46px; left: 670px; width: 320px; box-sizing: border-box; padding: 14px 16px 12px; background: #22282C; border: 1px solid #2D3439; border-radius: 12px; box-shadow: 0 8px 28px -6px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.4); font-size: 13px; line-height: 1.4; display: flex; flex-direction: column; gap: 12px;">
+    <div>
+      <div id="unlock-title" style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">Unlock passwords</div>
+      <div style="color: #96A1AA;">To sign in on accounts.fieldguide.org.</div>
+    </div>
+    <button style="height: 36px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #5EC4BE; border-radius: 8px; background: #5EC4BE; color: #15191C; font: inherit; font-weight: 600;">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6V4.5A1.5 1.5 0 0 1 4.5 3H6M10 3h1.5A1.5 1.5 0 0 1 13 4.5V6M13 10v1.5a1.5 1.5 0 0 1-1.5 1.5H10M6 13H4.5A1.5 1.5 0 0 1 3 11.5V10"/><path d="M6 6.5v1M10 6.5v1M6 10.2c1.2 1 2.8 1 4 0"/></svg>
+      Use Windows Hello
+    </button>
+    <div style="display: flex; align-items: center; gap: 10px; color: #96A1AA; font-size: 12px;"><span style="flex: 1; height: 1px; background: #2D3439;"></span>or your master password<span style="flex: 1; height: 1px; background: #2D3439;"></span></div>
+    <div style="display: flex; gap: 8px;">
+      <input type="password" aria-label="Master password" placeholder="Master password" style="flex: 1; min-width: 0; height: 34px; box-sizing: border-box; border: 1px solid #5EC4BE; box-shadow: 0 0 0 1px #5EC4BE; border-radius: 8px; padding: 0 10px; background: #1D2226; color: #E3E8EB; font: inherit;">
+      <button style="padding: 0 14px; height: 34px; border: 1px solid #2D3439; border-radius: 8px; background: transparent; color: #E3E8EB; font: inherit; font-weight: 500;">Unlock</button>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid #2D3439;">
+      <a href="#forgot" style="color: #5EC4BE; font-weight: 500; text-decoration: none;">Forgot password?</a>
+      <span style="color: #96A1AA; font-size: 12px;">Locks after 15 min idle</span>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":760}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

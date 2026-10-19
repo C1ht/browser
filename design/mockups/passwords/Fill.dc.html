@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fill dropdown and generator</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0B6E6E}a:hover{color:#095858}
+</style>
+</helmet>
+<div style="width: 1280px; height: 760px; box-sizing: border-box; position: relative; overflow: hidden; background: #E5E9EC; color: #1B2126; font-family: 'Instrument Sans', system-ui, sans-serif; display: flex; flex-direction: column;">
+
+  <div style="height: 48px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px;">
+    <div style="display: flex; gap: 2px;">
+      <button aria-label="Back" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: #5C6771; display: grid; place-items: center; padding: 0;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"/></svg></button>
+      <button aria-label="Forward" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: #5C6771; opacity: 0.45; display: grid; place-items: center; padding: 0;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg></button>
+      <button aria-label="Reload" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: #5C6771; display: grid; place-items: center; padding: 0;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></svg></button>
+    </div>
+    <div style="flex: 1; max-width: 720px; height: 34px; margin: 0 auto; box-sizing: border-box; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 4px; background: #FFFFFF; border: 1px solid #D0D6DB; border-radius: 10px;">
+      <button aria-label="Site information" style="height: 26px; min-width: 26px; border: 0; border-radius: 7px; background: transparent; color: #5C6771; display: grid; place-items: center; padding: 0 5px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h5M11 5h2M3 11h2M8 11h5"/><circle cx="9.5" cy="5" r="1.5"/><circle cx="6.5" cy="11" r="1.5"/></svg></button>
+      <div style="flex: 1; font-size: 13.5px; color: #5C6771; white-space: nowrap;"><span style="color: #1B2126; font-weight: 600;">accounts.fieldguide.org</span>/signin</div>
+      <button aria-label="Passwords" style="height: 26px; min-width: 26px; border: 0; border-radius: 7px; background: transparent; color: #5C6771; display: grid; place-items: center; padding: 0 5px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="10.5" r="2.75"/><path d="M7.5 8.5 13.5 2.5M11 5l1.75 1.75M9.5 6.5l1.25 1.25"/></svg></button>
+      <button aria-label="Protections: 6 blocked" style="height: 26px; border: 0; border-radius: 7px; background: transparent; color: #5C6771; display: flex; align-items: center; gap: 5px; padding: 0 7px 0 5px; font: inherit; font-size: 12px; font-weight: 600;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2 3 4v4c0 3 2.2 5 5 6 2.8-1 5-3 5-6V4z"/></svg>6</button>
+    </div>
+    <div style="display: flex; gap: 2px;">
+      <button aria-label="Menu" style="width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: #5C6771; display: grid; place-items: center; padding: 0;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 4.5h10M3 8h10M3 11.5h10"/></svg></button>
+    </div>
+  </div>
+
+  <div style="height: 40px; flex: none; display: flex; align-items: flex-end; padding: 0 12px;">
+    <div style="height: 34px; width: 220px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: #FFFFFF; border-radius: 10px 10px 0 0; font-size: 13px; font-weight: 500;"><span style="width: 16px; height: 16px; border-radius: 4px; background: #0B6E6E; color: #FFFFFF; font-size: 10px; font-weight: 700; display: grid; place-items: center;">F</span><span style="white-space: nowrap; overflow: hidden;">Sign in · Field Guide</span></div>
+  </div>
+
+  <div style="flex: 1; background: #FFFFFF; display: flex; justify-content: center; gap: 120px; padding-top: 80px; font-family: system-ui, sans-serif; color: #2B2B2B;">
+    <div style="width: 320px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-family: Georgia, serif; font-size: 26px;">Welcome back</div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">Email<input style="height: 36px; border: 2px solid #3D5A40; border-radius: 4px; padding: 0 10px; font: inherit; font-size: 14px;"></label>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">Password<input type="password" style="height: 36px; border: 1px solid #BBB; border-radius: 4px; padding: 0 10px; font: inherit; font-size: 14px;"></label>
+    </div>
+    <div style="width: 320px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="font-family: Georgia, serif; font-size: 26px;">New here?</div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">Email<input value="ana@fieldguide.org" style="height: 36px; border: 1px solid #BBB; border-radius: 4px; padding: 0 10px; font: inherit; font-size: 14px;"></label>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">Choose a password<input type="password" style="height: 36px; border: 2px solid #3D5A40; border-radius: 4px; padding: 0 10px; font: inherit; font-size: 14px;"></label>
+    </div>
+  </div>
+
+  <div role="listbox" aria-label="Saved logins for accounts.fieldguide.org" style="position: absolute; top: 266px; left: 300px; width: 320px; box-sizing: border-box; padding: 6px; background: #FFFFFF; border: 1px solid #D0D6DB; border-radius: 10px; box-shadow: 0 8px 28px -6px rgba(15,20,25,0.28), 0 1px 3px rgba(15,20,25,0.12); font-size: 13px; display: flex; flex-direction: column; gap: 2px;">
+    <div role="option" aria-selected="true" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; background: rgba(27,33,38,0.07);">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5C6771" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="10.5" r="2.75"/><path d="M7.5 8.5 13.5 2.5M11 5l1.75 1.75M9.5 6.5l1.25 1.25"/></svg>
+      <div style="display: flex; flex-direction: column;"><span style="font-weight: 600;">ana@fieldguide.org</span><span style="font-size: 12px; color: #5C6771;">accounts.fieldguide.org</span></div>
+    </div>
+    <div role="option" aria-selected="false" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px;">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5C6771" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="10.5" r="2.75"/><path d="M7.5 8.5 13.5 2.5M11 5l1.75 1.75M9.5 6.5l1.25 1.25"/></svg>
+      <div style="display: flex; flex-direction: column;"><span style="font-weight: 600;">ana.lab@fieldguide.org</span><span style="font-size: 12px; color: #5C6771;">accounts.fieldguide.org</span></div>
+    </div>
+    <div style="height: 1px; background: #D0D6DB; margin: 4px 6px;"></div>
+    <div style="padding: 4px 10px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5C6771;">Saved for www.fieldguide.org</div>
+    <div role="option" aria-selected="false" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px;">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5C6771" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="10.5" r="2.75"/><path d="M7.5 8.5 13.5 2.5M11 5l1.75 1.75M9.5 6.5l1.25 1.25"/></svg>
+      <div style="flex: 1; display: flex; flex-direction: column;"><span style="font-weight: 600;">ana.old@fieldguide.org</span><span style="font-size: 12px; color: #5C6771;">Click to fill · also use here</span></div>
+    </div>
+    <div style="height: 1px; background: #D0D6DB; margin: 4px 6px;"></div>
+    <div style="padding: 7px 10px; color: #0B6E6E; font-weight: 500;">Manage passwords</div>
+  </div>
+
+  <div role="listbox" aria-label="Password suggestion" style="position: absolute; top: 352px; left: 740px; width: 340px; box-sizing: border-box; padding: 6px; background: #FFFFFF; border: 1px solid #D0D6DB; border-radius: 10px; box-shadow: 0 8px 28px -6px rgba(15,20,25,0.28), 0 1px 3px rgba(15,20,25,0.12); font-size: 13px; display: flex; flex-direction: column; gap: 2px;">
+    <div role="option" aria-selected="true" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; background: rgba(27,33,38,0.07);">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#0B6E6E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><circle cx="5.75" cy="5.75" r=".6" fill="#0B6E6E"/><circle cx="10.25" cy="10.25" r=".6" fill="#0B6E6E"/><circle cx="8" cy="8" r=".6" fill="#0B6E6E"/></svg>
+      <div style="display: flex; flex-direction: column; min-width: 0;"><span style="font-weight: 600;">Use a strong password</span><span style="font-size: 12px; color: #5C6771; font-family: ui-monospace, 'Cascadia Mono', 'DejaVu Sans Mono', monospace; letter-spacing: 0.02em;">kV7#qmTe-x2Lp9!wRe4s</span></div>
+    </div>
+    <div style="padding: 6px 10px 4px; font-size: 12px; color: #5C6771;">Saved when you create the account. Undo from the key in the address field.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":760}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

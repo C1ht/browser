@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Set up passwords</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0B6E6E}a:hover{color:#095858}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; overflow: hidden; background: #FFFFFF; color: #1B2126; font: 15px/1.55 'Instrument Sans', system-ui, sans-serif; display: flex; justify-content: center; gap: 48px; padding: 64px 48px;">
+
+  <div style="width: 520px; display: flex; flex-direction: column; gap: 18px;">
+    <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5C6771;">Step 1 of 3</div>
+    <h1 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: -0.012em;">Choose a master password</h1>
+    <p style="margin: 0; color: #5C6771;">It encrypts every password you save. You'll type it to unlock, to see a password and to export.</p>
+    <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 500;">Master password
+      <input type="password" value="orbit velvet lantern pebble tundra" style="height: 40px; box-sizing: border-box; border: 1px solid #0B6E6E; box-shadow: 0 0 0 1px #0B6E6E; border-radius: 9px; padding: 0 12px; font: inherit; color: #1B2126;">
+    </label>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="flex: 1; height: 6px; border-radius: 999px; background: rgba(27,33,38,0.16); overflow: hidden;"><div style="width: 92%; height: 100%; background: #0B6E6E;"></div></div>
+      <span style="font-size: 13.5px; color: #0B6E6E; font-weight: 600;">Strong</span>
+    </div>
+    <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 500;">Type it again
+      <input type="password" style="height: 40px; box-sizing: border-box; border: 1px solid #C3CAD0; border-radius: 9px; padding: 0 12px; font: inherit;">
+    </label>
+    <div style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+      <button style="border: 1px solid #C3CAD0; border-radius: 9px; padding: 6px 14px; background: transparent; color: #1B2126; font: inherit; font-weight: 500;">Suggest a passphrase</button>
+      <span style="color: #5C6771;">At least 12 characters. Five random words are easy to remember and hard to guess.</span>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: #FBEBD4; color: #8A4B00; font-size: 14px;">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 3px;"><path d="M8 2.5 14 13H2z"/><path d="M8 6.5v3M8 11.3v.1"/></svg>
+      <span>Nobody can recover a forgotten master password: there's no account and no server. The next step offers a recovery key you keep yourself.</span>
+    </div>
+    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+      <button style="border: 1px solid #C3CAD0; border-radius: 9px; padding: 7px 16px; background: transparent; color: #1B2126; font: inherit; font-size: 14px; font-weight: 500;">Cancel</button>
+      <button style="border: 0; border-radius: 9px; padding: 9px 22px; background: #1B2126; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600;">Continue</button>
+    </div>
+  </div>
+
+  <div style="width: 1px; background: #E1E5E9;"></div>
+
+  <div style="width: 480px; display: flex; flex-direction: column; gap: 18px;">
+    <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5C6771;">Step 2 of 3</div>
+    <h1 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: -0.012em;">Your recovery key</h1>
+    <p style="margin: 0; color: #5C6771;">If you forget your master password, this key opens your passwords and lets you set a new one. It's shown only now.</p>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 18px; border-radius: 12px; background: #F3F5F7; font-family: ui-monospace, 'Cascadia Mono', 'DejaVu Sans Mono', monospace; font-size: 16px; letter-spacing: 0.06em; text-align: center;">
+      <span>[XXXX]</span><span>[XXXX]</span><span>[XXXX]</span><span>[XXXX]</span>
+      <span>[XXXX]</span><span>[XXXX]</span><span>[XXXX]</span><span>[XXXX]</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button style="border: 1px solid #C3CAD0; border-radius: 9px; padding: 7px 16px; background: transparent; color: #1B2126; font: inherit; font-size: 14px; font-weight: 500;">Print</button>
+      <button style="border: 1px solid #C3CAD0; border-radius: 9px; padding: 7px 16px; background: transparent; color: #1B2126; font: inherit; font-size: 14px; font-weight: 500;">Copy</button>
+    </div>
+    <label style="display: flex; gap: 10px; align-items: center; font-size: 14px;"><input type="checkbox" checked="checked" style="width: 16px; height: 16px; accent-color: #0B6E6E;">I've stored it somewhere safe, away from this computer</label>
+    <div style="display: flex; gap: 10px; justify-content: space-between; align-items: center;">
+      <a href="#skip" style="font-size: 14px; font-weight: 500; text-decoration: none;">Skip, no recovery key</a>
+      <button style="border: 0; border-radius: 9px; padding: 9px 22px; background: #1B2126; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600;">Continue</button>
+    </div>
+    <div style="border-top: 1px solid #E1E5E9; padding-top: 16px; font-size: 14px; color: #5C6771;">Step 3 offers Windows Hello or your system keyring for quicker unlocking. Both are off unless you turn them on.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
