@@ -25,6 +25,7 @@
   <script src="chrome://browser-wip/content/contextmenu.js"/>
   <script src="chrome://browser-wip/content/permissions.js"/>
   <script src="chrome://browser-wip/content/taboverview.js"/>
+  <script src="chrome://browser-wip/content/fullscreen.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
   <script src="chrome://browser-wip/content/browser.js"/>
 </head>
@@ -288,6 +289,13 @@
       <span id="tab-overview-count"></span>
     </div>
     <div id="tab-overview-grid"></div>
+  </div>
+
+  <!-- While a page is in fullscreen (fullscreen.js). A popover, so it shows
+       above the fullscreen page. -->
+  <div id="fullscreen-warning" popover="manual" role="alert">
+    <span id="fullscreen-warning-text"></span>
+    <button id="fullscreen-exit-button" class="panel-button" data-l10n-id="fullscreen-exit-button"/>
   </div>
 </body>
 </html>

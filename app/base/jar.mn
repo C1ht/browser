@@ -12,6 +12,7 @@ browser-wip.jar:
   content/browser-wip/contextmenu.js         (content/contextmenu.js)
   content/browser-wip/permissions.js         (content/permissions.js)
   content/browser-wip/taboverview.js         (content/taboverview.js)
+  content/browser-wip/fullscreen.js          (content/fullscreen.js)
   content/browser-wip/urlbar.js              (content/urlbar.js)
   content/browser-wip/privacy-controls.js    (content/privacy-controls.js)
   content/browser-wip/welcome.html           (content/welcome.html)

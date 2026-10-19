@@ -108,8 +108,15 @@ var PermissionPrompts = {
     if (request == this._shown && this.panel.state != "closed") {
       return;
     }
-    this._shown = request;
     let doc = this.window.document;
+    if (doc.fullscreen) {
+      // The prompt hangs from the address field, which fullscreen hides:
+      // leave fullscreen first, so it can be seen and answered.
+      this.window.addEventListener("MozDOMFullscreen:Exited", () => this._show(), { once: true });
+      FullScreen.exitDomFullScreen();
+      return;
+    }
+    this._shown = request;
     let args = { host: this._host(request.principal) };
     let id = `permission-${request.kind}`;
     if (request.kind == "webrtc") {

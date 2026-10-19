@@ -1193,3 +1193,54 @@ menupopup.wip-menu menuseparator {
   margin: 4px 6px;
   padding: 0;
 }
+
+/* ---------- Fullscreen pages (fullscreen.js) ---------- */
+
+/* The page's <browser> fills the screen from the top layer; the rest of the
+   window is hidden so it isn't laid out underneath. */
+:root[inDOMFullscreen] :is(#nav-bar, #tab-strip, #findbar, #tab-overview) {
+  display: none;
+}
+
+:root[inDOMFullscreen] #browsers > browser {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#fullscreen-warning {
+  inset: 0 0 auto;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  background-color: var(--panel-bg);
+  color: var(--chrome-fg);
+  box-shadow: var(--panel-shadow);
+  font: 13px/1.4 var(--font-ui);
+  overflow: visible;
+  translate: 0 calc(-100% - 8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: translate 200ms ease-out, opacity 200ms ease-out;
+}
+
+#fullscreen-warning:not(:popover-open) {
+  display: none;
+}
+
+#fullscreen-warning[shown] {
+  translate: 0 16px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#fullscreen-warning-text {
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #fullscreen-warning { transition: none; }
+}

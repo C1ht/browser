@@ -31,6 +31,7 @@ var BrowserWip = {
     BrowserContextMenu.init(window);
     PermissionPrompts.init(window);
     TabOverview.init(window);
+    FullScreen.init(window);
     // Gecko asks this object where to open links and window.open() calls.
     window.browserDOMWindow = gBrowser.browserDOMWindow;
 

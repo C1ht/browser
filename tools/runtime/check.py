@@ -623,6 +623,30 @@ def part4(bindir, base, shots):
         record(4, "adding a tab from the overview keeps it open, with a card for the new tab",
                added["added"] == 1 and added["open"] and added["cards"] == added["tabs"], added)
 
+        # Fullscreen: a page's own button (a video's), and a player embedded
+        # from another site, which asks from its own process.
+        for name, page, (x, y) in [("a page", "fullscreen.html", (40, 40)),
+                                   ("an embedded player", "fullscreen-embed.html", (40, 140))]:
+            b.js("gBrowser.addTab(arguments[0]);", f"{base}/{page}")
+            b.wait("return gBrowser.selectedBrowser.contentTitle == 'fullscreen off';")
+            time.sleep(0.5)
+            b.m.click(x, y)
+            entered = b.wait("""let shown = id => getComputedStyle(document.getElementById(id)).display != "none";
+              let text = document.getElementById("fullscreen-warning-text").textContent;
+              return gBrowser.selectedBrowser.contentTitle == "fullscreen on" &&
+                document.fullscreenElement == gBrowser.selectedBrowser && text.includes("127.0.0.1") && {
+                  barsHidden: !shown("nav-bar") && !shown("tab-strip"),
+                  warning: document.getElementById("fullscreen-warning").hasAttribute("shown"), text };""", timeout=15)
+            if not entered:
+                entered = b.js("return gBrowser.selectedBrowser.contentTitle;")
+            record(4, f"{name} can go fullscreen, with the bars hidden and the site named",
+                   isinstance(entered, dict) and entered["barsHidden"] and entered["warning"], entered)
+            b.js("FullScreen.exitDomFullScreen();")
+            left = b.wait("""return gBrowser.selectedBrowser.contentTitle == "fullscreen off" && !document.fullscreenElement &&
+                !document.documentElement.hasAttribute("inDOMFullscreen") &&
+                getComputedStyle(document.getElementById("nav-bar")).display != "none";""", timeout=15)
+            record(4, f"leaving fullscreen ({name}) brings the bars back", bool(left), left)
+
         # Site icons: a declared <link rel="icon">, and /favicon.ico otherwise.
         b.js("let [base] = arguments; gBrowser.addTab(base + '/icon.html'); gBrowser.addTab(base + '/target.html');", base)
         icons = b.wait("""let tab = name => gBrowser.tabs.find(t => t.linkedBrowser.currentURI.spec.endsWith(name));

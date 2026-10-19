@@ -288,3 +288,10 @@ protections-open-settings = Privacy settings
 identity-title = { $host }
 identity-summary-secure = Your connection to this site is encrypted.
 identity-summary-insecure = Your connection to this site is not encrypted. Don’t enter passwords or card numbers here.
+
+## Fullscreen pages
+
+# $host (String) - the site, e.g. "youtube.com"
+fullscreen-warning-host = { $host } is now full screen
+fullscreen-warning-page = This page is now full screen
+fullscreen-exit-button = Exit full screen (Esc)

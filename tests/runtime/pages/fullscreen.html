@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>fullscreen off</title>
+<!-- For the fullscreen checks in tools/runtime/check.py: a button that asks
+     for fullscreen, as a video's fullscreen button does, at a fixed position
+     so the browser window can click it. The title says whether this page is
+     in fullscreen. -->
+<style>
+  body { margin: 0; }
+  #go { position: absolute; left: 20px; top: 20px; width: 120px; height: 40px; }
+</style>
+<button id="go">fullscreen</button>
+<script>
+  document.addEventListener("fullscreenchange", () => {
+    document.title = document.fullscreenElement ? "fullscreen on" : "fullscreen off";
+  });
+  document.getElementById("go").addEventListener("click", () => {
+    document.documentElement.requestFullscreen().catch(e => (document.title = `fullscreen refused: ${e.message}`));
+  });
+</script>

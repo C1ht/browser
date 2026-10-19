@@ -46,6 +46,28 @@ const JSWINDOWACTORS = {
     allFrames: true,
     safeForUntrustedWebProcess: true,
   },
+  // Fullscreen video and requestFullscreen() (fullscreen.js). In every
+  // frame: an embedded player asks from its own iframe.
+  DOMFullscreen: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/DOMFullscreenParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/DOMFullscreenChild.sys.mjs",
+      events: {
+        "MozDOMFullscreen:Request": {},
+        "MozDOMFullscreen:Entered": {},
+        "MozDOMFullscreen:NewOrigin": {},
+        "MozDOMFullscreen:Exit": {},
+        "MozDOMFullscreen:Exited": {},
+        "MozDOMFullscreen:WarnAboutKeyboardLock": {},
+        "MozDOMFullscreen:UpdateKeyboardLock": {},
+      },
+    },
+    messageManagerGroups: ["browsers"],
+    allFrames: true,
+    safeForUntrustedWebProcess: true,
+  },
   // Middle-click and Ctrl+click on links open a new tab (LinkClickChild).
   LinkClick: {
     parent: {

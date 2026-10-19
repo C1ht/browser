@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>fullscreen off</title>
+<!-- fullscreen.html embedded from another site (localhost rather than
+     127.0.0.1), like a video player embedded from elsewhere: it runs in its
+     own process. Its button is at (40, 140) on this page. The title says
+     whether this page is in fullscreen, which it is while the frame is. -->
+<style>
+  body { margin: 0; }
+  iframe { position: absolute; left: 0; top: 100px; width: 400px; height: 200px; border: 0; }
+</style>
+<script>
+  document.addEventListener("fullscreenchange", () => {
+    document.title = document.fullscreenElement ? "fullscreen on" : "fullscreen off";
+  });
+  let frame = document.createElement("iframe");
+  frame.allowFullscreen = true;
+  frame.src = `http://localhost:${location.port}/fullscreen.html`;
+  document.documentElement.append(frame);
+</script>
