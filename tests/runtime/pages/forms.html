@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>forms page</title>
+<!-- A sign-in form for the checks in tools/runtime/check.py (part 6), at
+     fixed positions (CSS pixels from the page's top left). -->
+<style>
+  body { margin: 0; font: 16px sans-serif; }
+  form > * { position: absolute; left: 20px; margin: 0; }
+  #q { top: 20px; }
+  #pw { top: 60px; }
+  #go { top: 100px; }
+</style>
+<form action="target.html">
+  <input id="q" name="wipq">
+  <input id="pw" name="pw" type="password">
+  <button id="go">Go</button>
+</form>
+<script>
+  document.getElementById("q").addEventListener("input", e => {
+    document.title = `forms page q ${e.target.value}`;
+  });
+  document.getElementById("pw").addEventListener("focus", () => {
+    document.title = "forms page pw focused";
+  });
+</script>

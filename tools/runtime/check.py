@@ -4,7 +4,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Runtime checks against a built browser-wip.
 
-    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4] [--shots DIR]
+    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4 5 6] [--shots DIR]
 
 Starts the browser (headless, fresh profile, Marionette on a local port),
 runs privileged JavaScript in its window and reports pass/fail per check.
@@ -12,7 +12,9 @@ Test pages are served from tests/runtime/pages on 127.0.0.1.
 """
 
 import argparse
+import base64
 import functools
+import re
 import http.server
 import json
 import os
@@ -50,9 +52,35 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+# Pages under /auth/ need HTTP Basic sign-in as wip:secret; /deny/ accepts
+# nobody (part 6).
+AUTH_HEADER = "Basic " + base64.b64encode(b"wip:secret").decode()
+
+
+class PageHandler(QuietHandler):
+    def do_GET(self):
+        for prefix, realm in [("/auth/", "browser-wip check"), ("/deny/", "browser-wip deny")]:
+            if self.path.startswith(prefix):
+                break
+        else:
+            return super().do_GET()
+        if prefix == "/auth/" and self.headers.get("Authorization") == AUTH_HEADER:
+            body = b"<!doctype html><title>signed in</title>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+        else:
+            body = b"<!doctype html><title>not signed in</title>"
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", f'Basic realm="{realm}"')
+            self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
 def serve_pages():
     port = free_port()
-    handler = functools.partial(QuietHandler, directory=str(PAGES))
+    handler = functools.partial(PageHandler, directory=str(PAGES))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return f"http://127.0.0.1:{port}"
@@ -814,10 +842,123 @@ def part5(bindir, base):
     b.quit()
 
 
+# ---------------------------------------------------------------------------
+# Part 6: Firefox's password manager is off; HTTP sign-in still works
+
+SIGNON_OFF = {
+    "signon.rememberSignons": False,
+    "signon.autofillForms": False,
+    "signon.generation.enabled": False,
+    "signon.formlessCapture.enabled": False,
+    "signon.privateBrowsingCapture.enabled": False,
+    "signon.backup.enabled": False,
+    "signon.includeOtherSubdomainsInLookup": False,
+    "signon.schemeUpgrades": False,
+}
+
+# The open HTTP sign-in dialog: toolkit's window-modal commonDialog, since
+# this browser has no tab-modal prompts.
+AUTH_DIALOG = """let win = [...Services.wm.getEnumerator(null)].find(w =>
+  w.location.href == "chrome://global/content/commonDialog.xhtml" && w.document.readyState == "complete");
+return win && { text: win.document.getElementById("infoBody").textContent,
+  login: !win.document.getElementById("loginContainer")?.hidden };"""
+ANSWER_AUTH_DIALOG = """let [user, password] = arguments;
+let win = [...Services.wm.getEnumerator(null)].find(w =>
+  w.location.href == "chrome://global/content/commonDialog.xhtml");
+let dialog = win.document.getElementById("commonDialog");
+if (user == null) { dialog.cancelDialog(); return; }
+win.document.getElementById("loginTextbox").value = user;
+win.document.getElementById("password1Textbox").value = password;
+dialog.acceptDialog();"""
+
+
+def part6(bindir, base):
+    # Console messages from chrome and pages go to the log, to look for
+    # errors from code that expects toolkit's password manager.
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True,
+                               "devtools.console.stdout.chrome": True,
+                               "devtools.console.stdout.content": True})
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        wrong = b.js(IMPORTS + "let [want] = arguments; return Object.entries(want)"
+                     ".filter(([k, v]) => pref(k) !== v).map(([k]) => [k, pref(k)]);", SIGNON_OFF)
+        record(6, "Firefox's password manager prefs are off", not wrong, wrong)
+
+        def open_tab(url, title):
+            b.js("gBrowser.selectTab(gBrowser.addTab(arguments[0]));", url)
+            return b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith(arguments[0]) && t;",
+                          title, timeout=15)
+
+        open_tab(f"{base}/forms.html", "forms page")
+        actor = b.js("""return gBrowser.selectedBrowser.browsingContext.currentWindowGlobal
+          .getActor("LoginManager").constructor.name;""")
+        record(6, "toolkit's LoginManager actor is replaced by the inert one", actor == "LoginManagerStubParent", actor)
+
+        # Form history still saves typed (here: pasted) text, which needs the
+        # LoginManager actor to exist; and a password field takes focus
+        # without errors.
+        b.js("gBrowser.selectedBrowser.focus();")
+        b.js("""Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper)
+          .copyString("wip-history-check");""")
+        b.m.right_click(30, 30)
+        b.wait("return document.getElementById('content-context-menu').state == 'open';", timeout=5)
+        b.js("document.getElementById('context-paste').doCommand();"
+             "document.getElementById('content-context-menu').hidePopup();")
+        pasted = b.wait("return gBrowser.selectedBrowser.contentTitle == 'forms page q wip-history-check';",
+                        timeout=5)
+        b.m.click(30, 70)
+        focused = b.wait("return gBrowser.selectedBrowser.contentTitle == 'forms page pw focused';", timeout=5)
+        time.sleep(0.5)
+        b.m.click(30, 110)
+        submitted = b.wait("return gBrowser.selectedBrowser.contentTitle.startsWith('target page');", timeout=15)
+        saved = b.wait("""const { FormHistory } = ChromeUtils.importESModule("resource://gre/modules/FormHistory.sys.mjs");
+          return FormHistory.count({ fieldname: "wipq", value: "wip-history-check" });""", timeout=10)
+        record(6, "form history is still saved when a form with a password field is submitted",
+               pasted and focused and submitted and saved == 1, [pasted, focused, submitted, saved])
+
+        # HTTP Basic: a dialog names the site; signing in loads the page.
+        b.js("gBrowser.selectTab(gBrowser.addTab(arguments[0]));", f"{base}/auth/")
+        shown = b.wait(AUTH_DIALOG, timeout=15)
+        if shown:
+            b.js(ANSWER_AUTH_DIALOG, "wip", "secret")
+        title = b.wait("return gBrowser.selectedBrowser.contentTitle == 'signed in';", timeout=15)
+        record(6, "HTTP Basic sign-in prompts with the site's name and signs in",
+               bool(shown) and "127.0.0.1" in shown["text"] and shown["login"] and bool(title),
+               [shown, b.js("return gBrowser.selectedBrowser.contentTitle;")])
+
+        # Cancelling twice in a tab stops further prompts from that site there.
+        b.js("gBrowser.selectTab(gBrowser.addTab(arguments[0]));", f"{base}/deny/1")
+        prompts = []
+        for i in range(3):
+            if i:
+                b.js("gBrowser.selectedBrowser.loadURI(Services.io.newURI(arguments[0]),"
+                     "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });",
+                     f"{base}/deny/{i + 1}")
+            shown = b.wait(AUTH_DIALOG, timeout=5 if i == 2 else 15)
+            prompts.append(bool(shown))
+            if shown:
+                b.js(ANSWER_AUTH_DIALOG, None, None)
+                b.wait("""return ![...Services.wm.getEnumerator(null)].some(w =>
+                  w.location.href == "chrome://global/content/commonDialog.xhtml");""", timeout=5)
+        record(6, "a site whose sign-in prompt is cancelled twice gets no third", prompts == [True, True, False],
+               prompts)
+
+        loaded = b.js("""return ["LoginManagerParent", "LoginManagerAuthPrompter", "storage-json", "storage-rust",
+          "LoginManager"].filter(m => Cu.isESModuleLoaded(`resource://gre/modules/${m}.sys.mjs`));""")
+        record(6, "none of Firefox's password manager loaded in the browser process", loaded == [], loaded)
+    finally:
+        b.quit()
+    files = [f for f in ("logins.json", "logins.db", "logins-backup.json") if (b.profile / f).exists()]
+    record(6, "no Firefox login store in the profile", not files, files)
+    errors = [line for line in (b.profile / "browser.log").read_text(errors="replace").splitlines()
+              if re.search(r"LoginManager(?!Stub)|Delegation to password manager|authentication prompt failed", line)]
+    record(6, "no errors from code expecting Firefox's password manager", not errors, errors[:5])
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("bindir")
-    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5])
+    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5, 6])
     parser.add_argument("--shots", help="directory for screenshots")
     args = parser.parse_args()
     if args.shots:
@@ -825,7 +966,7 @@ def main():
     base = serve_pages()
     parts = {1: lambda: part1(args.bindir, base), 2: lambda: part2(args.bindir, base),
              3: lambda: part3(args.bindir, base, args.shots), 4: lambda: part4(args.bindir, base, args.shots),
-             5: lambda: part5(args.bindir, base)}
+             5: lambda: part5(args.bindir, base), 6: lambda: part6(args.bindir, base)}
     for p in args.part:
         try:
             parts[p]()

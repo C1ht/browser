@@ -101,7 +101,7 @@ jobs:
         if: matrix.platform == 'linux-x86_64'
         run: |
           sudo apt-get install -y -qq strace > /dev/null
-          python3 browser/tools/runtime/check.py "$WORK/mozilla-central/obj-release/dist/bin" --part 1 2 3 4
+          python3 browser/tools/runtime/check.py "$WORK/mozilla-central/obj-release/dist/bin" --part 1 2 3 4 6
 
       - name: Rename archive
         run: |
@@ -143,7 +143,7 @@ jobs:
         shell: pwsh
         run: |
           $exe = Get-ChildItem app -Recurse -Filter browser-wip.exe | Select-Object -First 1
-          python browser/tools/runtime/check.py $exe.DirectoryName --part 1 2 3 4
+          python browser/tools/runtime/check.py $exe.DirectoryName --part 1 2 3 4 6
 
   release:
     name: Publish release
