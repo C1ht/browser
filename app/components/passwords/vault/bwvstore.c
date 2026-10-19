@@ -19,6 +19,7 @@
 #else
 #  include <errno.h>
 #  include <fcntl.h>
+#  include <stdio.h> /* renameat */
 #  include <sys/file.h>
 #  include <sys/stat.h>
 #  include <unistd.h>
