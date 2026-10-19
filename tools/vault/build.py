@@ -70,7 +70,7 @@ class Compiler:
             flags += [f"-fsanitize={sanitizers}", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer"]
         return flags
 
-    def compile(self, src, obj, includes, defines, ours):
+    def compile(self, src, obj, includes, defines, ours, kat=False):
         if self.msvc:
             cmd = [self.cc, *self.common(), "/c", str(src), f"/Fo{obj}"]
             cmd += ["/W4", "/WX"] if ours else ["/w"]
@@ -79,6 +79,11 @@ class Compiler:
         else:
             cmd = [self.cc, *self.common(), "-c", str(src), "-o", str(obj)]
             cmd += ["-Wall", "-Wextra", "-Werror"] if ours else ["-w"]
+            if kat and self.sanitize:
+                # Under ASan, upstream's harness sets its guard page to NULL
+                # and its misuse checks pass that to non-null parameters on
+                # purpose. Only the test programs are exempt, not libsodium.
+                cmd.append("-fno-sanitize=nonnull-attribute")
             cmd += [f"-I{i}" for i in includes]
             cmd += [f"-D{k}={v}" for k, v in defines.items()]
         return subprocess.run(cmd, capture_output=True, text=True)
@@ -131,7 +136,7 @@ def build(args):
     def run(job):
         src, obj, ours = job
         is_kat = src.parent == SODIUM / "test"
-        return src, cc.compile(src, obj, inc, test_defines if is_kat else defines, ours)
+        return src, cc.compile(src, obj, inc, test_defines if is_kat else defines, ours, is_kat)
 
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
         failed = [(s, r) for s, r in pool.map(run, jobs) if r.returncode != 0]
