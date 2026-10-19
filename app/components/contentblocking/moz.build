@@ -2,14 +2,18 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+DIRS += ["blocker"]
+
 EXTRA_JS_MODULES.browserwip += [
     "ContentBlockingChild.sys.mjs",
     "ContentBlockingLists.sys.mjs",
 ]
 
-# Compile the vendored filter lists into classifier tables and element-hiding
-# sheets. The first output is written by the build; compile_lists.py writes
-# the rest next to it.
+# The vendored filter lists. Network rules ship as list text, which the
+# network blocker (blocker/) compiles at startup. Element-hiding rules are
+# compiled at build time into a stylesheet and a per-site index for the
+# ContentBlockingChild actor; the first output is written by the build,
+# compile_lists.py writes the rest next to it.
 lists = [
     "lists/easylist.txt",
     "lists/easyprivacy.txt",
@@ -17,9 +21,6 @@ lists = [
 ]
 outputs = [
     "compile-stats.json",
-    "wip-ads-digest256.update",
-    "wip-track-digest256.update",
-    "wip-social-digest256.update",
     "cosmetic-generic.css",
     "cosmetic-sites.json",
 ]
@@ -27,3 +28,4 @@ GeneratedFile(*outputs, script="compile_lists.py", entry_point="generate", input
 
 # resource://gre/defaults/contentblocking/
 FINAL_TARGET_FILES.defaults.contentblocking += sorted("!%s" % o for o in outputs)
+FINAL_TARGET_FILES.defaults.contentblocking += lists

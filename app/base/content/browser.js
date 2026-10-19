@@ -9,6 +9,7 @@
 ChromeUtils.defineESModuleGetters(this, {
   AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
   ContentBlockingAllowList: "resource://gre/modules/ContentBlockingAllowList.sys.mjs",
+  ContentBlockingLists: "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
   SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
 });
@@ -37,6 +38,12 @@ var BrowserWip = {
 
     this._wireButtons();
     this._wirePanels();
+    // The network blocker failing or recovering changes the shield.
+    let onBlockerState = () => gURLBar.update();
+    Services.obs.addObserver(onBlockerState, "browserwip:blocker-state");
+    window.addEventListener("unload", () => Services.obs.removeObserver(onBlockerState, "browserwip:blocker-state"), {
+      once: true,
+    });
     this._wireTabContextMenu();
     gBrowser.tabContainer.addEventListener("TabSelect", () => this._onTabSelect());
     gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
@@ -412,6 +419,12 @@ var BrowserWip = {
   // -----------------------------------------------------------------------
   // Protections and site information panels
 
+  // The network blocker isn't working (its engine failed to build or took
+  // too long); nothing is blocked anywhere.
+  protectionsUnavailable() {
+    return ContentBlockingLists.unavailable;
+  },
+
   protectionsDisabledFor(browser) {
     try {
       return ContentBlockingAllowList.canHandle(browser) && ContentBlockingAllowList.includes(browser);
@@ -467,11 +480,15 @@ var BrowserWip = {
     l10n.setAttributes(document.getElementById("protections-title"), "protections-title", {
       host: this._host(),
     });
-    l10n.setAttributes(
-      document.getElementById("protections-summary"),
-      disabled ? "protections-summary-off" : "protections-summary-on",
-      { count, mode: PrivacyModes.mode }
-    );
+    let summary = disabled
+      ? "protections-summary-off"
+      : this.protectionsUnavailable()
+        ? "protections-summary-unavailable"
+        : "protections-summary-on";
+    l10n.setAttributes(document.getElementById("protections-summary"), summary, {
+      count,
+      mode: PrivacyModes.mode,
+    });
     document.getElementById("protections-toggle").setAttribute("aria-checked", String(!disabled));
   },
 

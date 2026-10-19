@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<!-- Every way a page can make the browser touch a blocked host, one host per
+     way, so a DNS lookup can be traced to its cause (check.py part 7).
+     Requests: script, image, fetch, iframe, and in Strict a social widget.
+     Not requests: a DNS prefetch hint, a preconnect hint and a link. -->
+<meta charset="utf-8">
+<title>loading</title>
+<link rel="dns-prefetch" href="//fls.doubleclick.net">
+<link rel="preconnect" href="https://static.doubleclick.net">
+<a href="https://www.googletagmanager.com/x">a link</a>
+<script src="https://www.google-analytics.com/analytics.js"></script>
+<img src="https://securepubads.g.doubleclick.net/pagead/pixel.gif" alt="">
+<iframe src="https://ad.doubleclick.net/frame.html"></iframe>
+<script>
+  if (location.search == "?strict") {
+    let frame = document.createElement("iframe");
+    frame.src = "https://www.facebook.com/plugins/like.php?href=x";
+    document.body.append(frame);
+  }
+  fetch("https://stats.bitdefender.com/collect", { mode: "no-cors" }).catch(() => {});
+  window.addEventListener("load", () => (document.title = "dns page"));
+</script>

@@ -6,10 +6,11 @@
  * Hides the empty frames that blocked ads leave behind, using the
  * element-hiding rules of the bundled filter lists.
  *
- * Network blocking happens in Gecko's URL classifier; this actor only adds
- * user-agent stylesheets. It runs on DOMDocElementInserted, before the first
- * layout, so ad slots never flash on screen. Rules are applied as agent-level
- * `display: none !important`, which page styles cannot override.
+ * Network blocking happens in the parent (blocker/NetworkBlocker.cpp); this
+ * actor only adds user-agent stylesheets. It runs on DOMDocElementInserted,
+ * before the first layout, so ad slots never flash on screen. Rules are
+ * applied as agent-level `display: none !important`, which page styles
+ * cannot override.
  */
 
 const BASE = "resource://gre/defaults/contentblocking/";

@@ -63,9 +63,6 @@ pref("browserwip.search.suggest.enabled", false);
 pref("browserwip.privacy.mode", "standard");
 pref("browserwip.firstrun.completed", false);
 
-// Version of the bundled filter lists last loaded into the URL classifier.
-pref("browserwip.contentblocking.listsVersion", "");
-
 // ---------------------------------------------------------------------------
 // 2. Protections (Standard)
 // ---------------------------------------------------------------------------
@@ -93,9 +90,11 @@ pref("dom.security.https_only_mode", false);
 pref("security.mixed_content.block_active_content", true);
 pref("security.mixed_content.upgrade_display_content", true);
 
-// Ads and trackers, from the bundled lists (ContentBlockingLists.sys.mjs).
-// The classifier only blocks third-party loads, so a site's own resources are
-// never affected. Mozilla's table names are replaced so nothing looks for
+// Ads and trackers, from the bundled lists: the network blocker
+// (contentblocking/blocker/) checks every request against them, a site's own
+// requests included. These prefs switch it on (pbmode: in private windows);
+// socialtracking adds Fanboy's social list. Gecko's URL classifier gets no
+// tables at all, so nothing is blocked or counted twice, and nothing looks for
 // tables that would have to be downloaded.
 pref("privacy.trackingprotection.enabled", true);
 pref("privacy.trackingprotection.pbmode.enabled", true);
@@ -104,12 +103,12 @@ pref("privacy.trackingprotection.fingerprinting.enabled", false);
 pref("privacy.trackingprotection.cryptomining.enabled", false);
 pref("privacy.trackingprotection.emailtracking.enabled", false);
 pref("privacy.trackingprotection.emailtracking.pbmode.enabled", false);
-pref("urlclassifier.trackingTable", "wip-ads-digest256,wip-track-digest256");
-pref("urlclassifier.trackingAnnotationTable", "wip-ads-digest256,wip-track-digest256");
+pref("urlclassifier.trackingTable", "");
+pref("urlclassifier.trackingAnnotationTable", "");
 pref("urlclassifier.trackingWhitelistTable", "");
 pref("urlclassifier.trackingAnnotationWhitelistTable", "");
-pref("urlclassifier.features.socialtracking.blacklistTables", "wip-social-digest256");
-pref("urlclassifier.features.socialtracking.annotate.blacklistTables", "wip-social-digest256");
+pref("urlclassifier.features.socialtracking.blacklistTables", "");
+pref("urlclassifier.features.socialtracking.annotate.blacklistTables", "");
 pref("urlclassifier.features.socialtracking.whitelistTables", "");
 pref("urlclassifier.features.socialtracking.annotate.whitelistTables", "");
 pref("urlclassifier.features.fingerprinting.blacklistTables", "");

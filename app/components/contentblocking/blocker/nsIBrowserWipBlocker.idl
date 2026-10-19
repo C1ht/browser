@@ -1,0 +1,29 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+/**
+ * The network blocker (NetworkBlocker.cpp). Checks HTTP requests in the
+ * parent process against the bundled filter lists and cancels matches.
+ */
+[scriptable, uuid(1f23f0f3-1c94-450a-beca-b66f926ff26c)]
+interface nsIBrowserWipBlocker : nsISupports
+{
+  /**
+   * "idle" until start(), then "building", and then "ready", "failed" (the
+   * filter engine could not be built) or "timeout" (not built within
+   * 10 seconds; it can still become "ready" afterwards). Each change is
+   * announced with the observer topic "browserwip:blocker-state", the new
+   * state as data.
+   */
+  readonly attribute ACString state;
+
+  /**
+   * Starts checking requests. Requests made before the filter engine is
+   * built are held until it is. aMainLists holds the text of EasyList and
+   * EasyPrivacy, aSocialList that of Fanboy Social. Later calls do nothing.
+   */
+  void start(in ACString aMainLists, in ACString aSocialList);
+};

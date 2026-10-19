@@ -1,18 +1,14 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-"""Compile Adblock Plus filter lists into the formats the browser loads.
+"""Compile the element-hiding rules of Adblock Plus filter lists.
 
-Network rules become Safe Browsing v2 "digest256" table updates: one SHA-256
-hash per URL fragment ("host/" or "host/path"). Gecko's URL classifier matches
-them locally with full hashes, so no lookup ever leaves the machine. Only rules
-the classifier can express exactly are kept: a host, optionally a literal
-path, and no options beyond third-party (the classifier only blocks
-third-party loads anyway).
-
-Element-hiding rules become one user-agent stylesheet of generic selectors and
-a JSON index of per-site selectors and exceptions, applied by the
-ContentBlockingChild actor.
+They become one user-agent stylesheet of generic selectors and a JSON index
+of per-site selectors and exceptions, applied by the ContentBlockingChild
+actor. Network rules are not compiled here: the lists ship as text and the
+network blocker (blocker/NetworkBlocker.cpp) builds its engine from them at
+startup. Of the network rules, only the exceptions that switch element
+hiding off for a site ($generichide, $elemhide) are read here.
 
 Run by the build (see moz.build). Can also be run by hand:
     python3 compile_lists.py <out-dir> lists/*.txt
@@ -25,34 +21,14 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-# list file stem -> classifier table its network rules go into
-TABLES = {
-    "easylist": "wip-ads-digest256",
-    "easyprivacy": "wip-track-digest256",
-    "fanboy-social": "wip-social-digest256",
-}
-
 # Lists whose element-hiding rules are applied. Social widgets are only
-# hidden in Strict mode, which handles them through its own table.
+# blocked in Strict mode, by the network blocker.
 COSMETIC_LISTS = {"easylist", "easyprivacy"}
 
 COSMETIC = re.compile(r"^([^#]*)(##|#@#|#\?#|#@\?#|#\$#|#@\$#|#%#|#@%#)(.+)$")
 HOST_RULE = re.compile(
     r"^\|\|(?P<host>[a-z0-9][a-z0-9.-]*[a-z0-9])(?P<path>/[^*^|$]*)?\^?\|?$"
 )
-# Options a host rule may carry and still be applied. Resource-type options
-# are accepted: the classifier then blocks every third-party load from the
-# host, which is right for hosts that exist to serve ads or tracking.
-# Anything scoped to particular sites ($domain=), first-party-only, popup-only,
-# or rewriting requests ($redirect=, $csp=, ...) is skipped, because applying
-# it everywhere would block more than the list intends.
-NETWORK_OPTIONS_OK = {
-    "third-party", "3p", "important", "all", "document", "doc",
-    "script", "image", "stylesheet", "css", "xmlhttprequest", "xhr",
-    "subdocument", "frame", "ping", "beacon", "media", "object",
-    "websocket", "font", "other",
-}
-RESOURCE_TYPES = NETWORK_OPTIONS_OK - {"third-party", "3p", "important", "all"}
 EXCEPTION_COSMETIC_OPTIONS = {"generichide", "ghide", "elemhide", "ehide"}
 
 # Procedural or extension-specific selector syntax that CSS cannot apply.
@@ -71,7 +47,7 @@ def split_options(rule):
 
 
 def fragment(body):
-    """Classifier fragment for a network rule body, or None."""
+    """"host/" or "host/path" for a host-anchored rule body, or None."""
     m = HOST_RULE.match(body.lower())
     if not m:
         return None
@@ -83,10 +59,6 @@ def fragment(body):
 
 class Compiled:
     def __init__(self):
-        self.blocked = defaultdict(set)  # table -> fragments
-        self.badfilters = set()  # (fragment, options) cancelled by $badfilter
-        self.rule_options = defaultdict(set)  # fragment -> option sets seen
-        self.allowed = set()  # fragments unblocked everywhere
         self.generic = set()
         self.generic_except = defaultdict(set)  # selector -> domains
         self.generic_disabled_everywhere = set()
@@ -96,7 +68,6 @@ class Compiled:
         self.skipped = defaultdict(int)
 
     def add_list(self, stem, lines):
-        table = TABLES[stem]
         cosmetic = stem in COSMETIC_LISTS
         for raw in lines:
             line = raw.strip()
@@ -107,7 +78,7 @@ class Compiled:
                 if cosmetic:
                     self.add_cosmetic(*m.groups())
                 continue
-            self.add_network(table, line)
+            self.add_network(line)
 
     def add_cosmetic(self, domains, sep, selector):
         if sep not in ("##", "#@#") or UNSUPPORTED_SELECTOR.search(selector):
@@ -135,44 +106,15 @@ class Compiled:
             for d in exclude:
                 self.generic_except[selector].add(d)
 
-    def add_network(self, table, line):
-        exception = line.startswith("@@")
-        body, opts = split_options(line[2:] if exception else line)
+    def add_network(self, line):
+        # Only "@@||site^$generichide" and the like: no generic element
+        # hiding on that site.
+        if not line.startswith("@@"):
+            return
+        body, opts = split_options(line[2:])
         frag = fragment(body)
-        if exception:
-            if opts & EXCEPTION_COSMETIC_OPTIONS and frag and frag.endswith("/"):
-                self.no_generic.add(frag[:-1])
-            elif frag and not opts:
-                self.allowed.add(frag)
-            return
-        if "badfilter" in opts:
-            # "rule$badfilter" cancels "rule" wherever it appears.
-            if frag:
-                self.badfilters.add((frag, frozenset(opts - {"badfilter"})))
-            return
-        if frag is None:
-            self.skipped["network-pattern"] += 1
-        elif not opts <= NETWORK_OPTIONS_OK:
-            self.skipped["network-options"] += 1
-        else:
-            self.blocked[table].add(frag)
-            self.rule_options[frag].add(frozenset(opts))
-
-    def _cancelled(self, frag):
-        # A fragment is dropped only if every rule that produced it was
-        # cancelled by a matching $badfilter.
-        seen = self.rule_options.get(frag, set())
-        return bool(seen) and all((frag, o) in self.badfilters for o in seen)
-
-    def table_update(self, table):
-        hashes = sorted(
-            hashlib.sha256(f.encode()).digest()
-            for f in self.blocked[table] - self.allowed
-            if not self._cancelled(f)
-        )
-        data = b"".join(hashes)
-        head = f"n:1000\ni:{table}\na:1:32:{len(data)}\n".encode()
-        return head + data, len(hashes)
+        if opts & EXCEPTION_COSMETIC_OPTIONS and frag and frag.endswith("/"):
+            self.no_generic.add(frag[:-1])
 
     def conditional_generic(self):
         """Generic selectors some sites opt out of, with those sites.
@@ -227,12 +169,7 @@ def compile_lists(out_dir, list_paths):
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    # The browser reloads its classifier tables when this changes.
-    stats = {"version": digest.hexdigest()[:16], "snapshot": snapshot, "tables": {}}
-    for table in TABLES.values():
-        data, count = c.table_update(table)
-        (out_dir / f"{table}.update").write_bytes(data)
-        stats["tables"][table] = count
+    stats = {"version": digest.hexdigest()[:16], "snapshot": snapshot}
     css, count = c.generic_css()
     (out_dir / "cosmetic-generic.css").write_text(css, encoding="utf-8")
     stats["generic-selectors"] = count

@@ -70,6 +70,10 @@ protections-button =
            *[other] { $count } trackers and ads blocked
         }
     .aria-label = Protections
+# Shown when the ad and tracker blocker failed to start
+protections-button-unavailable =
+    .title = Ad and tracker blocking isn’t working
+    .aria-label = Protections
 
 ## Tabs
 
@@ -279,6 +283,7 @@ protections-summary-on =
        *[standard] Standard privacy is on.
     }
 protections-summary-off = Protections are off for this site. Trackers and ads can load.
+protections-summary-unavailable = Ad and tracker blocking isn’t working right now, so ads and trackers can load on every site. Restarting the browser may fix it.
 protections-toggle-label = Protections for this site
 protections-toggle-help = Turn this off if the site doesn’t work properly. The page reloads.
 protections-open-settings = Privacy settings

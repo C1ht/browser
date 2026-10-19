@@ -97,12 +97,6 @@ jobs:
         env:
           MOZCONFIG: ${{ github.workspace }}/browser/mozconfigs/${{ env.MOZCONFIG_NAME }}
 
-      - name: Smoke test (Linux)
-        if: matrix.platform == 'linux-x86_64'
-        run: |
-          sudo apt-get install -y -qq strace > /dev/null
-          python3 browser/tools/runtime/check.py "$WORK/mozilla-central/obj-release/dist/bin" --part 1 2 3 4
-
       - name: Rename archive
         run: |
           cd "$WORK/mozilla-central/obj-release/dist"
@@ -114,16 +108,26 @@ jobs:
           cp "$src" "$WORK/out/browser-wip-${{ inputs.tag }}-${{ matrix.platform }}.$ext"
           ls -la "$WORK/out"
 
+      # Uploaded before the smoke test, so a failing check still leaves the
+      # build to look at; the release job needs the tests to pass anyway.
       - uses: actions/upload-artifact@v4
         with:
           name: browser-wip-${{ matrix.platform }}
           path: ${{ env.WORK }}/out/*
           retention-days: 7
 
+      - name: Smoke test (Linux)
+        if: matrix.platform == 'linux-x86_64'
+        run: |
+          sudo apt-get install -y -qq strace > /dev/null
+          python3 browser/tools/runtime/check.py "$WORK/mozilla-central/obj-release/dist/bin" --part 1 2 3 4 7
+
   test-windows:
     name: Smoke test on Windows
     needs: build
-    if: inputs.platforms != 'linux'
+    # Also when the Linux smoke test failed: its results are wanted too. A
+    # missing Windows build fails the download step.
+    if: ${{ !cancelled() && inputs.platforms != 'linux' }}
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
@@ -139,11 +143,11 @@ jobs:
         run: |
           Expand-Archive -Path (Get-ChildItem dist/*.zip).FullName -DestinationPath app
           Get-ChildItem app -Recurse -Filter browser-wip.exe | Select-Object -First 1 FullName
-      - name: Run checks (app identity, prefs, blocking, first run, chrome)
+      - name: Run checks (app identity, prefs, blocking, first run, chrome, network blocker)
         shell: pwsh
         run: |
           $exe = Get-ChildItem app -Recurse -Filter browser-wip.exe | Select-Object -First 1
-          python browser/tools/runtime/check.py $exe.DirectoryName --part 1 2 3 4
+          python browser/tools/runtime/check.py $exe.DirectoryName --part 1 2 3 4 7
 
   release:
     name: Publish release

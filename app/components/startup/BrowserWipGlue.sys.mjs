@@ -201,9 +201,9 @@ BrowserWipGlue.prototype = {
     applyAppearance();
     Services.prefs.addObserver(APPEARANCE_PREF, applyAppearance);
     lazy.PrivacyModes.init();
+    // Before session restore, so its pages' requests are held until the
+    // blocker is ready instead of loading unchecked.
+    lazy.ContentBlockingLists.start();
     lazy.SessionStore.init();
-    lazy.ContentBlockingLists.ensureLoaded().catch(() => {
-      // Already reported; pages still load, just without blocking.
-    });
   },
 };
