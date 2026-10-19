@@ -46,6 +46,21 @@ const JSWINDOWACTORS = {
     allFrames: true,
     safeForUntrustedWebProcess: true,
   },
+  // Middle-click and Ctrl+click on links open a new tab (LinkClickChild).
+  LinkClick: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/LinkClickParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/LinkClickChild.sys.mjs",
+      events: {
+        chromelinkclick: { capture: true, mozSystemGroup: true },
+      },
+    },
+    messageManagerGroups: ["browsers"],
+    allFrames: true,
+    safeForUntrustedWebProcess: true,
+  },
   // Site icons on tabs (FaviconChild.sys.mjs).
   Favicon: {
     parent: {

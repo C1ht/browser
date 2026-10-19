@@ -117,6 +117,8 @@ class TabBrowser {
     this.tabs = [];
     this.selectedTab = null;
     this._closedTabs = [];
+    // The last tab opened next to its opener: { opener, tab }.
+    this._lastRelatedTab = null;
     this._filters = new WeakMap();
     this._listeners = new WeakMap();
 
@@ -180,7 +182,13 @@ class TabBrowser {
     let browser = this._createBrowser({ remoteType, openWindowInfo, name });
     tab.linkedBrowser = browser;
 
-    let index = options.index ?? (opener ? this.tabs.indexOf(opener) + 1 : this.tabs.length);
+    // A tab opened from a page goes next to it. Several opened from the same
+    // page in a row (Ctrl+click on one link after another) keep their order,
+    // until another tab is selected.
+    let related = this._lastRelatedTab;
+    let after =
+      opener && related?.opener == opener && this.tabs.includes(related.tab) ? related.tab : opener;
+    let index = options.index ?? (opener ? this.tabs.indexOf(after) + 1 : this.tabs.length);
     // Pinned tabs go before the unpinned ones, the rest after.
     let boundary = this._firstUnpinnedIndex();
     index = options.pinned
@@ -188,6 +196,9 @@ class TabBrowser {
       : Math.max(boundary, Math.min(index, this.tabs.length));
     this.tabs.splice(index, 0, tab);
     this.tabContainer.insertBefore(tab, this.tabContainer.children[index] ?? null);
+    if (opener && options.index == null) {
+      this._lastRelatedTab = { opener, tab };
+    }
     if (options.pinned) {
       tab.setAttribute("pinned", "true");
     }
@@ -380,6 +391,7 @@ class TabBrowser {
       return;
     }
     let previous = this.selectedTab;
+    this._lastRelatedTab = null;
     if (previous) {
       previous.removeAttribute("selected");
       previous.setAttribute("aria-selected", "false");

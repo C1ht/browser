@@ -536,6 +536,21 @@ def part4(bindir, base, shots):
         record(4, "Open link in new tab opens it next to the page, in the background",
                opened == f"{base}/target.html", opened)
 
+        # Middle-click and Ctrl+click on the same link do the same.
+        for name, button, modifiers in [("Middle-click", 1, ()), ("Ctrl+click", 0, ("CONTROL",))]:
+            page = b.js("""window.__opened = null; window.__page = gBrowser.selectedTab;
+              gBrowser.tabContainer.addEventListener("TabOpen", e => window.__opened = e.target, { once: true });
+              return gBrowser.selectedBrowser.currentURI.spec;""")
+            b.m.click(25, 28, button, modifiers)
+            got = b.wait("""let [target, page] = arguments, tab = window.__opened, from = window.__page;
+              return tab?.linkedBrowser.currentURI.spec == target && {
+                background: gBrowser.selectedTab == from,
+                pageStays: from.linkedBrowser.currentURI.spec == page,
+                besidePage: gBrowser.tabs.indexOf(tab) > gBrowser.tabs.indexOf(from) };""",
+                         f"{base}/target.html", page, timeout=15)
+            record(4, f"{name} on a link opens it in a background tab next to the page",
+                   bool(got) and all(got.values()), got)
+
         b.js("""Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper).copyString("pasted");""")
         context_menu(30, 160, "context-paste")
         title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith('field') && t;", timeout=5)

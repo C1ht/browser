@@ -88,6 +88,18 @@ class Marionette:
             window.synthesizeMouseEvent(type, r.left + x, r.top + y, { button: 2, clickCount: 1 });
           }""", x, y)
 
+    def click(self, x, y, button=0, modifiers=()):
+        """Click the selected tab's page at (x, y), as right_click does.
+        button 1 is the middle button; modifiers are nsIDOMWindowUtils
+        MODIFIER_* names, e.g. ("CONTROL",)."""
+        self.js("""
+          let [x, y, button, names] = arguments;
+          let modifiers = names.reduce((m, n) => m | Ci.nsIDOMWindowUtils["MODIFIER_" + n], 0);
+          let r = gBrowser.selectedBrowser.getBoundingClientRect();
+          for (let type of ["mousedown", "mouseup"]) {
+            window.synthesizeMouseEvent(type, r.left + x, r.top + y, { button, clickCount: 1, modifiers });
+          }""", x, y, button, list(modifiers))
+
     def screenshot(self, path):
         data = self.command("WebDriver:TakeScreenshot", {"full": False, "hash": False})
         import base64

@@ -288,6 +288,29 @@ var BrowserWip = {
     gURLBar.focusAndSelect();
   },
 
+  /**
+   * A link a page asked to open elsewhere (LinkClickParent): middle-click
+   * and Ctrl+click open a background tab, with Shift a foreground one, as in
+   * Firefox; Shift+click alone opens a window.
+   *
+   * @param {string} where  "tab", "tabshifted" or "window"
+   * @param {object} params  browser (the page's), triggeringPrincipal,
+   *   policyContainer, referrerInfo
+   */
+  openLink(url, where, { browser, ...params }) {
+    if (where == "window") {
+      this.openNewWindow(url);
+      return;
+    }
+    let background = Services.prefs.getBoolPref("browser.tabs.loadInBackground", true);
+    gBrowser.addTab(url, {
+      select: (where == "tabshifted") == background,
+      opener: gBrowser.getTabForBrowser(browser) ?? gBrowser.selectedTab,
+      userGesture: true,
+      ...params,
+    });
+  },
+
   openNewWindow(url = NEW_TAB_URL) {
     window.openDialog(
       Services.prefs.getStringPref("browser.chromeURL"),

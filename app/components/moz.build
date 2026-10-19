@@ -8,6 +8,7 @@ DIRS += [
     "contentblocking",
     "contextmenu",
     "favicons",
+    "links",
     "permissions",
     "privacy",
     "sessionstore",
