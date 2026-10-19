@@ -7,3 +7,7 @@ EXTRA_JS_MODULES.browserwip += [
     "LoginManagerStubChild.sys.mjs",
     "LoginManagerStubParent.sys.mjs",
 ]
+
+DIRS += [
+    "vault",
+]

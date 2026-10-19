@@ -62,10 +62,10 @@ Linux keyring secret (32 random B) ───────────┼─ each 
 Windows Hello signature over challenge ─HKDF──► HK ─┘                │
                                                      HKDF(VK,"index")│ HKDF(VK,"secret")
                                                          ▼           ▼
-                                        body: whole index      each password sealed again
-                                        (sites, usernames,     inside the index; opened one at a
-                                         times) XChaCha20-     time, in locked memory, only to
-                                         Poly1305              fill / reveal / copy / export
+                                        body: whole index      each password sealed again,
+                                        (sites, usernames,     in a table beside the index that
+                                         times) XChaCha20-     stays in C; opened one at a time,
+                                         Poly1305              only to fill / reveal / copy / export
 ```
 
 - **One file per profile, fully encrypted.** Sites and usernames are
@@ -155,14 +155,18 @@ content process (one per site)            parent process
 
 ---
 
-## 4. Vault format v1
+## 4. Vault format (version 2)
+
+Version 1 was the first development format, with the passwords inside the
+JSON index. It is refused with BWV_E_OLDER ("made by an earlier development
+version"), never misread. No released build ever wrote it.
 
 ### 4.1 Layout (little-endian)
 
 ```
 prefix, 16 bytes
   0   8  magic        "BWVAULT\0"
-  8   2  version      1
+  8   2  version      2
   10  2  header_len   H  (≤ 4096)
   12  4  reserved     0
 header, H bytes: records  type u8 | len u16 | value
@@ -174,68 +178,118 @@ header, H bytes: records  type u8 | len u16 | value
   0x11 slot.recovery  t u32 | m_kib u32 | salt 16 | nonce 24 | wrapped_vk 48
                       (its own parameters, so raising the password's later
                       doesn't break a recovery key on paper)
-  0x12 slot.keyring   item_tag 16 | nonce 24 | wrapped_vk 48
+  0x12 slot.keyring   generation 16 | nonce 24 | wrapped_vk 48
   0x13 slot.hello     challenge 32 | nonce 24 | wrapped_vk 48
   type ≥ 0x80 = "critical": a reader that doesn't know it refuses the file.
   Unknown types below 0x80 are skipped and kept unchanged on rewrite.
 body
   nonce 24 | ct_len u32 | ciphertext (incl. 16-byte tag)
   AAD = prefix ‖ header, byte for byte
+payload (the body's plaintext, before padding)
+  index_len u32 | count u32 | index (JSON) | records
+  record   len u32 | entry id 16 | origin_len u16 | origin | sealed password
 ```
 
 - **Slot wrap AAD:** `magic ‖ version ‖ vault_id ‖ slot type ‖ the slot's
   fixed fields`. A wrapped key can't be moved to another vault or another
   slot type.
-- **Body plaintext:** JSON padded with `sodium_pad` to a 16 KiB multiple, so
-  the file size gives the number of logins only to within about 60. JSON is
-  parsed in JS, but only *after* authentication. The C parser handles only
-  the prefix, header and body framing, which is the part an attacker can
-  feed us, and it's the part we fuzz.
+- **The payload is padded** with `sodium_pad` to a 16 KiB multiple, so the
+  file size gives the number of logins only to within about 60.
+- **The index (JSON) and the sealed passwords are kept apart.** The index
+  goes to JS: sites, usernames, times. The passwords stay in the C core,
+  so JS never holds them, not even sealed. The core can then re-encrypt the
+  whole vault (§4.2) without JS building a new plaintext index.
+- **Parsing:** the C parser handles the prefix, the header, the body framing
+  and the password table, which is everything an attacker can feed us, and
+  it's what we fuzz. The index is parsed in JS, after authentication.
 
 ```json
 { "v": 1,
   "entries": [{ "id": "<16 B, base64url>", "origin": "https://accounts.example.com",
                 "also": [], "realm": null, "username": "ana@example.com",
-                "secret": "<nonce‖ct, base64>", "created": 0, "changed": 0, "used": 0 }],
+                "created": 0, "changed": 0, "used": 0 }],
   "never": ["https://example.org"] }
 ```
 
-- **Secrets are sealed a second time inside the index:**
-  `secret = XChaCha20-Poly1305(SK, nonce, password, AAD = vault_id ‖ id ‖
-  origin)`. The decrypted index can therefore sit in JS memory while no
-  password does. Because the AAD includes the origin, a password opens only
-  when the caller presents the entry's own origin. The automatic fill path
-  always passes the *frame's* origin, so if the matching code has a bug,
-  decryption fails rather than filling the wrong site.
+- **Each password is sealed a second time:**
+  `XChaCha20-Poly1305(SK, nonce, password, AAD = vault_id ‖ entry id ‖
+  origin)`. It is opened only to fill, reveal, copy or export.
+  - Because the AAD includes the origin, a password opens only when the
+    caller presents that origin.
+  - The automatic fill path always passes the *frame's* origin, so if the
+    matching code has a bug, decryption fails rather than filling the wrong
+    site.
 
-### 4.2 Keys
+### 4.2 Keys, changing the master password, replacing the key
 
 | Key | How it is made | Where it lives |
 |---|---|---|
-| VK, the vault key | 32 random bytes, made once and **replaced on every master-password change** | Wrapped in each slot. Kept in `sodium_malloc` memory while unlocked, `mprotect`ed no-access between uses. |
+| VK, the vault key | 32 random bytes; replaced only by "Replace encryption key" | Wrapped in each slot. Kept in `sodium_malloc` memory while unlocked, `mprotect`ed no-access between uses. |
 | IK, the index key | `HKDF-SHA256(VK, salt=vault_id, info="vault/v1/index")` | Same. Encrypts the body. |
 | SK, the secret key | `HKDF-SHA256(VK, salt=vault_id, info="vault/v1/secret")` | Same. Seals each password. |
 | MPK, the master password key | `Argon2id(NFC(master password), salt, t, m, p=1)` → 32 B | Exists only during unlock, then zeroed. |
-| RK, the recovery key | 160-bit random code, shown once as 8 groups of base32 → Argon2id with the recovery slot's own salt | Only on paper; same handling as MPK. |
+| RK, the recovery key | 160-bit random code, shown once as 8 groups of base32 → Argon2id with the recovery slot's own salt and parameters | Only on paper; same handling as MPK. |
 | HK, the Hello key | See §5.3 | Exists only during unlock. |
-| KK, the keyring key | 32 random bytes in the Secret Service | The user's keyring. |
+| KK, the keyring key | 32 random bytes in the Secret Service, under an entry named by vault id and generation | The user's keyring. |
 
-On a master-password change, VK is rotated and every secret re-sealed.
-That way an old password plus an old copy of the file can't open the new
-file. `.bak` is rewritten too.
+**Changing the master password re-wraps VK** (decided after the part 1
+checkpoint):
+- Only the password slot changes: a fresh salt, the vault's current KDF
+  parameters, the same VK.
+- The recovery key, the keyring and Windows Hello keep working, and no new
+  recovery key is shown.
+- The dialog has an unchecked box, "My old password may have been exposed".
+  Ticked, the key replacement below runs as part of the same operation,
+  wrapping the new key under the new password.
 
-**What rotating VK costs** (found while building the core; see the Stage 2
-part 1 checkpoint):
-- Every slot held the old VK, so every slot has to be made again.
-- The keyring slot is redone silently, with a new KK.
-- Windows Hello needs one Hello confirmation during the change.
-- **The recovery key can't be carried over,** because its code exists only
-  on paper. A password change therefore shows a new recovery key, and the
-  old one stops working.
+**Replace encryption key** (Settings › Passwords, or the box above). In
+order:
+1. **Confirm:** the master password is checked.
+2. **Warn:** if Windows Hello is set up, the user is told it will ask twice.
+3. **Lock:** the write lock is taken (§4.5).
+4. **Build the new vault on a copy, in the C core** (the live vault isn't
+   touched):
+   - a new VK
+   - the index and every password encrypted again
+   - the password slot under the master password (the same KDF parameters)
+   - a new recovery key, with the old slot's parameters, **only if there was
+     one**
+   - a new keyring entry, under a **new generation**, if the keyring was set
+     up
+   - Hello enrolled again on a new challenge (**first prompt**), if it was
+     set up
+5. **Write `vault.bwv.new`,** owner-only, flushed to disk.
+6. **Check it from disk.** Every way in has to work:
+   - the password
+   - the new recovery key
+   - a *fresh* keyring lookup
+   - a second Hello signature (**second prompt**). If that signature doesn't
+     reproduce the first, it's a failure: abort, nothing changes.
+7. **Show the new recovery key once.** It is described as taking effect only
+   once the replacement finishes, and the user keeps the current one until
+   then. "I have stored it" is required to go on.
+8. **Commit:**
+   - the cleanup marker
+   - `vault.bwv.new` renamed over `vault.bwv`
+   - the browser's own `vault.bwv.bak` refreshed from the new file
+   - keyring entries of other generations deleted
+   - the marker removed
+9. **Final screen:** "Replacement complete. Your old recovery key no longer
+   works and can be destroyed." Also: "Copies of your passwords saved before
+   now, such as backups, still open with the password you used then."
 
-The alternative is Bitwarden's: a password change only rewraps VK, so the
-recovery key and all slots stay valid, and replacing VK becomes a separate
-"Replace encryption key" action. Your call.
+**If anything fails:**
+- **Before the rename** (re-encrypting, wrapping, writing, checking,
+  keyring, a Hello cancel, a non-reproducing Hello signature, closing the
+  dialog):
+  - `vault.bwv.new` and the new keyring entry are deleted
+  - the copy's keys, index and passwords are wiped
+  - the old vault, recovery key, keyring entry and Hello enrolment stay valid
+- **A Hello cancel** stops everything and offers to retry, or to turn Hello
+  off first.
+- **After the rename** the new vault is in use. Unfinished tidying (the
+  backup, old keyring entries, the marker) returns BWV_E_CLEANUP and is
+  finished at the next start (§4.4).
 
 ### 4.3 KDF parameters
 
@@ -245,25 +299,62 @@ recovery key and all slots stay valid, and replacing VK becomes a separate
 - **Accepted range when opening:** m between 64 MiB and 2 GiB, t between 2
   and 16. Anything outside is refused, with no downgrade to cheap
   parameters and no memory blow-up from a crafted file.
+- **Both flows keep the parameters:** a password change and a replacement
+  use the vault's current ones (tested).
 - **Upgrades:** when we raise the defaults, the next successful unlock
   re-derives and rewraps (the password is in hand at that moment).
 
-### 4.4 Versions and migration
+### 4.4 Versions, writes and start-up recovery
 
-- **Readers** open their own version and every earlier one. After a
-  successful unlock, an older vault is rewritten in the current format. The
-  previous file is kept as `vault.v<N>.bwv` until the next successful open,
-  then deleted.
 - **A newer version, or a critical record we don't know,** is refused with
   "This vault was made by a newer version" and **never overwritten.**
-- **The body has its own `"v"`,** so the entry schema can change without
+- **Older versions** are migrated after a successful unlock, once there are
+  released ones. Version 1 is refused (above).
+- **The index has its own `"v"`,** so the entry schema can change without
   touching the outer format.
 - **Algorithm agility:** the `kdf` and `aead` ids. A new cipher means a new
   id and a rewrite after unlock.
-- **Writes are atomic:** temp file, then fsync, then rename, then fsync of
-  the directory (`MoveFileExW(…REPLACE_EXISTING|WRITE_THROUGH)` on Windows).
-  One previous good copy is kept as `vault.bwv.bak`. A file that fails to
-  parse or authenticate is **never** replaced automatically.
+- **Writes are durable:**
+  - temp file, then flush, then rename, then directory flush
+  - Linux: `fsync` of the file and the directory
+  - Windows: `FlushFileBuffers`, then `MoveFileExW(REPLACE_EXISTING |
+    WRITE_THROUGH)`, retried up to 10 times, 50 ms apart, while a scanner
+    holds the file
+  - an ordinary save first makes the current file the browser's own `.bak`
+  - a file that fails to parse or authenticate is **never** replaced
+    automatically
+- **At start:**
+  - a leftover `vault.bwv.new` or temp file is deleted, never promoted
+  - keyring entries whose generation isn't the one in the header are deleted
+    (all of this vault's entries, if there's no keyring slot); if the
+    keyring is locked, this waits for its next unlock
+  - if the cleanup marker is present, the backup is refreshed from
+    `vault.bwv` and the marker removed
+
+  A crash at any point therefore leaves no orphan entry and no
+  half-finished state.
+
+### 4.5 The write lock and saves made meanwhile
+
+- **The write lock is held from step 3 of a replacement until commit or
+  abort.** A password change holds it for its own (short) duration.
+- **A save that comes in meanwhile is queued:**
+  - the password is sealed at once under a key that exists only for the
+    session
+  - the index change is kept with it
+  - the key button shows the pending dot
+- **When the dialog closes,** the queue is applied to whichever vault is now
+  current and saved. Nothing leaves the queue until a save that includes it
+  has succeeded.
+- **If applying fails,** the queue stays sealed in memory, the user is told
+  plainly, and it's retried. A queued save is never dropped silently.
+- **Quitting while the dialog is open** aborts the replacement, then applies
+  the queue to the old vault before exit.
+- **A second instance:**
+  - Gecko's profile lock stops a second browser on the same profile
+  - as a second layer, the vault directory's own lock (`flock`, or an
+    unshared handle on Windows) makes the vault refuse to open in another
+    process
 
 ---
 
@@ -281,8 +372,10 @@ recovery key and all slots stay valid, and replacing VK becomes a separate
 
 - **Enabling it** (needs the master password):
   1. Make KK and store it with `secret_password_store_sync`. Schema
-     `org.browserwip.Vault` (renamed with the codename), attribute
-     `vault=<vault_id hex>`, the default collection.
+     `org.browserwip.Vault` (renamed with the codename), attributes
+     `vault=<vault_id hex>` and `generation=<generation hex>` (the
+     generation is also in the entry's label and in the vault header),
+     the default collection.
   2. Add `slot.keyring`.
 
   libsecret is loaded with `dlopen`, as Gecko's `LibSecret.cpp` does, so

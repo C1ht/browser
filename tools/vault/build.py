@@ -7,12 +7,16 @@
     python3 -I tools/vault/build.py [--cc clang|gcc|clang-cl] [--sanitize]
                                     [--out DIR] [--run]
     python3 -I tools/vault/build.py --fuzz SECONDS     (Linux, clang)
+    python3 -I tools/vault/build.py --release-check
 
 Compiles the vendored libsodium exactly as app/third_party/libsodium/
-sources.mozbuild describes for this OS, plus the vault core, then (--run):
+sources.mozbuild describes for this OS, plus the vault core (built with
+BWV_TESTING, which adds hooks for failure and crash tests), then (--run):
 libsodium's own known-answer tests for Argon2id and XChaCha20-Poly1305
 against this build, and the vault tests. --fuzz builds the libFuzzer target
-and runs it on a corpus seeded by `vault_test corpus`.
+and runs it on a corpus seeded by `vault_test corpus`. --release-check
+compiles the core as the browser does, without BWV_TESTING, and checks that
+none of the test hooks are in it.
 """
 
 import argparse
@@ -25,10 +29,14 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from testhooks import REQUIRED, scan  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 SODIUM = ROOT / "app/third_party/libsodium"
 VAULT = ROOT / "app/components/passwords/vault"
 CODENAME = re.compile(r"browser-?wip", re.I)
+CORE = ["bwvault.c", "bwvstore.c", "bwvtxn.c"]
 
 
 def sodium_config():
@@ -116,7 +124,8 @@ def build(args):
 
     jobs = [(s, out / "obj" / (s.relative_to(SODIUM).as_posix().replace("/", "_") + ext), False)
             for s in sources]
-    jobs.append((VAULT / "bwvault.c", out / "obj" / ("bwvault" + ext), True))
+    for c in CORE:
+        jobs.append((VAULT / c, out / "obj" / (Path(c).stem + ext), True))
     tests = {
         "vault_test": VAULT / "tests/vault_test.c",
         "kat_argon2id": SODIUM / "test/pwhash_argon2id.c",
@@ -133,10 +142,13 @@ def build(args):
     # Upstream tests find their expected output here.
     test_defines["TEST_SRCDIR"] = '"' + (SODIUM / "test").as_posix() + '"'
 
+    ours_defines = dict(defines, BWV_TESTING=1)
+
     def run(job):
         src, obj, ours = job
         is_kat = src.parent == SODIUM / "test"
-        return src, cc.compile(src, obj, inc, test_defines if is_kat else defines, ours, is_kat)
+        chosen = test_defines if is_kat else ours_defines if ours else defines
+        return src, cc.compile(src, obj, inc, chosen, ours, is_kat)
 
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
         failed = [(s, r) for s, r in pool.map(run, jobs) if r.returncode != 0]
@@ -146,18 +158,42 @@ def build(args):
         sys.exit(f"{len(failed)} file(s) failed to compile")
 
     lib = [out / "obj" / (s.relative_to(SODIUM).as_posix().replace("/", "_") + ext) for s in sources]
-    core = out / "obj" / ("bwvault" + ext)
+    core = [out / "obj" / (Path(c).stem + ext) for c in CORE]
     exe_ext = ".exe" if cc.windows else ""
     exes = {}
     for name in tests:
         exe = out / (name + exe_ext)
         objs = [out / "obj" / (name + ext), *lib]
         if name in ("vault_test", "fuzz_vault"):
-            objs.append(core)
+            objs += core
         cc.link(objs, exe)
         exes[name] = exe
     print(f"built {', '.join(exes)} in {out}")
     return out, exes
+
+
+def release_check(args):
+    """The core as the browser compiles it: no BWV_TESTING, so none of the
+    hooks for failure and crash tests may be in the objects."""
+    out = Path(args.out).resolve() / "release-obj"
+    out.mkdir(parents=True, exist_ok=True)
+    cc = Compiler(args.cc, False, False)
+    _, includes, defines = sodium_config()
+    ok = True
+    for c in CORE:
+        obj = out / (Path(c).stem + cc.obj_ext())
+        r = cc.compile(VAULT / c, obj, includes + [VAULT], defines, True)
+        if r.returncode != 0:
+            sys.exit(f"{c} failed to compile\n{r.stdout}{r.stderr}")
+        data = obj.read_bytes()
+        need = REQUIRED.get(Path(c).stem)
+        found, has_core = scan(data, need)
+        print(f"{obj.name}: {len(data)} bytes; test hooks: "
+              f"{', '.join(found) if found else 'none'}"
+              + (f"; contains {need.decode()!r}: {'yes' if has_core else 'NO'}" if need else ""))
+        ok &= not found and has_core
+    print("release check:", "passed" if ok else "FAILED")
+    return ok
 
 
 def run_tests(out, exes):
@@ -194,7 +230,10 @@ def main():
     parser.add_argument("--fuzz", type=int, metavar="SECONDS")
     parser.add_argument("--out", default=str(ROOT / "obj-vault"))
     parser.add_argument("--run", action="store_true")
+    parser.add_argument("--release-check", action="store_true")
     args = parser.parse_args()
+    if args.release_check:
+        sys.exit(0 if release_check(args) else 1)
     out, exes = build(args)
     if args.fuzz is not None:
         sys.exit(0 if fuzz(out, exes, args.fuzz) else 1)

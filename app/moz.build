@@ -14,6 +14,7 @@ DIRS += [
     "policies",
     "themes",
     "launcher",
+    "third_party/libsodium",
 ]
 
 if CONFIG["OS_ARCH"] == "WINNT":

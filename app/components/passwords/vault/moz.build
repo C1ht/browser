@@ -1,0 +1,25 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# The password vault core (bwvault.h). Built without BWV_TESTING: the test
+# hooks exist only in tools/vault/build.py's build, and
+# tools/vault/release_binary_check.py checks the release build for them.
+
+SOURCES += [
+    "bwvault.c",
+    "bwvstore.c",
+    "bwvtxn.c",
+]
+
+LOCAL_INCLUDES += [
+    "../../../third_party/libsodium/src/include",
+    "../../../third_party/libsodium/src/include/sodium",
+]
+
+DEFINES["SODIUM_STATIC"] = 1
+
+if CONFIG["OS_ARCH"] == "WINNT":
+    OS_LIBS += ["advapi32"]
+
+FINAL_LIBRARY = "xul"
