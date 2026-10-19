@@ -13,6 +13,7 @@
 #include "mozilla/StaticPrefs_privacy.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/net/ChannelClassifierUtils.h"
+#include "nsIChannel.h"
 #include "nsICookieJarSettings.h"
 #include "nsIEffectiveTLDService.h"
 #include "nsILoadInfo.h"
