@@ -68,7 +68,7 @@ sodium_defines = {
     "NATIVE_LITTLE_ENDIAN": 1,
 }
 
-# By CPU_ARCH.
+# By TARGET_CPU.
 sodium_defines_cpu = {
     "x86_64": {
         "HAVE_MMINTRIN_H": 1,

@@ -13,7 +13,7 @@ LOCAL_INCLUDES += sodium_includes
 
 for name, value in sodium_defines.items():
     DEFINES[name] = value
-for name, value in sodium_defines_cpu.get(CONFIG["CPU_ARCH"], {}).items():
+for name, value in sodium_defines_cpu.get(CONFIG["TARGET_CPU"], {}).items():
     DEFINES[name] = value
 for name, value in sodium_defines_os.get(CONFIG["OS_ARCH"], {}).items():
     DEFINES[name] = value
