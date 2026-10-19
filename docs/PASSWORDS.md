@@ -1,8 +1,9 @@
 # Built-in password manager: Stage 1 design
 
-Status: **for review. Nothing below is built yet** except the groundwork
-in §0. The decisions you made after Stage 0 are folded in. Questions still
-open are in §17, each with my recommendation.
+Status: **approved 2026-10-19; Stage 2 in progress.** Every question in
+§17 was decided as recommended. Q9: logind `Lock`/`LockedHint` and
+`org.freedesktop.ScreenSaver`. Windows Hello is tested by hand on a real
+Windows machine (§15).
 
 Mockups: `design/mockups/passwords/` (published as a canvas, *Password manager
 mockups*).
@@ -170,7 +171,9 @@ header, H bytes: records  type u8 | len u16 | value
   0x03 aead       alg u8 (1 = XChaCha20-Poly1305-IETF)
   0x04 counter    u64, +1 on every write (for rollback checks and sync later)
   0x10 slot.password  nonce 24 | wrapped_vk 48
-  0x11 slot.recovery  salt 16 | nonce 24 | wrapped_vk 48       (same t, m)
+  0x11 slot.recovery  t u32 | m_kib u32 | salt 16 | nonce 24 | wrapped_vk 48
+                      (its own parameters, so raising the password's later
+                      doesn't break a recovery key on paper)
   0x12 slot.keyring   item_tag 16 | nonce 24 | wrapped_vk 48
   0x13 slot.hello     challenge 32 | nonce 24 | wrapped_vk 48
   type ≥ 0x80 = "critical": a reader that doesn't know it refuses the file.
@@ -220,6 +223,19 @@ body
 On a master-password change, VK is rotated and every secret re-sealed.
 That way an old password plus an old copy of the file can't open the new
 file. `.bak` is rewritten too.
+
+**What rotating VK costs** (found while building the core; see the Stage 2
+part 1 checkpoint):
+- Every slot held the old VK, so every slot has to be made again.
+- The keyring slot is redone silently, with a new KK.
+- Windows Hello needs one Hello confirmation during the change.
+- **The recovery key can't be carried over,** because its code exists only
+  on paper. A password change therefore shows a new recovery key, and the
+  old one stops working.
+
+The alternative is Bitwarden's: a password change only rewraps VK, so the
+recovery key and all slots stay valid, and replacing VK becomes a separate
+"Replace encryption key" action. Your call.
 
 ### 4.3 KDF parameters
 
@@ -663,9 +679,9 @@ minutes and needs no Gecko build:
 
 | Job | What runs |
 |---|---|
-| core (ubuntu-24.04, gcc and clang + ASan/UBSan) | vault core plus vendored libsodium, standalone: round-trip, wrong password, every byte of a sample file flipped (must fail authentication), truncation, header limits (KDF floor and cap), unknown critical records, padding, migration from fixture v0 to v1, password change rotates VK, KAT vectors for HKDF/AEAD/Argon2 from libsodium's tests |
+| core (ubuntu-24.04, gcc and clang + ASan/UBSan) | vault core plus vendored libsodium, standalone: round-trip, wrong password, every byte of a sample file flipped (must fail authentication), truncation, header limits (KDF floor and cap), newer versions and unknown critical records refused, unknown non-critical records kept through a rewrite, padding, sealed secrets bound to entry and origin, slots bound to their type, password change rotates VK, recovery codes as typed from paper, the Hello slot; libsodium's own Argon2id and XChaCha20-Poly1305 known-answer tests run against our build; HKDF against RFC 5869 A.1 |
 | core (windows-2022, clang-cl) | the same suite |
-| cross-OS | Linux makes `vault-linux.bwv` and Windows makes `vault-windows.bwv` (artifacts); each opens the other's and checks every entry. Golden fixtures in the repo catch format drift between releases. |
+| cross-OS | Linux makes `vault-linux.bwv` and Windows makes `vault-windows.bwv` (artifacts); each opens the other's and checks every entry. Both also open `tests/fixtures/v1-windows.bwv`, a v1 vault committed to the repo, so format drift between releases is caught. |
 | fuzz (ubuntu, libFuzzer) | the header/body parser and the slot unwrapper, 5 minutes per push, with a corpus in the repo. Windows replays the corpus as regression tests. |
 | matching (Node, both OSes) | origin rules: exact origin; ports; `http` refused; IDN look-alikes (`раypal.com` vs `paypal.com`), `paypal.com.evil.io`, `xn--` forms; trailing dots; IPv4/IPv6; subdomains; PSL edge cases (`github.io`, `co.uk`); `also` lists; opaque/`data:`/`file:` |
 | no keyring | Linux job with no `org.freedesktop.secrets`: unlock asks for the password and never writes a keyring slot. A second run starts `gnome-keyring-daemon` in `dbus-run-session` and checks the keyring round trip. |
@@ -740,7 +756,7 @@ adds runtime part 7:
 1. **Vault core and KDF:** vendor libsodium, write the C core,
    `passwords.yml` with core, cross-OS and fuzz jobs. Checkpoint.
 2. **Storage and migration:** file I/O with permissions, atomic writes,
-   `.bak`, the v0→v1 fixture migration, the XPCOM component, and
+   `.bak`, the version-migration path, the XPCOM component, and
    `PasswordVault.sys.mjs` with its index. Checkpoint.
 3. **OS unlock providers:** libsecret, fprintd, logind/ScreenSaver; Hello,
    WTS, power; the no-keyring tests. Checkpoint.

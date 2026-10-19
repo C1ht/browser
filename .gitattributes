@@ -1,0 +1,5 @@
+# Vendored code stays byte-for-byte as upstream released it.
+app/third_party/** -text
+
+# Vault files (test fixtures, fuzz seeds) are binary.
+*.bwv binary

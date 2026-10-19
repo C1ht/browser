@@ -1,0 +1,109 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# The libsodium files the password vault compiles, and the configuration
+# its configure script would otherwise work out. Included by moz.build and
+# read by tools/vault/build.py (the standalone test build), so both build
+# exactly the same thing. Paths are relative to this directory.
+#
+# x86 SIMD variants select themselves at run time (sodium/runtime.c); each
+# file enables its instruction set with a pragma, so no per-file flags.
+
+sodium_sources = [
+    "browserwip_stubs.c",
+    "src/crypto_aead/chacha20poly1305/aead_chacha20poly1305.c",
+    "src/crypto_aead/xchacha20poly1305/aead_xchacha20poly1305.c",
+    "src/crypto_auth/hmacsha256/auth_hmacsha256.c",
+    "src/crypto_core/hchacha20/core_hchacha20.c",
+    "src/crypto_generichash/blake2b/generichash_blake2.c",
+    "src/crypto_generichash/blake2b/ref/blake2b-compress-avx2.c",
+    "src/crypto_generichash/blake2b/ref/blake2b-compress-ref.c",
+    "src/crypto_generichash/blake2b/ref/blake2b-compress-sse41.c",
+    "src/crypto_generichash/blake2b/ref/blake2b-compress-ssse3.c",
+    "src/crypto_generichash/blake2b/ref/blake2b-ref.c",
+    "src/crypto_generichash/blake2b/ref/generichash_blake2b.c",
+    "src/crypto_generichash/crypto_generichash.c",
+    "src/crypto_hash/sha256/cp/hash_sha256_cp.c",
+    "src/crypto_hash/sha256/hash_sha256.c",
+    "src/crypto_kdf/hkdf/kdf_hkdf_sha256.c",
+    "src/crypto_onetimeauth/crypto_onetimeauth.c",
+    "src/crypto_onetimeauth/poly1305/donna/poly1305_donna.c",
+    "src/crypto_onetimeauth/poly1305/onetimeauth_poly1305.c",
+    "src/crypto_onetimeauth/poly1305/sse2/poly1305_sse2.c",
+    "src/crypto_pwhash/argon2/argon2-core.c",
+    "src/crypto_pwhash/argon2/argon2-encoding.c",
+    "src/crypto_pwhash/argon2/argon2-fill-block-avx2.c",
+    "src/crypto_pwhash/argon2/argon2-fill-block-avx512f.c",
+    "src/crypto_pwhash/argon2/argon2-fill-block-ref.c",
+    "src/crypto_pwhash/argon2/argon2-fill-block-ssse3.c",
+    "src/crypto_pwhash/argon2/argon2.c",
+    "src/crypto_pwhash/argon2/blake2b-long.c",
+    "src/crypto_pwhash/argon2/pwhash_argon2i.c",
+    "src/crypto_pwhash/argon2/pwhash_argon2id.c",
+    "src/crypto_pwhash/crypto_pwhash.c",
+    "src/crypto_stream/chacha20/dolbeau/chacha20_dolbeau-avx2.c",
+    "src/crypto_stream/chacha20/dolbeau/chacha20_dolbeau-ssse3.c",
+    "src/crypto_stream/chacha20/ref/chacha20_ref.c",
+    "src/crypto_stream/chacha20/stream_chacha20.c",
+    "src/crypto_verify/verify.c",
+    "src/randombytes/randombytes.c",
+    "src/randombytes/sysrandom/randombytes_sysrandom.c",
+    "src/sodium/codecs.c",
+    "src/sodium/core.c",
+    "src/sodium/runtime.c",
+    "src/sodium/utils.c",
+    "src/sodium/version.c",
+]
+
+sodium_includes = [
+    "src/include",
+    "src/include/sodium",
+]
+
+sodium_defines = {
+    "CONFIGURED": 1,
+    "SODIUM_STATIC": 1,
+    # x86-64 and AArch64, the only targets, are both little-endian.
+    "NATIVE_LITTLE_ENDIAN": 1,
+}
+
+# By CPU_ARCH.
+sodium_defines_cpu = {
+    "x86_64": {
+        "HAVE_MMINTRIN_H": 1,
+        "HAVE_EMMINTRIN_H": 1,
+        "HAVE_PMMINTRIN_H": 1,
+        "HAVE_TMMINTRIN_H": 1,
+        "HAVE_SMMINTRIN_H": 1,
+        "HAVE_AVXINTRIN_H": 1,
+        "HAVE_AVX2INTRIN_H": 1,
+        "HAVE_AVX512FINTRIN_H": 1,
+        "HAVE_CPUID": 1,
+    },
+}
+
+# By OS_ARCH. Windows needs nothing: libsodium uses VirtualLock,
+# VirtualProtect, SecureZeroMemory and RtlGenRandom there by itself.
+sodium_defines_os = {
+    "Linux": {
+        "HAVE_EXPLICIT_BZERO": 1,
+        "HAVE_GETPID": 1,
+        "HAVE_GETRANDOM": 1,
+        "HAVE_LINUX_COMPATIBLE_GETRANDOM": 1,
+        "HAVE_MADVISE": 1,
+        "HAVE_MLOCK": 1,
+        "HAVE_MMAP": 1,
+        "HAVE_MPROTECT": 1,
+        "HAVE_POSIX_MEMALIGN": 1,
+        "HAVE_PTHREAD": 1,
+        "HAVE_RAISE": 1,
+        "HAVE_SYSCONF": 1,
+        "HAVE_SYS_AUXV_H": 1,
+        "HAVE_SYS_MMAN_H": 1,
+        "HAVE_SYS_PARAM_H": 1,
+        "HAVE_SYS_RANDOM_H": 1,
+        "HAVE_TI_MODE": 1,
+    },
+    "WINNT": {},
+}
