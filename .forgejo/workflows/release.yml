@@ -1,0 +1,183 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Build browser-wip for Linux and Windows on the home build server, test
+# both, and publish them as a Forgejo release (docs/FORGEJO.md).
+#
+# Differences from .github/workflows/release.yml:
+#   - Runs on the "gecko-linux" runner, in host mode. Each platform keeps its
+#     Gecko checkout, build directory and toolchains in $CI_ROOT/<platform>
+#     between runs, so most builds are incremental.
+#   - Windows is still cross-compiled on Linux. Its smoke test runs on the
+#     Windows test VM over SSH, because forgejo-runner has no Windows build.
+#   - The release is created through Forgejo's API.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create, e.g. v0.1.0-alpha.1
+        required: true
+      publish:
+        description: Create the release after the builds pass
+        type: boolean
+        default: true
+      prerelease:
+        description: Mark the release as a pre-release
+        type: boolean
+        default: true
+      platforms:
+        description: Platforms to build (a release needs both)
+        type: choice
+        options: [both, linux, windows]
+        default: both
+      clobber:
+        description: Delete the build directory first (full rebuild)
+        type: boolean
+        default: false
+
+env:
+  # Persistent working area on the build VM, outside the job workspace.
+  CI_ROOT: /srv/gecko-ci
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: gecko-linux
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(inputs.platforms == 'linux' && '["linux-x86_64"]' || inputs.platforms == 'windows' && '["windows-x86_64"]' || '["linux-x86_64","windows-x86_64"]') }}
+    env:
+      PLATFORM: ${{ matrix.platform }}
+      MOZCONFIG_NAME: ${{ startsWith(matrix.platform, 'windows') && 'ci-win64' || 'ci-linux' }}
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+        with:
+          path: browser
+
+      - name: Prepare the persistent tree
+        run: |
+          work="$CI_ROOT/$PLATFORM"
+          mkdir -p "$work"
+          # Copy only files whose contents changed: unchanged files keep
+          # their timestamps, so the build redoes only what changed.
+          rsync -a --checksum --delete --exclude /.git "$GITHUB_WORKSPACE/browser/" "$work/browser/"
+          git -C "$GITHUB_WORKSPACE/browser" rev-parse HEAD > "$work/browser/.ci-commit"
+          echo "WORK=$work" >> "$GITHUB_ENV"
+          echo "MOZBUILD_STATE_PATH=$CI_ROOT/mozbuild" >> "$GITHUB_ENV"
+          echo "MOZCONFIG=$work/browser/mozconfigs/$MOZCONFIG_NAME" >> "$GITHUB_ENV"
+          # Where bootstrap installs Rust for the runner's user.
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          df -h "$CI_ROOT"
+
+      - name: Fetch the pinned Gecko release
+        run: GECKO_DIR="$WORK/mozilla-central" "$WORK/browser/tools/fetch-gecko.sh"
+
+      - name: Clobber
+        if: inputs.clobber
+        working-directory: ${{ env.WORK }}/mozilla-central
+        run: rm -rf obj-release
+
+      - name: Bootstrap the toolchains
+        working-directory: ${{ env.WORK }}/mozilla-central
+        run: |
+          # System packages were installed once when the VM was set up
+          # (docs/FORGEJO.md); this only fetches and updates toolchains.
+          ./mach --no-interactive bootstrap --no-system-changes --application-choice "Firefox for Desktop"
+          if [[ "$PLATFORM" == windows-* ]]; then
+            rustup target add x86_64-pc-windows-msvc
+          fi
+
+      - name: Build
+        working-directory: ${{ env.WORK }}/mozilla-central
+        run: ./mach build
+
+      - name: Package
+        working-directory: ${{ env.WORK }}/mozilla-central
+        run: |
+          rm -f obj-release/dist/*.zip obj-release/dist/*.tar.xz
+          ./mach package
+          src=$(cat obj-release/dist/package_name.txt)
+          ext="${src##*.}"; [[ "$src" == *.tar.xz ]] && ext="tar.xz"
+          rm -rf "$WORK/out" && mkdir -p "$WORK/out"
+          cp "obj-release/dist/$src" "$WORK/out/browser-wip-${{ inputs.tag }}-$PLATFORM.$ext"
+          ls -la "$WORK/out"
+
+      # Uploaded before the smoke test, so a failing check still leaves the
+      # build to look at; the release job needs the tests to pass anyway.
+      - uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: browser-wip-${{ matrix.platform }}
+          path: ${{ env.WORK }}/out/*
+          retention-days: 7
+
+      - name: Smoke test (Linux)
+        if: matrix.platform == 'linux-x86_64'
+        run: python3 "$WORK/browser/tools/runtime/check.py" "$WORK/mozilla-central/obj-release/dist/bin" --part 1 2 3 4 7
+
+  test-windows:
+    name: Smoke test on Windows
+    needs: build
+    # Also when the Linux smoke test failed: its results are wanted too.
+    if: ${{ !cancelled() && inputs.platforms != 'linux' }}
+    runs-on: gecko-linux
+    timeout-minutes: 45
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+        with:
+          path: browser
+      - uses: https://code.forgejo.org/forgejo/download-artifact@v4
+        with:
+          name: browser-wip-windows-x86_64
+          path: dist
+      - name: Run checks on the Windows test VM
+        env:
+          WINDOWS_TEST_HOST: ${{ vars.WINDOWS_TEST_HOST }}
+        run: |
+          zip=$(ls dist/*.zip)
+          browser/tools/ci/windows-smoke.sh "$WINDOWS_TEST_HOST" "$zip" "1 2 3 4 7"
+
+  release:
+    name: Publish release
+    needs: [build, test-windows]
+    if: inputs.publish && inputs.platforms == 'both'
+    runs-on: gecko-linux
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+      - uses: https://code.forgejo.org/forgejo/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Create release
+        env:
+          TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          ls -la assets
+          gecko=$(sed -n 's/^version=//p' GECKO_REVISION)
+          body=$(cat <<EOF
+          Early test build of browser-wip, built from ${GITHUB_SHA::12} on Gecko ${gecko} (Firefox Release).
+
+          | Platform | Download |
+          |---|---|
+          | Linux x86_64 | \`browser-wip-${TAG}-linux-x86_64.tar.xz\`: extract and run \`browser-wip/browser-wip\` |
+          | Windows x86_64 | \`browser-wip-${TAG}-windows-x86_64.zip\`: extract and run \`browser-wip.exe\` |
+
+          This is a pre-release for testing. Both builds passed automated checks for privacy defaults, ad and tracker blocking, first run and the browser window. Windows builds are unsigned, so SmartScreen will warn on first launch.
+          EOF
+          )
+          id=$(python3 -c 'import json,os,sys; print(json.dumps({"tag_name": os.environ["TAG"], "target_commitish": os.environ["GITHUB_SHA"], "name": "browser-wip " + os.environ["TAG"], "body": sys.stdin.read(), "prerelease": os.environ["PRERELEASE"] == "true"}))' <<< "$body" |
+            curl -fsS -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" --data @- "$API/releases" |
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          for f in assets/*; do
+            curl -fsS -X POST -H "Authorization: token $TOKEN" -F "attachment=@$f" \
+              "$API/releases/$id/assets?name=$(basename "$f")" > /dev/null
+            echo "uploaded $(basename "$f")"
+          done

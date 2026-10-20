@@ -1,0 +1,42 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Standalone checks for the network blocker, without building Gecko
+# (tools/adblock): adblock-rust's reference verdicts for the test cases, and
+# five minutes of odd input through the FFI's calls with the full lists.
+# Linux only here; the Windows build is tested in the browser by the release
+# workflow's smoke test (check.py part 7).
+
+name: Ad blocker engine
+
+on:
+  push:
+    paths:
+      - "app/components/contentblocking/**"
+      - "tests/blocker/**"
+      - "tools/adblock/**"
+      - ".forgejo/workflows/adblock.yml"
+  workflow_dispatch:
+
+jobs:
+  engine:
+    name: Reference and stress
+    runs-on: gecko-linux
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tools/adblock
+    env:
+      # Kept between runs on the build VM.
+      CARGO_TARGET_DIR: /srv/gecko-ci/adblock-target
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+      - name: Use the runner's Rust
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: Build
+        run: cargo build --release --locked
+      - name: Reference verdicts (hand-written and recorded cases)
+        run: cargo run --release --locked --bin reference
+      - name: Stress, 300 seconds
+        run: cargo run --release --locked --bin stress -- 300
