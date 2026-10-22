@@ -853,20 +853,32 @@ SIGNON_OFF = {
     "signon.schemeUpgrades": False,
 }
 
-# The open HTTP sign-in dialog: toolkit's window-modal commonDialog, since
-# this browser has no tab-modal prompts.
-AUTH_DIALOG = """let win = [...Services.wm.getEnumerator(null)].find(w =>
-  w.location.href == "chrome://global/content/commonDialog.xhtml" && w.document.readyState == "complete");
-return win && { text: win.document.getElementById("infoBody").textContent,
-  login: !win.document.getElementById("loginContainer")?.hidden };"""
-ANSWER_AUTH_DIALOG = """let [user, password] = arguments;
-let win = [...Services.wm.getEnumerator(null)].find(w =>
-  w.location.href == "chrome://global/content/commonDialog.xhtml");
-let dialog = win.document.getElementById("commonDialog");
-if (user == null) { dialog.cancelDialog(); return; }
-win.document.getElementById("loginTextbox").value = user;
-win.document.getElementById("password1Textbox").value = password;
-dialog.acceptDialog();"""
+# HTTP sign-in dialogs are toolkit's window-modal commonDialog, since this
+# browser has no tab-modal prompts. Marionette dismisses a window-modal dialog
+# it finds open before running a command (WebDriver's user prompt handling),
+# so each one is answered from inside the browser as it loads, with the next
+# queued [user, password] (none left: cancel). window.__auth.seen keeps what
+# each dialog showed.
+AUTH_ANSWERER = """window.__auth = { seen: [], answers: arguments[0] };
+if (!window.__authObserver) {
+  window.__authObserver = win => {
+    if (win.location.href != "chrome://global/content/commonDialog.xhtml") {
+      return;
+    }
+    let doc = win.document;
+    window.__auth.seen.push({ text: doc.getElementById("infoBody").textContent,
+      login: !doc.getElementById("loginContainer")?.hidden });
+    let [user, password] = window.__auth.answers.shift() ?? [];
+    if (user == null) {
+      doc.getElementById("commonDialog").cancelDialog();
+      return;
+    }
+    doc.getElementById("loginTextbox").value = user;
+    doc.getElementById("password1Textbox").value = password;
+    doc.getElementById("commonDialog").acceptDialog();
+  };
+  Services.obs.addObserver(window.__authObserver, "common-dialog-loaded");
+}"""
 
 
 def part6(bindir, base):
@@ -914,16 +926,16 @@ def part6(bindir, base):
                pasted and focused and submitted and saved == 1, [pasted, focused, submitted, saved])
 
         # HTTP Basic: a dialog names the site; signing in loads the page.
+        b.js(AUTH_ANSWERER, [["wip", "secret"]])
         b.js("gBrowser.selectTab(gBrowser.addTab(arguments[0]));", f"{base}/auth/")
-        shown = b.wait(AUTH_DIALOG, timeout=15)
-        if shown:
-            b.js(ANSWER_AUTH_DIALOG, "wip", "secret")
         title = b.wait("return gBrowser.selectedBrowser.contentTitle == 'signed in';", timeout=15)
+        shown = b.js("return window.__auth.seen[0];")
         record(6, "HTTP Basic sign-in prompts with the site's name and signs in",
                bool(shown) and "127.0.0.1" in shown["text"] and shown["login"] and bool(title),
                [shown, b.js("return gBrowser.selectedBrowser.contentTitle;")])
 
         # Cancelling twice in a tab stops further prompts from that site there.
+        b.js(AUTH_ANSWERER, [])
         b.js("gBrowser.selectTab(gBrowser.addTab(arguments[0]));", f"{base}/deny/1")
         prompts = []
         for i in range(3):
@@ -931,10 +943,9 @@ def part6(bindir, base):
                 b.js("gBrowser.selectedBrowser.loadURI(Services.io.newURI(arguments[0]),"
                      "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });",
                      f"{base}/deny/{i + 1}")
-            shown = b.wait(AUTH_DIALOG, timeout=5 if i == 2 else 15)
+            shown = b.wait("return window.__auth.seen.length > arguments[0];", i, timeout=5 if i == 2 else 15)
             prompts.append(bool(shown))
             if shown:
-                b.js(ANSWER_AUTH_DIALOG, None, None)
                 b.wait("""return ![...Services.wm.getEnumerator(null)].some(w =>
                   w.location.href == "chrome://global/content/commonDialog.xhtml");""", timeout=5)
         record(6, "a site whose sign-in prompt is cancelled twice gets no third", prompts == [True, True, False],

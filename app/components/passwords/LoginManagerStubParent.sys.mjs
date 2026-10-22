@@ -11,3 +11,6 @@
 export class LoginManagerStubParent extends JSWindowActorParent {
   maybeRecordPasswordGenerationShownTelemetryEvent() {}
 }
+
+// Gecko looks the class up by the actor's name: "LoginManager" + "Parent".
+export { LoginManagerStubParent as LoginManagerParent };

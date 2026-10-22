@@ -160,19 +160,33 @@ class AuthPrompter {
 
   async #show(channel, level, authInfo) {
     let { displayHost } = PromptUtils.getAuthTarget(channel, authInfo);
-    let host;
+    // The tab's site, or the asking host while the tab has none (a new tab
+    // is on about:blank, whose .host throws). Both must come out in the same
+    // form, or one site's dismissals are counted under two names.
+    let host = "";
     try {
-      host = this.browser?.currentURI.host || Services.io.newURI(displayHost).host;
+      host = this.browser?.currentURI.host ?? "";
     } catch (e) {
-      host = displayHost;
+      // No host.
+    }
+    if (!host) {
+      try {
+        host = Services.io.newURI(displayHost).host;
+      } catch (e) {
+        host = displayHost;
+      }
     }
     let domain = baseDomainOf(host);
     if (tooManyDismissals(this.browser, domain)) {
       return false;
     }
+    // Window-modal: this browser has no tab-modal prompts (no "Prompt"
+    // actor), so a tab-modal request falls back to the same window dialog,
+    // but with text that leaves the site's name to a tab dialog's header,
+    // and the dialog would never say which site is asking.
     let ok = await Services.prompt.asyncPromptAuth(
       this.browser?.browsingContext ?? null,
-      Ci.nsIPrompt.MODAL_TYPE_TAB,
+      Ci.nsIPrompt.MODAL_TYPE_WINDOW,
       channel,
       level,
       authInfo

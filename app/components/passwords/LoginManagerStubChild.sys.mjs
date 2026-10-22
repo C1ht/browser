@@ -68,3 +68,6 @@ export class LoginManagerStubChild extends JSWindowActorChild {
     return new EmptyResult(searchString);
   }
 }
+
+// Gecko looks the class up by the actor's name: "LoginManager" + "Child".
+export { LoginManagerStubChild as LoginManagerChild };

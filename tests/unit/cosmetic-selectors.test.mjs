@@ -1,5 +1,6 @@
 // Element-hiding selection, against lists compiled by run.sh into $CB_OUT.
 globalThis.Ci = { nsIStyleSheetService: { AGENT_SHEET: 0 } };
+globalThis.ChromeUtils = { defineLazyGetter() {} };
 globalThis.JSWindowActorChild = class {};
 const { selectorsForHost } = await import(
   "../../app/components/contentblocking/ContentBlockingChild.sys.mjs"

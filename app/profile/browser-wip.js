@@ -263,6 +263,10 @@ pref("network.prefetch-next", false);
 pref("network.dns.disablePrefetch", true);
 pref("network.dns.disablePrefetchFromHTTPS", true);
 pref("network.http.speculative-parallel-limit", 0);
+// <link rel=preconnect> and Link: rel=preconnect headers. Even with no
+// speculative connections allowed, they still look the host up, and the
+// network blocker never sees them (they aren't requests).
+pref("network.preconnect", false);
 pref("network.predictor.enabled", false);
 pref("network.predictor.enable-prefetch", false);
 
