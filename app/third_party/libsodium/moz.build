@@ -1,0 +1,24 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# The part of libsodium the password vault uses (tools/vault/
+# update-libsodium.py). The file list and configuration are shared with the
+# standalone test build, tools/vault/build.py.
+
+include("sources.mozbuild")
+
+SOURCES += sodium_sources
+LOCAL_INCLUDES += sodium_includes
+
+for name, value in sodium_defines.items():
+    DEFINES[name] = value
+for name, value in sodium_defines_cpu.get(CONFIG["TARGET_CPU"], {}).items():
+    DEFINES[name] = value
+for name, value in sodium_defines_os.get(CONFIG["OS_ARCH"], {}).items():
+    DEFINES[name] = value
+
+# Upstream code, kept as released.
+AllowCompilerWarnings()
+
+FINAL_LIBRARY = "xul"

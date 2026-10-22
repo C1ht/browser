@@ -10,6 +10,7 @@
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   ActorManagerParent: "resource://gre/modules/ActorManagerParent.sys.mjs",
+  AuthPromptFactory: "resource://gre/modules/browserwip/AuthPrompt.sys.mjs",
   ContentBlockingLists: "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs",
   ContentPermissionPrompt: "resource://gre/modules/browserwip/ContentPermissionPrompt.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
@@ -99,6 +100,18 @@ const JSWINDOWACTORS = {
     matches: ["http://*/*", "https://*/*"],
     safeForUntrustedWebProcess: true,
   },
+  // Replaces toolkit's password manager actor of the same name, which never
+  // runs here; toolkit code still looks it up (LoginManagerStubChild).
+  LoginManager: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/LoginManagerStubParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/LoginManagerStubChild.sys.mjs",
+    },
+    allFrames: true,
+    safeForUntrustedWebProcess: true,
+  },
   // Camera, microphone and screen sharing (WebRTCChild.sys.mjs).
   WebRTC: {
     parent: {
@@ -144,6 +157,26 @@ function registerPermissionPrompt() {
       {
         createInstance(iid) {
           return new lazy.ContentPermissionPrompt().QueryInterface(iid);
+        },
+      }
+    );
+}
+
+// HTTP authentication prompts without Firefox's login store (AuthPrompt.sys.mjs).
+const AUTH_PROMPT_FACTORY_CID = Components.ID("{3c6f2a0e-8d41-4f7b-b5e9-1a7d0c2e9f64}");
+
+function registerAuthPromptFactory() {
+  let factory = null;
+  Components.manager
+    .QueryInterface(Ci.nsIComponentRegistrar)
+    .registerFactory(
+      AUTH_PROMPT_FACTORY_CID,
+      "browser-wip HTTP authentication prompts",
+      "@mozilla.org/passwordmanager/authpromptfactory;1",
+      {
+        createInstance(iid) {
+          factory ??= new lazy.AuthPromptFactory();
+          return factory.QueryInterface(iid);
         },
       }
     );
@@ -195,9 +228,13 @@ BrowserWipGlue.prototype = {
     } catch (e) {
       console.error("browser-wip: element-hiding rules unavailable", e);
     }
-    lazy.ActorManagerParent.addJSWindowActors(JSWINDOWACTORS);
-    lazy.ActorManagerParent.addJSProcessActors(JSPROCESSACTORS);
+    let { ActorManagerParent } = lazy;
+    // Toolkit's LoginManager actor is registered by now; ours replaces it.
+    ChromeUtils.unregisterWindowActor("LoginManager");
+    ActorManagerParent.addJSWindowActors(JSWINDOWACTORS);
+    ActorManagerParent.addJSProcessActors(JSPROCESSACTORS);
     registerPermissionPrompt();
+    registerAuthPromptFactory();
     applyAppearance();
     Services.prefs.addObserver(APPEARANCE_PREF, applyAppearance);
     lazy.PrivacyModes.init();

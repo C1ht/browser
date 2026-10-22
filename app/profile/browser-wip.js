@@ -293,9 +293,30 @@ pref("captchadetection.actor.enabled", false);
 pref("toolkit.shopping.ohttpConfigURL", "");
 pref("toolkit.shopping.ohttpRelayURL", "");
 
-// Password manager: no Firefox Relay, no breach alerts.
+// Firefox's password manager is off: its actor is replaced by an inert one
+// and HTTP sign-in prompts don't use its store (components/passwords). These
+// prefs keep it off should any of its code run anyway: nothing is captured,
+// saved, filled, generated or backed up, and its looser matching (other
+// subdomains, http logins on https) is off too.
+pref("signon.rememberSignons", false);
+pref("signon.autofillForms", false);
+pref("signon.autofillForms.autocompleteOff", false);
+pref("signon.autologin.proxy", false);
+pref("signon.backup.enabled", false);
+pref("signon.capture.inputChanges.enabled", false);
+pref("signon.formlessCapture.enabled", false);
+pref("signon.formRemovalCapture.enabled", false);
+pref("signon.generation.available", false);
+pref("signon.generation.enabled", false);
+pref("signon.includeOtherSubdomainsInLookup", false);
+pref("signon.passwordEditCapture.enabled", false);
+pref("signon.privateBrowsingCapture.enabled", false);
+pref("signon.schemeUpgrades", false);
+pref("signon.storeWhenAutocompleteOff", false);
+pref("signon.usernameOnlyForm.enabled", false);
 pref("signon.firefoxRelay.feature", "disabled");
 pref("signon.management.page.breach-alerts.enabled", false);
+pref("signon.management.page.vulnerable-passwords.enabled", false);
 pref("signon.recipes.remoteRecipes.enabled", false);
 
 // Firefox Accounts and Sync are not part of this browser.

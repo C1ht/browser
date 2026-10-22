@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forgot master password</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#5EC4BE}a:hover{color:#8ad8d3}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; box-sizing: border-box; overflow: hidden; background: #1D2226; color: #E3E8EB; font: 15px/1.55 'Instrument Sans', system-ui, sans-serif; display: flex; justify-content: center; padding-top: 72px;">
+  <div style="width: 600px; display: flex; flex-direction: column; gap: 20px;">
+    <h1 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: -0.012em;">Forgot your master password?</h1>
+    <p style="margin: 0; color: #96A1AA;">Your passwords are encrypted with it, and there's no copy anywhere else. Nobody can reset it for you.</p>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 12px; border: 1.5px solid #5EC4BE; box-shadow: inset 0 0 0 1px #5EC4BE;">
+      <div style="font-weight: 600; font-size: 16px;">Use your recovery key</div>
+      <div style="color: #96A1AA; font-size: 14px;">The 32 characters you were shown when you set up passwords. Then you'll choose a new master password.</div>
+      <div style="display: flex; gap: 8px;">
+        <input aria-label="Recovery key" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" style="flex: 1; min-width: 0; height: 38px; box-sizing: border-box; border: 1px solid #3A4248; border-radius: 9px; padding: 0 12px; background: #1D2226; color: #E3E8EB; font-family: ui-monospace, 'Cascadia Mono', 'DejaVu Sans Mono', monospace; font-size: 14px; letter-spacing: 0.04em;">
+        <button style="border: 0; border-radius: 9px; padding: 0 20px; background: #E3E8EB; color: #15191C; font: inherit; font-size: 14px; font-weight: 600;">Continue</button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 12px; border: 1.5px solid #2D3439;">
+      <div style="font-weight: 600; font-size: 16px;">Start over with an empty vault</div>
+      <div style="color: #96A1AA; font-size: 14px;">Your current passwords are kept in a file, still locked, in case you remember the password later. Settings › Passwords › “Open an older vault” can merge them back.</div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 500;">Type “start over” to confirm
+        <input style="height: 38px; box-sizing: border-box; border: 1px solid #3A4248; border-radius: 9px; padding: 0 12px; background: #1D2226; color: #E3E8EB; font: inherit;">
+      </label>
+      <div style="display: flex; justify-content: flex-end;">
+        <button disabled="disabled" style="border: 1px solid #3A4248; border-radius: 9px; padding: 7px 16px; background: transparent; color: #E3E8EB; opacity: 0.45; font: inherit; font-size: 14px; font-weight: 500;">Start over</button>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: #23292E; color: #96A1AA; font-size: 14px;">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 3px;"><circle cx="8" cy="8" r="5.5"/><path d="M8 7.5v3M8 5.2v.1"/></svg>
+      <span>Still unlocked with Windows Hello? Autofill keeps working, but showing, exporting and changing passwords need the master password or the recovery key.</span>
+    </div>
+    <a href="#back" style="font-size: 14px; font-weight: 500; text-decoration: none;">Back to unlock</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

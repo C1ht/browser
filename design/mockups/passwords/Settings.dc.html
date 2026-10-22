@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings, Passwords</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#5EC4BE}a:hover{color:#8ad8d3}
+</style>
+</helmet>
+<div style="width: 1280px; height: 960px; box-sizing: border-box; overflow: hidden; background: #1D2226; color: #E3E8EB; font: 15px/1.55 'Instrument Sans', system-ui, sans-serif;">
+  <main style="width: 720px; margin: 0 auto; padding: 48px 0 80px; display: flex; flex-direction: column; gap: 40px;">
+    <h1 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: -0.012em;">Settings</h1>
+
+    <section aria-labelledby="pw-heading" style="display: flex; flex-direction: column; gap: 16px;">
+      <h2 id="pw-heading" style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #96A1AA;">Passwords</h2>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border-radius: 12px; background: #23292E;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #5EC4BE;"></span>
+          <div style="display: flex; flex-direction: column;"><span style="font-weight: 600;">Unlocked · 48 logins</span><span style="font-size: 13.5px; color: #96A1AA;">Stored encrypted in this profile. Only your master password can reveal or export them.</span></div>
+        </div>
+        <div style="display: flex; gap: 8px; flex: none;">
+          <button style="border: 1px solid #3A4248; border-radius: 9px; padding: 7px 16px; background: transparent; color: #E3E8EB; font: inherit; font-size: 14px; font-weight: 500;">Lock now</button>
+          <button style="border: 0; border-radius: 9px; padding: 9px 18px; background: #E3E8EB; color: #15191C; font: inherit; font-size: 14px; font-weight: 600;">Open passwords</button>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 0; border-bottom: 1px solid #2D3439;">
+          <div><span style="display: block; font-weight: 500;">Offer to save logins</span><span style="display: block; font-size: 13.5px; color: #96A1AA;">Ask after you sign in. In Strict and Anonymous nothing is saved without your OK.</span></div>
+          <button role="switch" aria-checked="true" aria-label="Offer to save logins" style="position: relative; width: 36px; height: 22px; flex: none; border: 0; border-radius: 999px; background: #5EC4BE; padding: 0;"><span style="position: absolute; top: 3px; left: 17px; width: 16px; height: 16px; border-radius: 50%; background: #1D2226;"></span></button>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 0; border-bottom: 1px solid #2D3439;">
+          <div><span style="display: block; font-weight: 500;">Unlock with your system keyring</span><span style="display: block; font-size: 13.5px; color: #96A1AA;">Fills without typing the master password while your desktop session is unlocked. Programs running as you can read the keyring too.</span></div>
+          <button role="switch" aria-checked="true" aria-label="Unlock with your system keyring" style="position: relative; width: 36px; height: 22px; flex: none; border: 0; border-radius: 999px; background: #5EC4BE; padding: 0;"><span style="position: absolute; top: 3px; left: 17px; width: 16px; height: 16px; border-radius: 50%; background: #1D2226;"></span></button>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 0 12px 20px; border-bottom: 1px solid #2D3439;">
+          <div><span style="display: block; font-weight: 500;">Confirm with fingerprint</span><span style="display: block; font-size: 13.5px; color: #96A1AA;">Checks it's you at the keyboard before the keyring unlocks. It doesn't add protection to the vault itself.</span></div>
+          <button role="switch" aria-checked="false" aria-label="Confirm with fingerprint" style="position: relative; width: 36px; height: 22px; flex: none; border: 0; border-radius: 999px; background: rgba(255,255,255,0.18); padding: 0;"><span style="position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #1D2226;"></span></button>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 0; border-bottom: 1px solid #2D3439;">
+          <div><label for="idle" style="display: block; font-weight: 500;">Lock after inactivity</label><span style="display: block; font-size: 13.5px; color: #96A1AA;">Also locks whenever you lock the screen or the computer sleeps.</span></div>
+          <select id="idle" style="height: 34px; border: 1px solid #3A4248; border-radius: 9px; padding: 0 10px; background: #1D2226; color: #E3E8EB; font: inherit; font-size: 14px;">
+            <option>5 minutes</option>
+            <option selected="selected">15 minutes</option>
+            <option>30 minutes</option>
+            <option>1 hour</option>
+            <option>4 hours</option>
+          </select>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 0; border-bottom: 1px solid #2D3439;">
+          <div><span style="display: block; font-weight: 500;">Master password</span><span style="display: block; font-size: 13.5px; color: #96A1AA;">Changing it re-encrypts every password with a new key.</span></div>
+          <button style="border: 1px solid #3A4248; border-radius: 9px; padding: 7px 16px; background: transparent; color: #E3E8EB; font: inherit; font-size: 14px; font-weight: 500;">Change…</button>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 0; border-bottom: 1px solid #2D3439;">
+          <div><span style="display: block; font-weight: 500;">Recovery key</span><span style="display: block; font-size: 13.5px; color: #96A1AA;">Made 3 Mar 2026. A new one replaces it.</span></div>
+          <button style="border: 1px solid #3A4248; border-radius: 9px; padding: 7px 16px; background: transparent; color: #E3E8EB; font: inherit; font-size: 14px; font-weight: 500;">Make a new one…</button>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 0;">
+          <div><span style="display: block; font-weight: 500;">Import and export</span><span style="display: block; font-size: 13.5px; color: #96A1AA;">From Firefox, Chrome, Bitwarden or KeePassXC (CSV), or a vault file.</span></div>
+          <div style="display: flex; gap: 8px;">
+            <button style="border: 1px solid #3A4248; border-radius: 9px; padding: 7px 16px; background: transparent; color: #E3E8EB; font: inherit; font-size: 14px; font-weight: 500;">Import…</button>
+            <button style="border: 1px solid #3A4248; border-radius: 9px; padding: 7px 16px; background: transparent; color: #E3E8EB; font: inherit; font-size: 14px; font-weight: 500;">Export…</button>
+          </div>
+        </div>
+      </div>
+
+      <details open="open" style="border-top: 1px solid #2D3439; padding-top: 14px;">
+        <summary style="list-style: none; cursor: pointer; font-weight: 500; color: #96A1AA;">› What this protects against</summary>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; font-size: 14px;">
+          <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid #2D3439;">
+            <div style="font-weight: 600; margin-bottom: 6px;">Protected</div>
+            <div style="color: #96A1AA;">Someone who copies this profile or your disk. Other people's accounts on this computer. Look-alike sites: a login fills only on the exact site you saved it for, over HTTPS, after you click.</div>
+          </div>
+          <div style="padding: 14px 16px; border-radius: 12px; background: #3A2A14; color: #F2B866;">
+            <div style="font-weight: 600; margin-bottom: 6px;">Not protected</div>
+            <div>Malware running as you while passwords are unlocked can read them, or catch your master password as you type it. Keep your system updated and your disk encrypted.</div>
+          </div>
+        </div>
+      </details>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":960}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-19T12:00:00Z" },
+  "title": "Password manager mockups",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 760, "title": "Save prompt (light)" },
+    "Fill.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 760, "title": "Fill dropdown + generator (light)" },
+    "Unlock.dc.html": { "x": 2720, "y": 0, "w": 1280, "h": 760, "title": "Unlock panel (dark)" },
+    "Iframe.dc.html": { "x": 0, "y": 1180, "w": 1280, "h": 760, "title": "Locked dropdown in a cross-origin iframe (light)" },
+    "Manager.dc.html": { "x": 1360, "y": 1180, "w": 1280, "h": 800, "title": "about:passwords (light)" },
+    "Settings.dc.html": { "x": 2720, "y": 1180, "w": 1280, "h": 960, "title": "Settings › Passwords (dark)" },
+    "Setup.dc.html": { "x": 0, "y": 2560, "w": 1280, "h": 800, "title": "Setup (light)" },
+    "Export.dc.html": { "x": 1360, "y": 2560, "w": 1280, "h": 800, "title": "Export (light)" },
+    "Forgot.dc.html": { "x": 2720, "y": 2560, "w": 1280, "h": 800, "title": "Forgot password (dark)" }
+  },
+  "order": [
+    "Main.dc.html",
+    "Fill.dc.html",
+    "Unlock.dc.html",
+    "Iframe.dc.html",
+    "Manager.dc.html",
+    "Settings.dc.html",
+    "Setup.dc.html",
+    "Export.dc.html",
+    "Forgot.dc.html"
+  ],
+  "notes": {
+    "row1": { "x": 0, "y": -300, "text": "In the browser window: save, fill, unlock", "kind": "title1", "maxW": 4000 },
+    "row2": { "x": 0, "y": 880, "text": "Locked fill, the manager, Settings", "kind": "title1", "maxW": 4000 },
+    "row3": { "x": 0, "y": 2260, "text": "Setup, export, forgotten password", "kind": "title1", "maxW": 4000 }
+  },
+  "designSystems": []
+}
