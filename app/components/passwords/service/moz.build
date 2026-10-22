@@ -1,0 +1,25 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# nsIPasswordVault: the vault core (../vault) for the browser process.
+
+XPIDL_SOURCES += [
+    "nsIPasswordVault.idl",
+]
+
+XPIDL_MODULE = "browserwip_passwords"
+
+XPCOM_MANIFESTS += [
+    "components.conf",
+]
+
+SOURCES += [
+    "PasswordVault.cpp",
+]
+
+LOCAL_INCLUDES += [
+    "../vault",
+]
+
+FINAL_LIBRARY = "xul"

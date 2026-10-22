@@ -23,6 +23,7 @@ const PAGES = {
   home: { url: "chrome://browser-wip/content/newtab.html", flags: PRIVILEGED },
   welcome: { url: "chrome://browser-wip/content/welcome.html", flags: PRIVILEGED },
   settings: { url: "chrome://browser-wip/content/settings.html", flags: PRIVILEGED },
+  passwords: { url: "chrome://browser-wip/content/passwords.html", flags: PRIVILEGED },
   // Gecko shows about:certerror for certificate problems. Firefox registers
   // it in browser/; it is toolkit's shared network-error page.
   certerror: { url: "chrome://global/content/aboutNetError.html", flags: ERROR_PAGE },

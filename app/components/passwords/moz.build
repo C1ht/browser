@@ -6,8 +6,13 @@ EXTRA_JS_MODULES.browserwip += [
     "AuthPrompt.sys.mjs",
     "LoginManagerStubChild.sys.mjs",
     "LoginManagerStubParent.sys.mjs",
+    "PasswordRules.sys.mjs",
+    "PasswordsChild.sys.mjs",
+    "PasswordsParent.sys.mjs",
+    "PasswordVault.sys.mjs",
 ]
 
 DIRS += [
+    "service",
     "vault",
 ]

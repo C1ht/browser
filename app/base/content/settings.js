@@ -111,6 +111,92 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   syncAppearance();
 
+  // Passwords (docs/PASSWORDS.md §12).
+  let { PasswordVault, LOCK_PREF, OFFER_PREF } = ChromeUtils.importESModule(
+    "resource://gre/modules/browserwip/PasswordVault.sys.mjs"
+  );
+  let $ = id => document.getElementById(id);
+  let syncPasswords = () => {
+    let state = PasswordVault.state;
+    let unlocked = state == "unlocked";
+    if (unlocked) {
+      document.l10n.setAttributes($("passwords-status"), "settings-passwords-unlocked", {
+        count: PasswordVault.entries().length,
+      });
+    } else {
+      document.l10n.setAttributes(
+        $("passwords-status"),
+        state == "locked" ? "settings-passwords-locked" : "settings-passwords-none"
+      );
+    }
+    $("passwords-lock").hidden = !unlocked;
+    // Changing the master password needs the vault unlocked.
+    $("passwords-change-box").hidden = !unlocked;
+    $("passwords-offer").setAttribute("aria-checked", String(Services.prefs.getBoolPref(OFFER_PREF, true)));
+    let minutes = String(Services.prefs.getIntPref(LOCK_PREF, 15));
+    for (let b of document.querySelectorAll("#passwords-lock-after [data-value]")) {
+      b.setAttribute("aria-checked", String(b.dataset.value == minutes));
+    }
+  };
+  $("passwords-lock").addEventListener("click", () => PasswordVault.lock());
+  $("passwords-manage").addEventListener("click", () => {
+    window.browsingContext.topChromeWindow?.PasswordsUI?.openManager();
+  });
+  $("passwords-offer").addEventListener("click", () => {
+    Services.prefs.setBoolPref(OFFER_PREF, $("passwords-offer").getAttribute("aria-checked") != "true");
+    syncPasswords();
+  });
+  $("passwords-offer-label").addEventListener("click", e => {
+    e.preventDefault();
+    $("passwords-offer").click();
+  });
+  for (let b of document.querySelectorAll("#passwords-lock-after [data-value]")) {
+    b.addEventListener("click", () => {
+      Services.prefs.setIntPref(LOCK_PREF, Number(b.dataset.value));
+      syncPasswords();
+    });
+  }
+  $("passwords-change-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    let result = $("passwords-change-result");
+    let submit = $("passwords-change-submit");
+    submit.disabled = true;
+    try {
+      await PasswordVault.changeMasterPassword(
+        $("passwords-current").value,
+        $("passwords-new").value,
+        $("passwords-repeat").value
+      );
+      result.removeAttribute("error");
+      document.l10n.setAttributes(result, "settings-passwords-changed");
+      for (let id of ["passwords-current", "passwords-new", "passwords-repeat"]) {
+        $(id).value = "";
+      }
+    } catch (err) {
+      result.setAttribute("error", "true");
+      let ids = {
+        "wrong-password": "passwords-wrong-password",
+        "too-short": "passwords-too-short",
+        mismatch: "passwords-mismatch",
+      };
+      document.l10n.setAttributes(result, ids[err.code] ?? "passwords-error");
+    } finally {
+      result.hidden = false;
+      submit.disabled = false;
+    }
+  });
+  let onPasswords = () => syncPasswords();
+  Services.obs.addObserver(onPasswords, "browserwip:passwords-state");
+  Services.obs.addObserver(onPasswords, "browserwip:passwords-changed");
+  window.addEventListener("unload", () => {
+    Services.obs.removeObserver(onPasswords, "browserwip:passwords-state");
+    Services.obs.removeObserver(onPasswords, "browserwip:passwords-changed");
+  });
+  syncPasswords();
+  PasswordVault.init()
+    .catch(() => {})
+    .then(syncPasswords);
+
   // About.
   document.l10n.setAttributes(document.getElementById("version"), "settings-about-version", {
     version: Services.appinfo.version,

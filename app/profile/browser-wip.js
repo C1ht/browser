@@ -323,6 +323,12 @@ pref("signon.management.page.breach-alerts.enabled", false);
 pref("signon.management.page.vulnerable-passwords.enabled", false);
 pref("signon.recipes.remoteRecipes.enabled", false);
 
+// The browser's own password manager (docs/PASSWORDS.md). Lock after this
+// many minutes without input (Settings: 5, 15, 30, 60, 240), and offer to
+// save logins after signing in.
+pref("browserwip.passwords.lockAfterMinutes", 15);
+pref("browserwip.passwords.offerToSave", true);
+
 // Firefox Accounts and Sync are not part of this browser.
 pref("identity.fxaccounts.enabled", false);
 

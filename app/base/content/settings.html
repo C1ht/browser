@@ -15,6 +15,7 @@
   <link rel="localization" href="branding/brand.ftl"/>
   <link rel="localization" href="browser-wip/privacy.ftl"/>
   <link rel="localization" href="browser-wip/settings.ftl"/>
+  <link rel="localization" href="browser-wip/passwords.ftl"/>
   <script src="chrome://browser-wip/content/privacy-controls.js"></script>
   <script src="chrome://browser-wip/content/settings.js"></script>
 </head>
@@ -30,6 +31,45 @@
         <p data-l10n-id="settings-restart-needed"></p>
         <button id="restart" class="secondary" type="button" data-l10n-id="settings-restart"></button>
       </div>
+    </section>
+
+    <section id="passwords" aria-labelledby="passwords-heading">
+      <h2 id="passwords-heading" data-l10n-id="settings-passwords-heading"></h2>
+      <div class="inline-row">
+        <p id="passwords-status"></p>
+        <div class="button-row">
+          <button id="passwords-lock" class="secondary" type="button" data-l10n-id="settings-passwords-lock"></button>
+          <button id="passwords-manage" class="secondary" type="button" data-l10n-id="settings-passwords-manage"></button>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <div>
+          <label id="passwords-offer-label" for="passwords-offer" data-l10n-id="settings-passwords-offer-label"></label>
+          <span class="help" data-l10n-id="settings-passwords-offer-help"></span>
+        </div>
+        <button id="passwords-offer" class="switch" type="button" role="switch" aria-labelledby="passwords-offer-label"></button>
+      </div>
+      <div class="inline-row">
+        <span id="passwords-lock-after-label" data-l10n-id="settings-passwords-lock-after"></span>
+        <div id="passwords-lock-after" class="segmented" role="radiogroup" aria-labelledby="passwords-lock-after-label">
+          <button type="button" role="radio" data-value="5" data-l10n-id="settings-passwords-minutes" data-l10n-args='{"minutes": 5}'></button>
+          <button type="button" role="radio" data-value="15" data-l10n-id="settings-passwords-minutes" data-l10n-args='{"minutes": 15}'></button>
+          <button type="button" role="radio" data-value="30" data-l10n-id="settings-passwords-minutes" data-l10n-args='{"minutes": 30}'></button>
+          <button type="button" role="radio" data-value="60" data-l10n-id="settings-passwords-hour"></button>
+          <button type="button" role="radio" data-value="240" data-l10n-id="settings-passwords-hours"></button>
+        </div>
+      </div>
+      <details id="passwords-change-box" class="advanced" hidden="hidden">
+        <summary data-l10n-id="settings-passwords-change"></summary>
+        <form id="passwords-change-form" class="change-form">
+          <input id="passwords-current" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-current"/>
+          <input id="passwords-new" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-new"/>
+          <input id="passwords-repeat" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-repeat"/>
+          <p id="passwords-change-result" role="status" hidden="hidden"></p>
+          <div><button id="passwords-change-submit" class="primary" type="submit" data-l10n-id="settings-passwords-change-button"></button></div>
+        </form>
+      </details>
+      <p class="muted" data-l10n-id="passwords-protects-text"></p>
     </section>
 
     <section id="startup" aria-labelledby="startup-heading">

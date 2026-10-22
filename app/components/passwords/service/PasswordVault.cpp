@@ -1,0 +1,734 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "PasswordVault.h"
+
+#include <inttypes.h>
+#include <string.h>
+
+#include "bwvault.h"
+#include "bwvstore.h"
+#include "bwvtxn.h"
+#include "mozilla/Base64.h"
+#include "mozilla/ClearOnShutdown.h"
+#include "mozilla/ErrorResult.h"
+#include "mozilla/Services.h"
+#include "mozilla/StaticPtr.h"
+#include "mozilla/UniquePtr.h"
+#include "mozilla/dom/Promise.h"
+#include "mozilla/dom/Promise-inl.h"
+#include "nsIObserverService.h"
+#include "nsPrintfCString.h"
+#include "nsProxyRelease.h"
+#include "nsTHashMap.h"
+#include "nsThreadUtils.h"
+#include "nsXULAppAPI.h"
+#include "xpcpublic.h"
+
+namespace mozilla::browserwip {
+
+using dom::Promise;
+using Outcome = PasswordVault::Outcome;
+
+namespace {
+
+StaticRefPtr<PasswordVault> sSingleton;
+
+// A new vault's master-password KDF: Argon2id, 256 MiB, t = 3 (§4.3).
+const bwv_kdf_params kDefaultKdf = {BWV_KDF_DEFAULT_T, BWV_KDF_DEFAULT_M_KIB};
+
+// Large enough for any slot's fixed inputs (a salt, a tag, a challenge).
+constexpr size_t kSlotInputsMax = 64;
+
+void Wipe(void* aData, size_t aLen) {
+  volatile uint8_t* p = static_cast<volatile uint8_t*>(aData);
+  while (aLen--) {
+    *p++ = 0;
+  }
+}
+
+void Wipe(nsCString& aValue) {
+  if (!aValue.IsEmpty()) {
+    Wipe(aValue.BeginWriting(), aValue.Length());
+  }
+  aValue.Truncate();
+}
+
+// A buffer of our own, so that wiping it wipes the copy we made. The one
+// XPConnect made from the JS string is freed by it; JS strings themselves
+// can't be wiped (docs/PASSWORDS.md §8).
+nsCString Own(const nsACString& aValue) {
+  return nsCString(aValue.BeginReading(), aValue.Length());
+}
+
+Outcome Done(bwv_status aStatus) {
+  Outcome out;
+  out.mStatus = aStatus;
+  return out;
+}
+
+Outcome Text(nsCString&& aValue, bool aSecret) {
+  Outcome out;
+  out.mKind = Outcome::Kind::String;
+  out.mString = std::move(aValue);
+  out.mSecret = aSecret;
+  return out;
+}
+
+Outcome Flag(bool aValue) {
+  Outcome out;
+  out.mKind = Outcome::Kind::Bool;
+  out.mBool = aValue;
+  return out;
+}
+
+bool DecodeId(const nsCString& aId, uint8_t aOut[BWV_ENTRY_ID_BYTES]) {
+  FallibleTArray<uint8_t> bytes;
+  if (NS_FAILED(Base64URLDecode(aId, Base64URLDecodePaddingPolicy::Reject, bytes)) ||
+      bytes.Length() != BWV_ENTRY_ID_BYTES) {
+    return false;
+  }
+  memcpy(aOut, bytes.Elements(), BWV_ENTRY_ID_BYTES);
+  return true;
+}
+
+// vault.bwv, loaded and still locked.
+bwv_status LoadFile(bws_store* aStore, bwv_vault** aOut) {
+  uint8_t* data = nullptr;
+  size_t len = 0;
+  bwv_status st = bws_read(aStore, BWS_VAULT, &data, &len);
+  if (st != BWV_OK) {
+    return st;
+  }
+  bwv_vault* vault = bwv_new();
+  st = vault ? bwv_load(vault, data, len) : BWV_E_NOMEM;
+  bwv_bytes_free(data);
+  if (st != BWV_OK) {
+    bwv_free(vault);
+    return st;
+  }
+  *aOut = vault;
+  return BWV_OK;
+}
+
+// The key of `aVault`'s password slot for `aPassword` (Argon2id: the slow
+// part of unlocking).
+bwv_status PasswordKey(const bwv_vault* aVault, const nsCString& aPassword,
+                       bwv_key** aOut) {
+  bwv_kdf_params params;
+  uint8_t inputs[kSlotInputsMax];
+  size_t inputsLen = 0;
+  bwv_status st =
+      bwv_slot_inputs(aVault, BWV_SLOT_PASSWORD, &params, inputs, &inputsLen);
+  if (st != BWV_OK) {
+    return st;
+  }
+  if (inputsLen < BWV_SALT_BYTES) {
+    return BWV_E_FORMAT;
+  }
+  bwv_key* key = bwv_key_new();
+  if (!key) {
+    return BWV_E_NOMEM;
+  }
+  st = bwv_derive_password_key(&params, inputs, aPassword.get(),
+                               aPassword.Length(), key);
+  if (st != BWV_OK) {
+    bwv_key_free(key);
+    return st;
+  }
+  *aOut = key;
+  return BWV_OK;
+}
+
+// A login waiting to be saved: its password, sealed under the capture key.
+struct Box {
+  uint8_t* mData = nullptr;
+  size_t mLen = 0;
+  ~Box() { bwv_bytes_free(mData); }
+};
+
+void Settle(Promise* aPromise, Outcome& aOut) {
+  if (aOut.mStatus != BWV_OK) {
+    aPromise->MaybeRejectWithOperationError(nsDependentCString(
+        bwv_status_name(static_cast<bwv_status>(aOut.mStatus))));
+  } else if (aOut.mKind == Outcome::Kind::String) {
+    nsAutoString value;
+    CopyUTF8toUTF16(aOut.mString, value);
+    aPromise->MaybeResolve(value);
+    if (aOut.mSecret && !value.IsEmpty()) {
+      Wipe(value.BeginWriting(), value.Length() * sizeof(char16_t));
+    }
+  } else if (aOut.mKind == Outcome::Kind::Bool) {
+    aPromise->MaybeResolve(aOut.mBool);
+  } else {
+    aPromise->MaybeResolveWithUndefined();
+  }
+  if (aOut.mSecret) {
+    Wipe(aOut.mString);
+  }
+}
+
+}  // namespace
+
+// Everything the core holds. Only ever used on the task queue.
+struct PasswordVault::Core {
+  bool mInitialized = false;
+  bws_store* mStore = nullptr;
+  bwt_session* mSession = nullptr;
+  bool mPermsFixed = false;
+  bool mCleanup = false;
+  // Logins submitted and not yet saved, sealed under a key that exists
+  // only for the session (§7.3).
+  bwv_key* mCaptureKey = nullptr;
+  uint64_t mNextCapture = 1;
+  nsTHashMap<nsCStringHashKey, UniquePtr<Box>> mCaptures;
+
+  ~Core() { Close(); }
+
+  bwv_status Init() {
+    if (!mInitialized) {
+      bwv_status st = bwv_init();
+      if (st != BWV_OK) {
+        return st;
+      }
+      mInitialized = true;
+    }
+    return BWV_OK;
+  }
+
+  bwv_vault* Vault() { return mSession ? bwt_vault(mSession) : nullptr; }
+
+  void DropCaptures() {
+    mCaptures.Clear();
+    bwv_key_free(mCaptureKey);
+    mCaptureKey = nullptr;
+  }
+
+  // Wipes the vault (keys, index, passwords) and the captured logins.
+  void Lock() {
+    if (mSession) {
+      bwt_attach(mSession, nullptr);
+    }
+    DropCaptures();
+  }
+
+  void Close() {
+    Lock();
+    bwt_session_free(mSession);
+    mSession = nullptr;
+    bws_close(mStore);
+    mStore = nullptr;
+  }
+
+  bwv_status OpenCapture(const nsCString& aId, uint8_t** aOut, size_t* aLen) {
+    auto lookup = mCaptures.Lookup(aId);
+    Box* box = lookup ? lookup.Data().get() : nullptr;
+    if (!box || !mCaptureKey) {
+      return BWV_E_NOT_FOUND;
+    }
+    return bwv_box_open(mCaptureKey, reinterpret_cast<const uint8_t*>(aId.get()),
+                        aId.Length(), box->mData, box->mLen, aOut, aLen);
+  }
+};
+
+NS_IMPL_ISUPPORTS(PasswordVault, nsIPasswordVault, nsIObserver)
+
+already_AddRefed<PasswordVault> PasswordVault::GetSingleton() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!sSingleton) {
+    if (!XRE_IsParentProcess()) {
+      return nullptr;
+    }
+    RefPtr<PasswordVault> vault = new PasswordVault();
+    if (NS_FAILED(vault->Init())) {
+      return nullptr;
+    }
+    sSingleton = vault;
+    ClearOnShutdown(&sSingleton);
+  }
+  return do_AddRef(sSingleton);
+}
+
+PasswordVault::~PasswordVault() {
+  if (mCore && mQueue) {
+    Core* core = mCore;
+    mCore = nullptr;
+    mQueue->Dispatch(NS_NewRunnableFunction("PasswordVault::~PasswordVault",
+                                            [core]() { delete core; }));
+  }
+}
+
+nsresult PasswordVault::Init() {
+  nsresult rv = NS_CreateBackgroundTaskQueue("PasswordVault", getter_AddRefs(mQueue));
+  NS_ENSURE_SUCCESS(rv, rv);
+  mCore = new Core();
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  if (obs) {
+    obs->AddObserver(this, "profile-before-change", false);
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PasswordVault::Observe(nsISupports* aSubject, const char* aTopic,
+                       const char16_t* aData) {
+  if (!strcmp(aTopic, "profile-before-change")) {
+    Shutdown();
+  }
+  return NS_OK;
+}
+
+// Quitting locks: the keys are wiped and the vault directory's lock is
+// released before the profile goes away.
+void PasswordVault::Shutdown() {
+  if (mShutDown) {
+    return;
+  }
+  mShutDown = true;
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  if (obs) {
+    obs->RemoveObserver(this, "profile-before-change");
+  }
+  if (mQueue && mCore) {
+    Core* core = mCore;
+    mCore = nullptr;
+    NS_DispatchAndSpinEventLoopUntilComplete(
+        "PasswordVault::Shutdown wipes the vault keys"_ns, mQueue,
+        NS_NewRunnableFunction("PasswordVault::Shutdown",
+                               [core]() { delete core; }));
+  }
+}
+
+nsresult PasswordVault::Run(JSContext* aCx, Promise** aPromise,
+                            const char* aName,
+                            std::function<Outcome(Core&)>&& aTask) {
+  MOZ_ASSERT(NS_IsMainThread());
+  NS_ENSURE_ARG_POINTER(aPromise);
+  nsIGlobalObject* global = xpc::CurrentNativeGlobal(aCx);
+  if (NS_WARN_IF(!global)) {
+    return NS_ERROR_UNEXPECTED;
+  }
+  ErrorResult result;
+  RefPtr<Promise> promise = Promise::Create(global, result);
+  if (NS_WARN_IF(result.Failed())) {
+    return result.StealNSResult();
+  }
+  if (mShutDown || !mQueue || !mCore) {
+    promise->MaybeRejectWithOperationError("BWV_E_STATE"_ns);
+    promise.forget(aPromise);
+    return NS_OK;
+  }
+
+  nsMainThreadPtrHandle<Promise> holder(
+      new nsMainThreadPtrHolder<Promise>(aName, promise));
+  Core* core = mCore;
+  nsresult rv = mQueue->Dispatch(
+      NS_NewRunnableFunction(
+          aName,
+          [core, holder, task = std::move(aTask)]() {
+            Outcome out = task(*core);
+            NS_DispatchToMainThread(NS_NewRunnableFunction(
+                "PasswordVault settle",
+                [holder, out = std::move(out)]() mutable {
+                  Settle(holder.get(), out);
+                }));
+          }),
+      NS_DISPATCH_NORMAL);
+  if (NS_FAILED(rv)) {
+    promise->MaybeRejectWithOperationError("BWV_E_STATE"_ns);
+  }
+  promise.forget(aPromise);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PasswordVault::Open(const nsACString& aDir, JSContext* aCx,
+                    Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::Open",
+             [dir = nsCString(aDir)](Core& core) {
+               bwv_status st = core.Init();
+               if (st == BWV_OK && !core.mStore) {
+                 int fixed = 0;
+                 st = bws_open(dir.get(), &core.mStore, &fixed);
+                 if (st == BWV_OK) {
+                   core.mPermsFixed = fixed;
+                   core.mSession = bwt_session_new(core.mStore, nullptr);
+                   if (!core.mSession) {
+                     bws_close(core.mStore);
+                     core.mStore = nullptr;
+                     st = BWV_E_NOMEM;
+                   }
+                 }
+                 if (st == BWV_OK) {
+                   core.mCleanup = bwt_recover(core.mSession) != BWV_OK;
+                 }
+               }
+               if (st != BWV_OK) {
+                 return Done(st);
+               }
+               return Text(
+                   nsCString(nsPrintfCString(
+                       R"({"exists":%s,"permsFixed":%s,"cleanup":%s})",
+                       bws_exists(core.mStore, BWS_VAULT) ? "true" : "false",
+                       core.mPermsFixed ? "true" : "false",
+                       core.mCleanup ? "true" : "false")),
+                   false);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::Create(const nsACString& aPassword, const nsACString& aIndex,
+                      JSContext* aCx, Promise** aPromise) {
+  return Run(
+      aCx, aPromise, "PasswordVault::Create",
+      [pw = Own(aPassword), index = Own(aIndex)](Core& core) mutable {
+        bwv_status st = core.mSession ? BWV_OK : BWV_E_STATE;
+        // Never overwrite a vault, whatever state JS thinks it is in.
+        if (st == BWV_OK && bws_exists(core.mStore, BWS_VAULT)) {
+          st = BWV_E_STATE;
+        }
+        bwv_vault* vault = nullptr;
+        bwv_key* key = nullptr;
+        if (st == BWV_OK) {
+          vault = bwv_new();
+          st = vault ? bwv_create(vault) : BWV_E_NOMEM;
+        }
+        if (st == BWV_OK) {
+          st = bwv_prepare_slot(vault, BWV_SLOT_PASSWORD, &kDefaultKdf);
+        }
+        bwv_kdf_params params;
+        uint8_t inputs[kSlotInputsMax];
+        size_t inputsLen = 0;
+        if (st == BWV_OK) {
+          st = bwv_prepared_inputs(vault, BWV_SLOT_PASSWORD, &params, inputs,
+                                   &inputsLen);
+        }
+        if (st == BWV_OK) {
+          key = bwv_key_new();
+          st = key ? bwv_derive_password_key(&params, inputs, pw.get(),
+                                             pw.Length(), key)
+                   : BWV_E_NOMEM;
+        }
+        Wipe(pw);
+        if (st == BWV_OK) {
+          st = bwv_set_slot(vault, BWV_SLOT_PASSWORD, key);
+        }
+        bwv_key_free(key);
+        if (st == BWV_OK) {
+          st = bwv_set_index(vault, reinterpret_cast<const uint8_t*>(index.get()),
+                             index.Length());
+        }
+        Wipe(index);
+        if (st != BWV_OK) {
+          bwv_free(vault);
+          return Done(st);
+        }
+        bwt_attach(core.mSession, vault);
+        st = bwt_save(core.mSession);
+        if (st != BWV_OK) {
+          bwt_attach(core.mSession, nullptr);
+        }
+        return Done(st);
+      });
+}
+
+NS_IMETHODIMP
+PasswordVault::Unlock(const nsACString& aPassword, JSContext* aCx,
+                      Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::Unlock",
+             [pw = Own(aPassword)](Core& core) mutable {
+               bwv_status st = core.mSession ? BWV_OK : BWV_E_STATE;
+               bwv_vault* vault = nullptr;
+               bwv_key* key = nullptr;
+               if (st == BWV_OK) {
+                 st = LoadFile(core.mStore, &vault);
+               }
+               if (st == BWV_OK) {
+                 st = PasswordKey(vault, pw, &key);
+               }
+               Wipe(pw);
+               if (st == BWV_OK) {
+                 st = bwv_unlock(vault, BWV_SLOT_PASSWORD, key);
+               }
+               bwv_key_free(key);
+               if (st == BWV_OK) {
+                 st = bwv_open_body(vault);
+               }
+               nsCString index;
+               if (st == BWV_OK) {
+                 uint8_t* data = nullptr;
+                 size_t len = 0;
+                 st = bwv_get_index(vault, &data, &len);
+                 if (st == BWV_OK) {
+                   index.Assign(reinterpret_cast<const char*>(data), len);
+                   bwv_secret_free(data);
+                 }
+               }
+               if (st != BWV_OK) {
+                 bwv_free(vault);
+                 return Done(st);
+               }
+               bwt_attach(core.mSession, vault);
+               return Text(std::move(index), true);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::CheckPassword(const nsACString& aPassword, JSContext* aCx,
+                             Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::CheckPassword",
+             [pw = Own(aPassword)](Core& core) mutable {
+               bwv_status st = core.mSession ? BWV_OK : BWV_E_STATE;
+               bwv_vault* vault = nullptr;
+               bwv_key* key = nullptr;
+               if (st == BWV_OK) {
+                 st = LoadFile(core.mStore, &vault);
+               }
+               if (st == BWV_OK) {
+                 st = PasswordKey(vault, pw, &key);
+               }
+               Wipe(pw);
+               if (st == BWV_OK) {
+                 st = bwv_unlock(vault, BWV_SLOT_PASSWORD, key);
+               }
+               bwv_key_free(key);
+               bwv_free(vault);
+               if (st == BWV_E_AUTH) {
+                 return Flag(false);
+               }
+               return st == BWV_OK ? Flag(true) : Done(st);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::Lock(JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::Lock", [](Core& core) {
+    core.Lock();
+    return Done(BWV_OK);
+  });
+}
+
+NS_IMETHODIMP
+PasswordVault::Save(const nsACString& aIndex, JSContext* aCx,
+                    Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::Save",
+             [index = Own(aIndex)](Core& core) mutable {
+               bwv_vault* vault = core.Vault();
+               bwv_status st =
+                   vault ? bwv_set_index(
+                               vault,
+                               reinterpret_cast<const uint8_t*>(index.get()),
+                               index.Length())
+                         : BWV_E_LOCKED;
+               Wipe(index);
+               if (st == BWV_OK) {
+                 st = bwt_save(core.mSession);
+               }
+               return Done(st);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::SetSecret(const nsACString& aEntryId, const nsACString& aOrigin,
+                         const nsACString& aSecret, JSContext* aCx,
+                         Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::SetSecret",
+             [id = nsCString(aEntryId), origin = nsCString(aOrigin),
+              secret = Own(aSecret)](Core& core) mutable {
+               uint8_t raw[BWV_ENTRY_ID_BYTES];
+               bwv_vault* vault = core.Vault();
+               bwv_status st =
+                   !vault                 ? BWV_E_LOCKED
+                   : !DecodeId(id, raw)   ? BWV_E_ARG
+                                          : bwv_set_secret(
+                                              vault, raw, origin.get(),
+                                              origin.Length(),
+                                              reinterpret_cast<const uint8_t*>(
+                                                  secret.get()),
+                                              secret.Length());
+               Wipe(secret);
+               return Done(st);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::GetSecret(const nsACString& aEntryId, const nsACString& aOrigin,
+                         JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::GetSecret",
+             [id = nsCString(aEntryId), origin = nsCString(aOrigin)](Core& core) {
+               uint8_t raw[BWV_ENTRY_ID_BYTES];
+               bwv_vault* vault = core.Vault();
+               if (!vault) {
+                 return Done(BWV_E_LOCKED);
+               }
+               if (!DecodeId(id, raw)) {
+                 return Done(BWV_E_ARG);
+               }
+               uint8_t* data = nullptr;
+               size_t len = 0;
+               bwv_status st = bwv_get_secret(vault, raw, origin.get(),
+                                              origin.Length(), &data, &len);
+               if (st != BWV_OK) {
+                 return Done(st);
+               }
+               nsCString secret(reinterpret_cast<const char*>(data), len);
+               bwv_secret_free(data);
+               return Text(std::move(secret), true);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::MoveSecret(const nsACString& aEntryId, const nsACString& aFrom,
+                          const nsACString& aTo, JSContext* aCx,
+                          Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::MoveSecret",
+             [id = nsCString(aEntryId), from = nsCString(aFrom),
+              to = nsCString(aTo)](Core& core) {
+               uint8_t raw[BWV_ENTRY_ID_BYTES];
+               bwv_vault* vault = core.Vault();
+               if (!vault) {
+                 return Done(BWV_E_LOCKED);
+               }
+               if (!DecodeId(id, raw)) {
+                 return Done(BWV_E_ARG);
+               }
+               uint8_t* data = nullptr;
+               size_t len = 0;
+               bwv_status st = bwv_get_secret(vault, raw, from.get(),
+                                              from.Length(), &data, &len);
+               if (st == BWV_OK) {
+                 st = bwv_set_secret(vault, raw, to.get(), to.Length(), data,
+                                     len);
+               }
+               bwv_secret_free(data);
+               return Done(st);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::RemoveSecret(const nsACString& aEntryId, JSContext* aCx,
+                            Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::RemoveSecret",
+             [id = nsCString(aEntryId)](Core& core) {
+               uint8_t raw[BWV_ENTRY_ID_BYTES];
+               bwv_vault* vault = core.Vault();
+               if (!vault) {
+                 return Done(BWV_E_LOCKED);
+               }
+               if (!DecodeId(id, raw)) {
+                 return Done(BWV_E_ARG);
+               }
+               return Done(bwv_remove_secret(vault, raw));
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::SealCapture(const nsACString& aSecret, JSContext* aCx,
+                           Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::SealCapture",
+             [secret = Own(aSecret)](Core& core) mutable {
+               bwv_status st = core.Init();
+               if (st == BWV_OK && !core.mCaptureKey) {
+                 core.mCaptureKey = bwv_key_new();
+                 if (core.mCaptureKey) {
+                   bwv_key_generate(core.mCaptureKey);
+                 } else {
+                   st = BWV_E_NOMEM;
+                 }
+               }
+               nsAutoCString id;
+               id.AppendPrintf("c%" PRIu64, core.mNextCapture++);
+               auto box = MakeUnique<Box>();
+               if (st == BWV_OK) {
+                 st = bwv_box_seal(core.mCaptureKey,
+                                   reinterpret_cast<const uint8_t*>(id.get()),
+                                   id.Length(),
+                                   reinterpret_cast<const uint8_t*>(secret.get()),
+                                   secret.Length(), &box->mData, &box->mLen);
+               }
+               Wipe(secret);
+               if (st != BWV_OK) {
+                 return Done(st);
+               }
+               core.mCaptures.InsertOrUpdate(id, std::move(box));
+               return Text(nsCString(id), false);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::OpenCapture(const nsACString& aCaptureId, JSContext* aCx,
+                           Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::OpenCapture",
+             [id = nsCString(aCaptureId)](Core& core) {
+               uint8_t* data = nullptr;
+               size_t len = 0;
+               bwv_status st = core.OpenCapture(id, &data, &len);
+               if (st != BWV_OK) {
+                 return Done(st);
+               }
+               nsCString secret(reinterpret_cast<const char*>(data), len);
+               bwv_secret_free(data);
+               return Text(std::move(secret), true);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::StoreCapture(const nsACString& aCaptureId,
+                            const nsACString& aEntryId,
+                            const nsACString& aOrigin, JSContext* aCx,
+                            Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::StoreCapture",
+             [captureId = nsCString(aCaptureId), id = nsCString(aEntryId),
+              origin = nsCString(aOrigin)](Core& core) {
+               uint8_t raw[BWV_ENTRY_ID_BYTES];
+               bwv_vault* vault = core.Vault();
+               if (!vault) {
+                 return Done(BWV_E_LOCKED);
+               }
+               if (!DecodeId(id, raw)) {
+                 return Done(BWV_E_ARG);
+               }
+               uint8_t* data = nullptr;
+               size_t len = 0;
+               bwv_status st = core.OpenCapture(captureId, &data, &len);
+               if (st == BWV_OK) {
+                 st = bwv_set_secret(vault, raw, origin.get(), origin.Length(),
+                                     data, len);
+               }
+               bwv_secret_free(data);
+               if (st == BWV_OK) {
+                 core.mCaptures.Remove(captureId);
+               }
+               return Done(st);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::DropCapture(const nsACString& aCaptureId, JSContext* aCx,
+                           Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::DropCapture",
+             [captureId = nsCString(aCaptureId)](Core& core) {
+               core.mCaptures.Remove(captureId);
+               return Done(BWV_OK);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::ChangePassword(const nsACString& aCurrent,
+                              const nsACString& aFresh, JSContext* aCx,
+                              Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::ChangePassword",
+             [current = Own(aCurrent), fresh = Own(aFresh)](Core& core) mutable {
+               bwv_status st = core.mSession ? bwt_change_password(
+                                                   core.mSession, current.get(),
+                                                   current.Length(), fresh.get(),
+                                                   fresh.Length())
+                                             : BWV_E_STATE;
+               Wipe(current);
+               Wipe(fresh);
+               return Done(st);
+             });
+}
+
+}  // namespace mozilla::browserwip

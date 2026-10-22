@@ -8,6 +8,34 @@ Windows machine (§15).
 Mockups: `design/mockups/passwords/` (published as a canvas, *Password manager
 mockups*).
 
+**Built so far (Stage 2):**
+
+- **Master password only.** The keyring, Windows Hello, the recovery key,
+  export and import are not built yet (§18 parts 3 and 5).
+- **The bridge to the core:** `components/passwords/service/`
+  (`nsIPasswordVault`). The core runs on one background task queue and
+  every call returns a Promise.
+- **`PasswordVault.sys.mjs`:** lock state and the index, saving and
+  editing, captured logins, reveal and copy behind the master password
+  with the 5-minute grace, clearing the clipboard after 30 s, locking on
+  idle (system idle, through `nsIUserIdleService`), on sleep and on quit.
+- **`PasswordRules.sys.mjs`:** the §7.1 origin rules, tested in Node
+  (`tests/unit/password-rules.test.mjs`).
+- **In pages:** `PasswordsChild`/`PasswordsParent` (https frames only) and
+  `base/content/passwords.js`. They provide:
+  - the key button with its dot
+  - the save, update, unlock and setup panel under it
+  - the dropdown under login fields, with the generator and "also use
+    here"
+  - Standard saving generated passwords with Undo
+- **The manager and Settings:** `about:passwords`
+  (`base/content/passwords.html`) and Settings › Passwords.
+- **Not built yet:**
+  - session-lock signals (§5.4)
+  - the passphrase suggestion at setup (it needs the EFF word list)
+  - "Start over" from Forgot password
+  - runtime checks for these parts in `tools/runtime/check.py`
+
 ---
 
 ## 0. Done before Stage 1 (branch `claude/password-manager`, from `main`)

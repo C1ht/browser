@@ -41,3 +41,43 @@
   background-color: var(--warn-bg);
   color: var(--warn-fg);
 }
+
+/* Passwords */
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.change-form {
+  display: grid;
+  gap: 10px;
+  max-width: 420px;
+  padding-top: 12px;
+}
+
+.change-form .field {
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background-color: var(--page-bg);
+  color: var(--fg);
+  outline: none;
+}
+
+.change-form .field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+#passwords-change-result[error] {
+  color: var(--warn-fg);
+}
+
+#passwords-change-result:not([error]) {
+  color: var(--accent);
+}

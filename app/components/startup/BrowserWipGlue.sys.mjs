@@ -100,6 +100,27 @@ const JSWINDOWACTORS = {
     matches: ["http://*/*", "https://*/*"],
     safeForUntrustedWebProcess: true,
   },
+  // The browser's own password manager in pages: login fields, the
+  // dropdown, filling and submitted logins (components/passwords). Only on
+  // https, the one scheme logins are kept for (docs/PASSWORDS.md §7.1).
+  Passwords: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/PasswordsParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/PasswordsChild.sys.mjs",
+      events: {
+        DOMFormHasPassword: {},
+        DOMInputPasswordAdded: {},
+        DOMPossibleUsernameInputAdded: {},
+        "form-submission-detected": { createActor: false },
+        pagehide: { createActor: false },
+      },
+    },
+    allFrames: true,
+    matches: ["https://*/*"],
+    safeForUntrustedWebProcess: true,
+  },
   // Replaces toolkit's password manager actor of the same name, which never
   // runs here; toolkit code still looks it up (LoginManagerStubChild).
   LoginManager: {

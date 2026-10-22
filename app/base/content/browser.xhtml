@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="chrome://browser-wip/skin/browser.css"/>
   <link rel="localization" href="branding/brand.ftl"/>
   <link rel="localization" href="browser-wip/browser.ftl"/>
+  <link rel="localization" href="browser-wip/passwords.ftl"/>
   <script src="chrome://browser-wip/content/tabbrowser.js"/>
   <script src="chrome://browser-wip/content/letterbox.js"/>
   <script src="chrome://browser-wip/content/downloads.js"/>
@@ -26,6 +27,7 @@
   <script src="chrome://browser-wip/content/permissions.js"/>
   <script src="chrome://browser-wip/content/taboverview.js"/>
   <script src="chrome://browser-wip/content/fullscreen.js"/>
+  <script src="chrome://browser-wip/content/passwords.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
   <script src="chrome://browser-wip/content/browser.js"/>
 </head>
@@ -215,6 +217,107 @@
         <p id="identity-summary" class="panel-text"></p>
       </div>
     </xul:panel>
+    <!-- Passwords (passwords.js): save or update a login, unlock, set up,
+         and the site's logins, all under the key button. view= picks one. -->
+    <xul:panel id="passwords-panel" class="wip-panel" type="arrow" role="dialog"
+               aria-labelledby="passwords-title">
+      <div class="panel-body">
+        <h2 id="passwords-title" class="panel-title"></h2>
+        <p id="passwords-text" class="panel-text"></p>
+
+        <div id="passwords-save-view" class="passwords-view">
+          <label class="passwords-field">
+            <span data-l10n-id="passwords-username-label"></span>
+            <input id="passwords-save-username" class="passwords-input" type="text"
+                   spellcheck="false" autocomplete="off" data-l10n-id="passwords-username-none"/>
+          </label>
+          <div class="passwords-field">
+            <span id="passwords-save-password-label" data-l10n-id="passwords-password-label"></span>
+            <div class="passwords-secret">
+              <span id="passwords-save-secret" aria-labelledby="passwords-save-password-label"></span>
+              <button id="passwords-save-reveal" class="passwords-icon-button" data-l10n-id="passwords-show-password">
+                <img class="icon" src="chrome://browser-wip/skin/icons/eye.svg" alt=""/>
+              </button>
+            </div>
+          </div>
+          <div class="passwords-buttons">
+            <button id="passwords-save-more" class="passwords-icon-button bordered" data-l10n-id="passwords-more-options">
+              <img class="icon" src="chrome://browser-wip/skin/icons/more.svg" alt=""/>
+            </button>
+            <span class="passwords-spacer"></span>
+            <button id="passwords-save-later" class="panel-button" data-l10n-id="passwords-not-now"/>
+            <button id="passwords-save-confirm" class="panel-button primary" data-l10n-id="passwords-save"/>
+          </div>
+        </div>
+
+        <div id="passwords-saved-view" class="passwords-view">
+          <div class="passwords-buttons">
+            <span class="passwords-spacer"></span>
+            <button id="passwords-saved-undo" class="panel-button" data-l10n-id="passwords-undo"/>
+          </div>
+        </div>
+
+        <div id="passwords-unlock-view" class="passwords-view">
+          <form id="passwords-unlock-form" class="passwords-inline">
+            <input id="passwords-unlock-password" class="passwords-input" type="password"
+                   autocomplete="off" data-l10n-id="passwords-master-password"/>
+            <button id="passwords-unlock-submit" class="panel-button" type="submit" data-l10n-id="passwords-unlock"/>
+          </form>
+          <p id="passwords-unlock-error" class="passwords-error" role="alert" hidden="true"
+             data-l10n-id="passwords-wrong-password"></p>
+          <div class="passwords-footer">
+            <button id="passwords-forgot" class="panel-link" data-l10n-id="passwords-forgot"/>
+            <span id="passwords-locks-after" class="passwords-note"></span>
+          </div>
+        </div>
+
+        <div id="passwords-setup-view" class="passwords-view">
+          <form id="passwords-setup-form" class="passwords-stack">
+            <input id="passwords-setup-password" class="passwords-input" type="password"
+                   autocomplete="off" data-l10n-id="passwords-setup-password"/>
+            <input id="passwords-setup-confirm" class="passwords-input" type="password"
+                   autocomplete="off" data-l10n-id="passwords-setup-confirm"/>
+            <p id="passwords-setup-error" class="passwords-error" role="alert" hidden="true"></p>
+            <p class="passwords-note" data-l10n-id="passwords-setup-where"></p>
+            <div class="passwords-buttons">
+              <span class="passwords-spacer"></span>
+              <button id="passwords-setup-cancel" class="panel-button" type="button" data-l10n-id="passwords-setup-cancel"/>
+              <button id="passwords-setup-create" class="panel-button primary" type="submit" data-l10n-id="passwords-setup-create"/>
+            </div>
+          </form>
+        </div>
+
+        <div id="passwords-site-view" class="passwords-view">
+          <div id="passwords-site-list" role="list" aria-labelledby="passwords-title"></div>
+          <div class="passwords-footer">
+            <button id="passwords-site-manage" class="panel-link" data-l10n-id="passwords-manage-link"/>
+            <button id="passwords-site-lock" class="panel-link" data-l10n-id="passwords-lock-now"/>
+          </div>
+        </div>
+
+        <div id="passwords-intro-view" class="passwords-view">
+          <div class="passwords-buttons">
+            <button id="passwords-intro-manage" class="panel-link" data-l10n-id="passwords-manage-link"/>
+            <span class="passwords-spacer"></span>
+            <button id="passwords-intro-setup" class="panel-button primary" data-l10n-id="passwords-setup-title"/>
+          </div>
+        </div>
+      </div>
+    </xul:panel>
+
+    <xul:menupopup id="passwords-more-menu" class="wip-menu">
+      <xul:menuitem id="passwords-never" data-l10n-id="passwords-never-for-site"/>
+      <xul:menuitem id="passwords-more-manage" data-l10n-id="passwords-manage"/>
+    </xul:menupopup>
+
+    <!-- Saved logins under a login field (passwords.js). Opened by a click in
+         the field or ArrowDown; focus stays in the page, which forwards the
+         arrow keys, Enter and Escape. -->
+    <xul:panel id="passwords-dropdown" class="passwords-dropdown" noautofocus="true"
+               consumeoutsideclicks="never" level="parent" role="listbox"
+               data-l10n-id="passwords-dropdown-label">
+      <div id="passwords-dropdown-body"></div>
+    </xul:panel>
   </xul:popupset>
 
   <header id="nav-bar" role="toolbar" data-l10n-id="nav-bar">
@@ -242,6 +345,9 @@
       </div>
       <button id="sharing-button" class="urlbar-button" hidden="true" data-l10n-id="sharing-button">
         <img class="icon" src="chrome://browser-wip/skin/icons/camera.svg" alt=""/>
+      </button>
+      <button id="passwords-button" class="urlbar-button" hidden="true" data-l10n-id="passwords-button">
+        <img class="icon" src="chrome://browser-wip/skin/icons/key.svg" alt=""/>
       </button>
       <button id="protections-button" class="urlbar-button" data-l10n-id="protections-button">
         <img id="protections-icon" class="icon" src="chrome://browser-wip/skin/icons/shield.svg" alt=""/>
