@@ -66,6 +66,10 @@ sodium_defines = {
     "SODIUM_STATIC": 1,
     # x86-64 and AArch64, the only targets, are both little-endian.
     "NATIVE_LITTLE_ENDIAN": 1,
+    # libxul already exports a C function with this name
+    # (security/manager/ssl/crypto_hash, written in Rust); ours is renamed
+    # wherever libsodium's headers are seen, so the two never meet.
+    "crypto_hash_sha256": "browserwip_sodium_crypto_hash_sha256",
 }
 
 # By TARGET_CPU.
@@ -85,12 +89,15 @@ sodium_defines_cpu = {
 
 # By OS_ARCH. Windows needs nothing: libsodium uses VirtualLock,
 # VirtualProtect, SecureZeroMemory and RtlGenRandom there by itself.
+#
+# Linux builds use Mozilla's sysroot, whose glibc predates 2.25: no
+# <sys/random.h>, getrandom() wrapper or explicit_bzero(). libsodium then
+# calls the getrandom system call itself (or reads /dev/urandom once
+# /dev/random is ready), and wipes memory with its weak-symbol barrier.
 sodium_defines_os = {
     "Linux": {
-        "HAVE_EXPLICIT_BZERO": 1,
         "HAVE_GETPID": 1,
-        "HAVE_GETRANDOM": 1,
-        "HAVE_LINUX_COMPATIBLE_GETRANDOM": 1,
+        "HAVE_INLINE_ASM": 1,
         "HAVE_MADVISE": 1,
         "HAVE_MLOCK": 1,
         "HAVE_MMAP": 1,
@@ -102,8 +109,8 @@ sodium_defines_os = {
         "HAVE_SYS_AUXV_H": 1,
         "HAVE_SYS_MMAN_H": 1,
         "HAVE_SYS_PARAM_H": 1,
-        "HAVE_SYS_RANDOM_H": 1,
         "HAVE_TI_MODE": 1,
+        "HAVE_WEAK_SYMBOLS": 1,
     },
     "WINNT": {},
 }

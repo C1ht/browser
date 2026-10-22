@@ -18,6 +18,9 @@ LOCAL_INCLUDES += [
 ]
 
 DEFINES["SODIUM_STATIC"] = 1
+# As in ../../../third_party/libsodium/sources.mozbuild: libxul has another
+# crypto_hash_sha256.
+DEFINES["crypto_hash_sha256"] = "browserwip_sodium_crypto_hash_sha256"
 
 if CONFIG["OS_ARCH"] == "WINNT":
     OS_LIBS += ["advapi32"]
