@@ -282,15 +282,20 @@ class URLBar {
     // Protections.
     this.protectionsButton.hidden = !isWeb;
     let allowListed = isWeb && BrowserWip.protectionsDisabledFor(browser);
+    let unavailable = isWeb && !allowListed && BrowserWip.protectionsUnavailable();
     this.protectionsButton.toggleAttribute("disabled-for-site", allowListed);
-    this.protectionsButton.querySelector("img").src = allowListed
-      ? "chrome://browser-wip/skin/icons/shield-off.svg"
-      : "chrome://browser-wip/skin/icons/shield.svg";
+    this.protectionsButton.toggleAttribute("unavailable", unavailable);
+    this.protectionsButton.querySelector("img").src =
+      allowListed || unavailable
+        ? "chrome://browser-wip/skin/icons/shield-off.svg"
+        : "chrome://browser-wip/skin/icons/shield.svg";
     this.protectionsButton.setAttribute("count", tab.blockedTrackers);
     this.protectionsCount.textContent = tab.blockedTrackers || "";
-    this.document.l10n.setAttributes(this.protectionsButton, "protections-button", {
-      count: tab.blockedTrackers,
-    });
+    this.document.l10n.setAttributes(
+      this.protectionsButton,
+      unavailable ? "protections-button-unavailable" : "protections-button",
+      { count: tab.blockedTrackers }
+    );
 
     // Loading progress.
     this.box.toggleAttribute("loading", tab.hasAttribute("busy"));

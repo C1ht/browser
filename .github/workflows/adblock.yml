@@ -1,0 +1,45 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Standalone checks for the network blocker, without building Gecko
+# (tools/adblock): adblock-rust's reference verdicts for the test cases, and
+# five minutes of odd input through the FFI's calls with the full lists.
+# The browser itself is tested by tools/runtime/check.py part 7 in the
+# release workflow.
+
+name: Ad blocker engine
+
+on:
+  push:
+    paths:
+      - "app/components/contentblocking/**"
+      - "tests/blocker/**"
+      - "tools/adblock/**"
+      - ".github/workflows/adblock.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: Reference and stress (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    defaults:
+      run:
+        shell: bash
+        working-directory: tools/adblock
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --release --locked
+      - name: Reference verdicts (hand-written and recorded cases)
+        run: cargo run --release --locked --bin reference
+      - name: Stress, 300 seconds
+        run: cargo run --release --locked --bin stress -- 300

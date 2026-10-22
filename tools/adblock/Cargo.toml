@@ -1,0 +1,25 @@
+# Standalone checks for the network blocker (app/components/contentblocking/
+# blocker/). Builds adblock-rust exactly as Gecko does (same version, same
+# features; toolkit/library/rust/shared/Cargo.toml) without building Gecko.
+#
+#   cargo run --release --bin reference -- --check   reference verdicts
+#   cargo run --release --bin stress -- SECONDS      odd inputs, full lists
+
+[package]
+name = "browserwip-adblock-tools"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+publish = false
+
+# Not part of any other workspace.
+[workspace]
+
+[dependencies]
+adblock = { version = "=0.12.1", features = ["full-regex-handling", "single-thread"], default-features = false }
+psl = "2"
+serde_json = "1"
+
+[profile.release]
+# Gecko's Rust opt level.
+opt-level = 2

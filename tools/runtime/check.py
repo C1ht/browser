@@ -4,7 +4,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Runtime checks against a built browser-wip.
 
-    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4] [--shots DIR]
+    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4 5 7] [--shots DIR]
 
 Starts the browser (headless, fresh profile, Marionette on a local port),
 runs privileged JavaScript in its window and reports pass/fail per check.
@@ -22,6 +22,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -59,7 +60,7 @@ def serve_pages():
 
 
 class Browser:
-    def __init__(self, bindir, prefs=None, profile=None, args=()):
+    def __init__(self, bindir, prefs=None, profile=None, args=(), env=None):
         self.profile = Path(profile or tempfile.mkdtemp(prefix="wip-profile-"))
         port = free_port()
         prefs = {
@@ -72,7 +73,7 @@ class Browser:
         with open(self.profile / "user.js", "a") as f:
             for k, v in prefs.items():
                 f.write(f"user_pref({json.dumps(k)}, {json.dumps(v)});\n")
-        env = {k: v for k, v in os.environ.items() if "proxy" not in k.lower()}
+        env = {**{k: v for k, v in os.environ.items() if "proxy" not in k.lower()}, **(env or {})}
         self.log = open(self.profile / "browser.log", "w")
         exe = Path(bindir) / ("browser-wip.exe" if sys.platform == "win32" else "browser-wip")
         self.proc = subprocess.Popen(
@@ -185,7 +186,8 @@ STANDARD_PREFS = {
     "network.trr.mode": 5,
     "security.OCSP.enabled": 0,
     "media.eme.enabled": False,
-    "urlclassifier.trackingTable": "wip-ads-digest256,wip-track-digest256",
+    # The network blocker replaces the URL classifier's tables (part 7).
+    "urlclassifier.trackingTable": "",
     "browserwip.search.engine": "brave",
 }
 
@@ -210,13 +212,8 @@ def part2(bindir, base):
         record(2, "bundled policy disables Remote Settings",
                policy == [1, False], f"status, allowed = {policy}")  # 1 == ACTIVE
 
-        tables = b.wait("""
-          if (!Services.prefs.getStringPref("browserwip.contentblocking.listsVersion", "")) return null;
-          let db = Cc["@mozilla.org/url-classifier/dbservice;1"].getService(Ci.nsIUrlClassifierDBService);
-          return new Promise(r => db.getTables(r));""", timeout=60)
-        names = sorted(line.split(";")[0] for line in (tables or "").splitlines() if line)
-        record(2, "bundled blocklists loaded into the URL classifier",
-               names == ["wip-ads-digest256", "wip-social-digest256", "wip-track-digest256"], names)
+        state = b.wait(BLOCKER_STATE + " return state == 'ready' && state;", timeout=30)
+        record(2, "the network blocker is ready", state == "ready", b.js(BLOCKER_STATE + " return state;"))
 
         # End to end: a page embedding a tracker and an ad network.
         url = f"{base}/blocking.html"
@@ -814,10 +811,408 @@ def part5(bindir, base):
     b.quit()
 
 
+# ---------------------------------------------------------------------------
+# Part 7: the network blocker (adblock-rust through toolkit's FFI)
+#
+# Requests go through a local HTTP proxy that answers for every host, so the
+# tests can use real hosts from the lists without the network. Which requests
+# were cancelled is read from the parent's own HTTP observers.
+
+BLOCKER_CASES = ROOT / "tests/blocker"
+REASON_TRACKING = 2004  # nsILoadInfo.BLOCKING_REASON_CLASSIFY_TRACKING_URI
+REASON_SOCIALTRACKING = 2009  # BLOCKING_REASON_CLASSIFY_SOCIALTRACKING_URI
+
+
+class ProxyHandler(http.server.BaseHTTPRequestHandler):
+    """An HTTP proxy that answers every request itself.
+
+    /__run?g=NAME and /__frame?g=NAME on any host are pages that make the
+    requests of a group of cases; /__redirect?to=URL redirects; anything
+    else is an empty 200 that any origin may read.
+    """
+
+    groups = {}
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        self.answer()
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        self.answer()
+
+    def answer(self):
+        url = urllib.parse.urlsplit(self.path)
+        query = urllib.parse.parse_qs(url.query)
+        status, headers, body = 200, {"Content-Type": "text/plain"}, b""
+        if url.path in ("/__run", "/__frame") and query.get("g", [""])[0] in self.groups:
+            headers["Content-Type"] = "text/html; charset=utf-8"
+            body = runner_page(self.groups[query["g"][0]]).encode()
+        elif url.path == "/__redirect":
+            status, headers["Location"] = 302, query["to"][0]
+        self.send_response(status)
+        for k, v in {**headers, "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store",
+                     "Content-Length": str(len(body))}.items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+
+RUNNER = """<!doctype html><meta charset="utf-8"><title>running</title><body><script>
+// Scripts report whether they loaded: the proxy answers every request, so
+// only a cancelled one fails. The title becomes "ran", then "ran {results}".
+const scripts = {};
+let pending = 0;
+const settle = (url, outcome) => {
+  scripts[url] = outcome;
+  if (--pending == 0) document.title = "ran " + JSON.stringify(scripts);
+};
+for (const c of ITEMS) {
+  try {
+    switch (c.kind) {
+      case "script": { let s = document.createElement("script"); s.src = c.url; pending++;
+        s.onload = () => settle(c.url, "load"); s.onerror = () => settle(c.url, "error");
+        document.head.append(s); break; }
+      case "image": new Image().src = c.url; break;
+      case "stylesheet": { let l = document.createElement("link"); l.rel = "stylesheet"; l.href = c.url;
+        document.head.append(l); break; }
+      case "xhr": { let x = new XMLHttpRequest(); x.open("GET", c.url); x.send(); break; }
+      case "fetch": fetch(c.url, { mode: "no-cors" }).catch(() => {}); break;
+      case "subdocument": case "frame": { let f = document.createElement("iframe"); f.src = c.url;
+        document.body.append(f); break; }
+      case "beacon": navigator.sendBeacon(c.url, "x"); break;
+      case "media": { let a = document.createElement("audio"); a.preload = "auto"; a.src = c.url;
+        document.body.append(a); a.load(); break; }
+      case "font": new FontFace("f" + Math.random().toString(36).slice(2), "url(" + JSON.stringify(c.url) + ")")
+        .load().catch(() => {}); break;
+    }
+  } catch (e) {}
+}
+// Script events come later, never during this loop.
+document.title = "ran";
+</script>"""
+
+
+def runner_page(items):
+    # Each item: {"kind", "url"}; kind "frame" loads a nested runner.
+    return RUNNER.replace("ITEMS", json.dumps(items).replace("</", "<\\/"))
+
+
+def serve_proxy():
+    port = free_port()
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), ProxyHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return port
+
+
+def proxy_prefs(port):
+    return {"network.proxy.type": 1, "network.proxy.http": "127.0.0.1", "network.proxy.http_port": port,
+            "network.proxy.no_proxies_on": "",
+            # The test pages are plain HTTP on purpose, on real hosts, some of
+            # them HSTS-preloaded; the proxy cannot answer HTTPS.
+            "dom.security.https_first": False,
+            "network.stricttransportsecurity.preloadlist": False}
+
+
+BLOCKER_STATE = """let state = Cc["@browser-wip/network-blocker;1"].getService(Ci.nsIBrowserWipBlocker).state;"""
+
+# Every HTTP request's outcome, by URL, from the parent's observers. The
+# status after http-on-modify-request is read once all of that topic's
+# observers (the blocker among them) have run.
+WATCH_REQUESTS = """
+if (window.__bkObserver) {
+  for (let t of ["http-on-modify-request", "http-on-stop-request", "http-on-failed-opening-request"]) {
+    Services.obs.removeObserver(window.__bkObserver, t);
+  }
+}
+window.__bk = { seen: {}, out: {} };
+let note = ch => {
+  let r = window.__bk.out[ch.URI.spec] ??= [];
+  let list = ""; try { list = ch.QueryInterface(Ci.nsIClassifiedChannel).matchedList; } catch (e) {}
+  r.push({ status: ch.status >>> 0, reason: ch.loadInfo.requestBlockingReason, list });
+};
+window.__bkObserver = { observe(subject, topic) {
+  let ch; try { ch = subject.QueryInterface(Ci.nsIHttpChannel); } catch (e) { return; }
+  if (topic == "http-on-modify-request") {
+    window.__bk.seen[ch.URI.spec] = true;
+    Services.tm.dispatchToMainThread(() => note(ch));
+  } else {
+    note(ch);
+  }
+} };
+for (let t of ["http-on-modify-request", "http-on-stop-request", "http-on-failed-opening-request"]) {
+  Services.obs.addObserver(window.__bkObserver, t);
+}
+return true;"""
+
+# Outcome per URL: "block" (cancelled by the blocker), "allow", or "unseen".
+OUTCOMES = """let [urls] = arguments;
+let blocked = [0x805D0022, 0x805D002B];  // NS_ERROR_TRACKING_URI, NS_ERROR_SOCIALTRACKING_URI
+let out = {};
+for (let url of urls) {
+  let spec = Services.io.newURI(url).spec;
+  let records = window.__bk.out[spec];
+  if (!window.__bk.seen[spec] && !records) { out[url] = { verdict: "unseen" }; continue; }
+  let hit = (records ?? []).find(r => blocked.includes(r.status));
+  out[url] = hit ? { verdict: "block", reason: hit.reason, list: hit.list } : { verdict: "allow" };
+}
+return out;"""
+
+
+def case_groups(cases):
+    """Runner pages: one per tab page, plus one per frame inside it."""
+    groups, tops = {}, {}
+    for c in cases:
+        top, page = c.get("top", c["page"]), c["page"]
+        item = {"kind": c["kind"], "url": c.get("via", c["url"])}
+        if top == page:
+            tops.setdefault(top, []).append(item)
+        else:
+            name = f"frame-{top}-{page}"
+            groups.setdefault(name, []).append(item)
+            frame = {"kind": "frame", "url": urllib.parse.urljoin(page, "/__frame?g=" + urllib.parse.quote(name))}
+            if frame not in tops.setdefault(top, []):
+                tops[top].append(frame)
+    runners = {}
+    for top, items in tops.items():
+        groups[f"top-{top}"] = items
+        runners[top] = urllib.parse.urljoin(top, "/__run?g=" + urllib.parse.quote(f"top-{top}"))
+    return groups, runners
+
+
+def run_cases(b, cases, settle=4, timeout=40):
+    """Load the pages that make the cases' requests; outcome per case id,
+    and the tab index of each page."""
+    groups, runners = case_groups(cases)
+    ProxyHandler.groups.update(groups)
+    b.js(WATCH_REQUESTS)
+    tabs = {}
+    for top, url in runners.items():
+        tabs[top] = b.js("return gBrowser.tabs.indexOf(gBrowser.addTab(arguments[0]));", url)
+        b.wait("return gBrowser.tabs[arguments[0]].linkedBrowser.contentTitle.startsWith('ran');",
+               tabs[top], timeout=30)
+    urls = [c["url"] for c in cases]
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if all(o["verdict"] != "unseen" for o in b.js(OUTCOMES, urls).values()):
+            break
+        time.sleep(1)
+    time.sleep(settle)
+    out = b.js(OUTCOMES, urls)
+    return {c["id"]: out[c["url"]] for c in cases}, tabs
+
+
+def part7(bindir, base):
+    hand = json.loads((BLOCKER_CASES / "hand-cases.json").read_text(encoding="utf-8"))["cases"]
+    generated = json.loads((BLOCKER_CASES / "cases.json").read_text(encoding="utf-8"))["cases"]
+    expected = json.loads((BLOCKER_CASES / "cases-expected.json").read_text(encoding="utf-8"))["verdicts"]
+    port = serve_proxy()
+    log_dir = Path(tempfile.mkdtemp(prefix="wip-blocker-log-"))
+
+    # A page given on the command line loads while the engine is still being
+    # built: its requests are held until the engine is ready, then checked.
+    ProxyHandler.groups["startup"] = [
+        {"kind": "script", "url": "http://google-analytics.com/startup.js"},
+        {"kind": "script", "url": "http://cdn.example.org/startup.js"},
+    ]
+    startup_page = "http://startup.example.com/__run?g=startup"
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True, **proxy_prefs(port)},
+                args=[startup_page],
+                env={"MOZ_LOG": "BrowserWipBlocker:5", "MOZ_LOG_FILE": str(log_dir / "blocker.log")})
+    try:
+        state = b.wait(BLOCKER_STATE + " return state == 'ready' && state;", timeout=30)
+        record(7, "the network blocker becomes ready", state == "ready", b.js(BLOCKER_STATE + " return state;"))
+        tab = b.wait("return gBrowser.tabs.findIndex(t => t.linkedBrowser.currentURI.spec == arguments[0]) + 1;",
+                     startup_page, timeout=30)
+        title = b.wait("""let t = gBrowser.tabs[arguments[0] - 1].linkedBrowser.contentTitle;
+          return t.startsWith("ran {") && t;""", tab, timeout=30) if tab else None
+        startup = json.loads(title[4:]) if title else None
+        record(7, "a page loading at startup, while the engine is built, is filtered",
+               startup == {"http://google-analytics.com/startup.js": "error",
+                           "http://cdn.example.org/startup.js": "load"}, [tab, title])
+
+        # Tables: Gecko's URL classifier gets none, so nothing is counted twice.
+        tables = b.js("""let db = Cc["@mozilla.org/url-classifier/dbservice;1"].getService(Ci.nsIUrlClassifierDBService);
+          return new Promise(r => db.getTables(r));""")
+        prefs = b.js(IMPORTS + """return ["urlclassifier.trackingTable", "urlclassifier.trackingAnnotationTable",
+          "urlclassifier.features.socialtracking.blacklistTables"].map(pref);""")
+        record(7, "the URL classifier has no blocking tables", prefs == ["", "", ""] and not (tables or "").strip(),
+               [prefs, tables])
+
+        # Hand-written cases: expectations from filter semantics.
+        engine_cases = [c for c in hand if c["kind"] != "document"]
+        got, tabs = run_cases(b, engine_cases)
+        print("     hand cases (expectation from filter semantics / browser):")
+        bad = []
+        for c in engine_cases:
+            o = got[c["id"]]
+            ok = o["verdict"] == c["expect"]
+            if c["expect"] == "block":
+                ok = ok and o.get("reason") == REASON_TRACKING and o.get("list") == "browserwip-ads-trackers"
+            if not ok:
+                bad.append(c["id"])
+            detail = f"  reason {o.get('reason')} list {o.get('list')}" if o["verdict"] == "block" else ""
+            print(f"     {c['id']}  {c['kind']:11} expect {c['expect']}  browser {o['verdict']}{detail}"
+                  f"  {'ok' if ok else 'WRONG'}  ({c['why']})")
+        record(7, f"{len(engine_cases)} hand-written cases match their expected verdicts "
+               "(blocked ones with reason 2004 and the list name)", not bad, bad)
+
+        # Top-level pages are not blocked in this phase ($document rules).
+        for c in (c for c in hand if c["kind"] == "document"):
+            b.js(WATCH_REQUESTS)
+            index = b.js("return gBrowser.tabs.indexOf(gBrowser.addTab(arguments[0]));", c["url"])
+            time.sleep(3)
+            o = b.js(OUTCOMES, [c["url"]])[c["url"]]
+            spec = b.js("return gBrowser.tabs[arguments[0]].linkedBrowser.currentURI.spec;", index)
+            record(7, f"{c['id']}: a top-level page matching a $document rule still loads",
+                   o["verdict"] == "allow" and spec == c["url"], [o, spec])
+
+        # The shield counts each blocked origin once, as the content-blocking
+        # log does.
+        top = "http://news.example.com/"
+        origins = sorted({"http://" + urllib.parse.urlsplit(c["url"]).netloc for c in engine_cases
+                          if c.get("top", c["page"]) == top and got[c["id"]]["verdict"] == "block"})
+        shield = b.js("return gBrowser.tabs[arguments[0]].blockedTrackers;", tabs[top])
+        record(7, "the shield counts the page's blocked origins", shield == len(origins), [shield, origins])
+
+        # Per-site switch: nothing on that page is blocked any more.
+        b.js(WATCH_REQUESTS)
+        b.js(IMPORTS + """let b = gBrowser.tabs[arguments[0]].linkedBrowser;
+          ContentBlockingAllowList.add(b); b.reload();""", tabs[top])
+        time.sleep(5)
+        mine = [c for c in engine_cases if c.get("top", c["page"]) == top]
+        after = b.js(OUTCOMES, [c["url"] for c in mine])
+        blocked_after = [u for u, o in after.items() if o["verdict"] == "block"]
+        seen_after = [u for u, o in after.items() if o["verdict"] != "unseen"]
+        record(7, "turning protections off for the site lets its requests through",
+               not blocked_after and len(seen_after) > 5, [blocked_after, len(seen_after)])
+        b.js(IMPORTS + "ContentBlockingAllowList.remove(gBrowser.tabs[arguments[0]].linkedBrowser);", tabs[top])
+
+        # Social list: Strict's socialtracking pref, live.
+        b.js("Services.prefs.setBoolPref('privacy.trackingprotection.socialtracking.enabled', true);")
+        for c in (c for c in hand if c.get("social")):
+            c = {**c, "page": "http://social.example.com/"}
+            o = run_cases(b, [c])[0][c["id"]]
+            record(7, f"{c['id']}: the social list blocks with socialtracking on (reason 2009)",
+                   o["verdict"] == "block" and o.get("reason") == REASON_SOCIALTRACKING
+                   and o.get("list") == "browserwip-social", o)
+        b.js("Services.prefs.clearUserPref('privacy.trackingprotection.socialtracking.enabled');")
+
+        # Generated cases: adblock-rust's own verdicts on requests recorded on
+        # real pages.
+        got, _ = run_cases(b, generated, timeout=60)
+        diff = [(c["id"], c["kind"], c["url"][:100], expected[c["id"]], got[c["id"]]["verdict"])
+                for c in generated if got[c["id"]]["verdict"] != expected[c["id"]]]
+        blocked = sum(1 for c in generated if got[c["id"]]["verdict"] == "block")
+        print(f"     generated cases: {len(generated)}, browser blocked {blocked}, "
+              f"reference blocks {sum(1 for v in expected.values() if v == 'block')}, differ {len(diff)}")
+        for d in diff:
+            print(f"     differs: {d}")
+        record(7, f"{len(generated)} recorded requests get adblock-rust's reference verdicts", not diff, diff[:10])
+
+        # Odd URLs through the real glue: nothing may crash the parent.
+        page = "http://odd.example.com/"
+        odd = [
+            {"id": "o1", "page": page, "kind": "image", "url": "http://odd.example.org/" + "a" * 60000},
+            {"id": "o2", "page": page, "kind": "image", "url": "http://bücher.example/x.png"},
+            {"id": "o3", "page": page, "kind": "image", "url": "http://[2001:db8::1]/x.png"},
+            {"id": "o4", "page": page, "kind": "image", "url": "http://ODD-Case.Example.COM/X.png"},
+            {"id": "o5", "page": page, "kind": "image", "url": "http://g.doubleclick.net:8080/x.png"},
+            {"id": "o6", "page": page, "kind": "image", "url": "http://odd.example.org/%00%ff%e4%be%8b?$^|*"},
+        ]
+        got, _ = run_cases(b, odd, settle=2, timeout=20)
+        alive = b.js("return Services.appinfo.name;")
+        print("     odd URLs: " + ", ".join(f"{k} {v['verdict']}" for k, v in got.items()))
+        record(7, "odd URLs (60 kB, IDN, IPv6, mixed case, port, escapes) are checked without crashing",
+               alive == "browser-wip" and got["o5"]["verdict"] == "block", got)
+
+        # The shield when the blocker isn't working. Only the UI: the state is
+        # faked, since nothing in a release build can make the engine fail.
+        ui = b.js("""const { ContentBlockingLists } = ChromeUtils.importESModule(
+            "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs");
+          gBrowser.selectTab(gBrowser.tabs[arguments[0]]);
+          let real = Object.getOwnPropertyDescriptor(ContentBlockingLists, "unavailable");
+          Object.defineProperty(ContentBlockingLists, "unavailable", { get: () => true, configurable: true });
+          Services.obs.notifyObservers(null, "browserwip:blocker-state", "failed");
+          let button = document.getElementById("protections-button");
+          let r = { attr: button.hasAttribute("unavailable"), l10n: button.getAttribute("data-l10n-id"),
+                    icon: button.querySelector("img").src };
+          BrowserWip._fillProtectionsPanel();
+          r.summary = document.getElementById("protections-summary").getAttribute("data-l10n-id");
+          Object.defineProperty(ContentBlockingLists, "unavailable", real);
+          Services.obs.notifyObservers(null, "browserwip:blocker-state", "ready");
+          r.after = button.getAttribute("data-l10n-id");
+          return r;""", tabs[top])
+        record(7, "a failed blocker shows on the shield (crossed-out icon, unavailable wording)",
+               ui["attr"] and ui["l10n"] == "protections-button-unavailable" and ui["icon"].endswith("shield-off.svg")
+               and ui["summary"] == "protections-summary-unavailable" and ui["after"] == "protections-button", ui)
+    finally:
+        b.quit()
+
+    # The blocker's own log: rule counts, build time, held requests, and the
+    # main-thread time of every check.
+    lines = []
+    for f in sorted(log_dir.glob("blocker.log*")):
+        lines += [line for line in f.read_text(errors="replace").splitlines() if "BrowserWipBlocker" in line]
+    info = [line for line in lines if " check " not in line and "  http" not in line]
+    print("     blocker log (MOZ_LOG=BrowserWipBlocker:5), without the per-request lines:")
+    for line in info[:40]:
+        print("       " + line)
+    record(7, "the 28 $redirect rules are left out, and the count is logged",
+           any("dropped 28 $redirect rules" in line for line in info), info[:5])
+    # Whether the startup page's requests came before the engine was ready
+    # depends on timing; the log says which happened.
+    held = [line for line in info if "held" in line or "holding" in line]
+    print(f"     requests held at startup: {held or 'none (the engine was ready first)'}")
+    checks = sorted(float(line.split(" check ")[1].split(" us")[0]) for line in lines if " check " in line)
+    if checks:
+        print(f"     main-thread time per check, {len(checks)} requests: median {checks[len(checks) // 2]:.1f} us, "
+              f"p99 {checks[min(len(checks) - 1, int(len(checks) * 0.99))]:.1f} us, max {checks[-1]:.1f} us")
+
+    # DNS: a blocked request should not look its host up. With
+    # network.dns.notifyResolution, Gecko reports every lookup it starts.
+    # No proxy here, so lookups are real.
+    for mode in ["standard", "strict"]:
+        b = Browser(bindir, prefs={"browserwip.firstrun.completed": True, "network.dns.notifyResolution": True})
+        try:
+            b.wait(BLOCKER_STATE + " return state == 'ready';", timeout=30)
+            if mode == "strict":
+                b.js(IMPORTS + "PrivacyModes.setMode('strict');")
+            b.js("""window.__dns = [];
+              window.__dnsObserver = { observe(s, t, host) { window.__dns.push(host); } };
+              Services.obs.addObserver(window.__dnsObserver, "dns-resolution-request");""")
+            b.js(WATCH_REQUESTS)
+            b.js("gBrowser.selectTab(gBrowser.addTab(arguments[0]));", f"{base}/blocking-dns.html?{mode}")
+            b.wait("return gBrowser.selectedBrowser.contentTitle == 'dns page';", timeout=20)
+            time.sleep(8)
+            looked_up = set(b.js("return window.__dns;"))
+            paths = [
+                ("script", "www.google-analytics.com", "https://www.google-analytics.com/analytics.js"),
+                ("image", "securepubads.g.doubleclick.net", "https://securepubads.g.doubleclick.net/pagead/pixel.gif"),
+                ("fetch", "stats.bitdefender.com", "https://stats.bitdefender.com/collect"),
+                ("iframe", "ad.doubleclick.net", "https://ad.doubleclick.net/frame.html"),
+                ("<link rel=dns-prefetch>", "fls.doubleclick.net", None),
+                ("<link rel=preconnect>", "static.doubleclick.net", None),
+                ("<a href> on the page", "www.googletagmanager.com", None),
+            ]
+            if mode == "strict":
+                paths.append(("social iframe", "www.facebook.com", "https://www.facebook.com/plugins/like.php?href=x"))
+            outcomes = b.js(OUTCOMES, [u for _, _, u in paths if u])
+            print(f"     {mode}: hosts Gecko started a DNS lookup for: {sorted(looked_up)}")
+            for path, host, url in paths:
+                verdict = outcomes[url]["verdict"] if url else "not a request"
+                record(7, f"{mode}: no DNS lookup for a blocked host ({path}: {host}; request: {verdict})",
+                       host not in looked_up and (not url or verdict == "block"))
+        finally:
+            b.quit()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("bindir")
-    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5])
+    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5, 7])
     parser.add_argument("--shots", help="directory for screenshots")
     args = parser.parse_args()
     if args.shots:
@@ -825,7 +1220,7 @@ def main():
     base = serve_pages()
     parts = {1: lambda: part1(args.bindir, base), 2: lambda: part2(args.bindir, base),
              3: lambda: part3(args.bindir, base, args.shots), 4: lambda: part4(args.bindir, base, args.shots),
-             5: lambda: part5(args.bindir, base)}
+             5: lambda: part5(args.bindir, base), 7: lambda: part7(args.bindir, base)}
     for p in args.part:
         try:
             parts[p]()

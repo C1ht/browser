@@ -275,7 +275,8 @@ browser:focus-visible {
   display: none;
 }
 
-#protections-button[disabled-for-site] {
+#protections-button[disabled-for-site],
+#protections-button[unavailable] {
   color: var(--warn-fg);
 }
 

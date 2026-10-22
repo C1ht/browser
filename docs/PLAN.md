@@ -9,7 +9,7 @@ Design mockups: `design/mockups/chrome-directions.html` (also published as an ar
 |---|---|---|
 | Design direction | **Folio** | `app/themes/shared/browser.css` |
 | Q1 DRM | **None at first, addable later** | Built with `--enable-eme` off. Adding it later means rebuilding with `--enable-eme=widevine` and adding an on-demand install prompt; nothing else depends on its absence. Paid streaming (Netflix, Disney+, Spotify Web) won't play until then. |
-| Q2 Ad blocking | **On by default, our own built-in tool** | EasyList, EasyPrivacy and Fanboy Social are vendored and compiled at build time into Gecko URL-classifier tables (network blocking) and element-hiding stylesheets. Never fetched. No extension needed. |
+| Q2 Ad blocking | **On by default, our own built-in tool** | EasyList, EasyPrivacy and Fanboy Social are vendored. Network blocking: adblock-rust, already in every libxul, checks every request in the parent (`docs/CONTENT-BLOCKING.md`). Element hiding: stylesheets compiled at build time. Never fetched. No extension needed. |
 | Q3 Mozilla downloads | **None**, so no CRLite. Safe Browsing excluded. | OCSP is also off: it reports every site you visit to the certificate authority. Revocation relies on the OneCRL list bundled with each release. A bundled enterprise policy disables Remote Settings entirely. |
 | Q4 Extensions | **v2** | Not supported in v1; AMO and update calls are off. |
 | Q5 Gecko | **Firefox Release** | Pinned in `GECKO_REVISION` (currently 157.0.2), updated with `tools/fetch-gecko.sh --update`. Considered and rejected on 2026-10-12: Firefox ESR to match Mullvad/Tor Browser, since ordinary Firefox users are the far larger crowd. |

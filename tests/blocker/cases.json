@@ -1,0 +1,2847 @@
+{
+ "about": "Requests recorded on real page loads (YouTube watch page, independent.co.uk and speedtest.net front pages, 2026-10-19), one case per distinct URL, made plain HTTP so a local proxy can answer them. 'page' is the document that made the request. Expected verdicts: cases-expected.json (adblock-rust's own, from tools/adblock).",
+ "cases": [
+  {
+   "id": "g001",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://i.ytimg.com/generate_204"
+  },
+  {
+   "id": "g002",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/player/0229cd64/player_es6.vflset/en_US/base.js"
+  },
+  {
+   "id": "g003",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/_/ytmainappweb/_/js/k=ytmainappweb.kevlar_base.en_US.VRNYTIAj20w.es5.O/am=AAAAAAIACEBK/d=1/br=1/rs=AGKMywHPXmWRAI-TYsgguEe1A6you-IocQ/m=kevlar_base_module,kevlar_main_module,kevlar_base_sync_mod_chunk"
+  },
+  {
+   "id": "g004",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/jsbin/web-animations-next-lite.min.vflset/web-animations-next-lite.min.js"
+  },
+  {
+   "id": "g005",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/jsbin/custom-elements-es5-adapter.vflset/custom-elements-es5-adapter.js"
+  },
+  {
+   "id": "g006",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/jsbin/webcomponents-sd.vflset/webcomponents-sd.js"
+  },
+  {
+   "id": "g007",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/jsbin/intersection-observer.min.vflset/intersection-observer.min.js"
+  },
+  {
+   "id": "g008",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/h-ROizd4OE8/hqdefault.jpg"
+  },
+  {
+   "id": "g009",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/jsbin/scheduler.vflset/scheduler.js"
+  },
+  {
+   "id": "g010",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/jsbin/www-i18n-constants-en_US.vflset/www-i18n-constants.js"
+  },
+  {
+   "id": "g011",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=YouTube+Sans:wght@300..900&display=swap"
+  },
+  {
+   "id": "g012",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://www.youtube.com/s/player/0229cd64/www-player.css"
+  },
+  {
+   "id": "g013",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/cssbin/www-main-desktop-watch-page-skeleton.css"
+  },
+  {
+   "id": "g014",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/cssbin/www-main-desktop-player-skeleton.css"
+  },
+  {
+   "id": "g015",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/cssbin/www-onepick.css"
+  },
+  {
+   "id": "g016",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://www.youtube.com/s/_/ytmainappweb/_/ss/k=ytmainappweb.kevlar_base.HimicgPxZO0.L.F4.O/am=AAAAAAJgCGBP/d=0/br=1/rs=AGKMywEuZ96yyGEnx8-5O-VaNj_B0Pb4Vw"
+  },
+  {
+   "id": "g017",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/img/favicon_32x32.png"
+  },
+  {
+   "id": "g018",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://rr1---sn-u15hn5-50.googlevideo.com/generate_204"
+  },
+  {
+   "id": "g019",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://rr1---sn-aj5goc-5x.c.youtube.com/generate_204"
+  },
+  {
+   "id": "g020",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/jsbin/spf.vflset/spf.js"
+  },
+  {
+   "id": "g021",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/desktop/5d669aa8/jsbin/network.vflset/network.js"
+  },
+  {
+   "id": "g022",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "font",
+   "url": "http://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2"
+  },
+  {
+   "id": "g023",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/player/0229cd64/player_es6.vflset/en_US/offline.js"
+  },
+  {
+   "id": "g024",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/player/0229cd64/player_es6.vflset/en_US/remote.js"
+  },
+  {
+   "id": "g025",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/player/0229cd64/player_es6.vflset/en_US/miniplayer.js"
+  },
+  {
+   "id": "g026",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "subdocument",
+   "url": "http://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26hl%3Den%26next%3D%252Fsignin_passive%26feature%3Dpassive&hl=en"
+  },
+  {
+   "id": "g027",
+   "site": "youtube",
+   "page": "http://accounts.google.com/",
+   "kind": "image",
+   "url": "http://www.google.com/images/branding/googlelogo/1x/googlelogo_color_150x54dp.png"
+  },
+  {
+   "id": "g028",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.google.com/js/th/7Dz4QdBCZePkp3mv-TNWPqNzmkWLxOTUbqQuluIiQqQ.js"
+  },
+  {
+   "id": "g029",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/search/v15/24px.svg"
+  },
+  {
+   "id": "g030",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/menu/v1/24px.svg"
+  },
+  {
+   "id": "g031",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.gstatic.com/youtube/img/icons/web/youtube_fill/yt-logo-updated/v3/24px.svg"
+  },
+  {
+   "id": "g032",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/AahuiWNS1bA/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAeq-4xwyBFITV0CgyO5x6rtdUNbQ"
+  },
+  {
+   "id": "g033",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/BBRVnXX8Ydg/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDOekr3vzwZksMFnXNs8Q7245dk2Q"
+  },
+  {
+   "id": "g034",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/scwlR0QHGOk/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAdBXrXaZREAae4HftiVfbKVrVa-w"
+  },
+  {
+   "id": "g035",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/RPimur0aI8Q/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAZ-uP6aFUPZuRz0zmlxuAQn9dFvw"
+  },
+  {
+   "id": "g036",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "font",
+   "url": "http://fonts.gstatic.com/s/youtubesans/v32/Qw38ZQNGEDjaO2m6tqIqX5E-AVS5_rSejo46_PCTRspJ0OosolrBEJL3HO_T7fE.woff2"
+  },
+  {
+   "id": "g037",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/_/ytmainappweb/_/js/k=ytmainappweb.kevlar_base.en_US.VRNYTIAj20w.es5.O/am=AAAAAAIAOAJI/d=1/br=1/rs=AGKMywE0RdMJ98P75x25U7GGOrdUxj9qkA/m=kevlar_base_module,kevlar_main_module,kevlar_base_sync_mod_chunk"
+  },
+  {
+   "id": "g038",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://www.youtube.com/s/_/ytmainappweb/_/ss/k=ytmainappweb.kevlar_base.HimicgPxZO0.L.F4.O/am=AAAAAAJgPANM/d=0/br=1/rs=AGKMywGKGukB66gmQepK4TZtnS0lCaM_tQ"
+  },
+  {
+   "id": "g039",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://rr1---sn-5go7yner.googlevideo.com/generate_204"
+  },
+  {
+   "id": "g040",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://rr1---sn-5go7yner.c.youtube.com/generate_204"
+  },
+  {
+   "id": "g041",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "xhr",
+   "url": "http://www.youtube.com/youtubei/v1/log_event?alt=json"
+  },
+  {
+   "id": "g042",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://www.youtube.com/generate_204?e8Pa9w"
+  },
+  {
+   "id": "g043",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "xhr",
+   "url": "http://www.youtube.com/api/jnn/v1/GenerateIT"
+  },
+  {
+   "id": "g044",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/ZYBw6-9aDI0/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDbvy_zATQghowvTZewnZtQFJmXYA"
+  },
+  {
+   "id": "g045",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/RBjLfAb3sCg/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCjTe5UkvJCaS8-wrioKUtdvXrL3w"
+  },
+  {
+   "id": "g046",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/zCYguD3D1Vg/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBR8qCrbAhP6MYFLQq-Uw0ryR5D1g"
+  },
+  {
+   "id": "g047",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "font",
+   "url": "http://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMaxKUBGEe.woff2"
+  },
+  {
+   "id": "g048",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.youtube.com/upgrade_visitor_cookie?eom=1"
+  },
+  {
+   "id": "g049",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://fonts.googleapis.com/css?family=Roboto:300italic,400italic,500italic,700italic"
+  },
+  {
+   "id": "g050",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://fonts.googleapis.com/css?family=Roboto+Mono:400"
+  },
+  {
+   "id": "g051",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://youtube.com/"
+  },
+  {
+   "id": "g052",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://consent.youtube.com/save?continue=https://www.youtube.com/watch%3Fv%3Dh-ROizd4OE8%26themeRefresh%3D1&gl=DK&m=0&pc=yt&x=5&src=2&hl=en&bl=1002044115&cm=2&set_eom=false&set_apyt=true&set_ytc=true&escs=AUjHKwehZvXkCo8yfKKDCqbOurLzBSabHdVtkJ4wul8JwVSdbzyTPQ-KWNEVk4HFh-_pii2-Y8sbvbfTN7Fkd-T9ZyLsZcajDrp9"
+  },
+  {
+   "id": "g053",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/x/v11/24px.svg"
+  },
+  {
+   "id": "g054",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/link/v8/24px.svg"
+  },
+  {
+   "id": "g055",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/overflow_horizontal/v6/24px.svg"
+  },
+  {
+   "id": "g056",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/download/v11/24px.svg"
+  },
+  {
+   "id": "g057",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/bookmark/v10/24px.svg"
+  },
+  {
+   "id": "g058",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/thumb_down/v25/24px.svg"
+  },
+  {
+   "id": "g059",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/share/v12/24px.svg"
+  },
+  {
+   "id": "g060",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/arrow_up/v3/24px.svg"
+  },
+  {
+   "id": "g061",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/calendar/v4/24px.svg"
+  },
+  {
+   "id": "g062",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/video/v3/24px.svg"
+  },
+  {
+   "id": "g063",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/thumb_up/v24/24px.svg"
+  },
+  {
+   "id": "g064",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/check_circle/v10/24px.svg"
+  },
+  {
+   "id": "g065",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/play/v4/24px.svg"
+  },
+  {
+   "id": "g066",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/overflow_vertical/v13/24px.svg"
+  },
+  {
+   "id": "g067",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/location_pin/v2/24px.svg"
+  },
+  {
+   "id": "g068",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/sort/v3/24px.svg"
+  },
+  {
+   "id": "g069",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/_/ytmainappweb/_/js/k=ytmainappweb.kevlar_base.en_US.VRNYTIAj20w.es5.O/am=AAAAAAIAOAJI/d=1/exm=kevlar_base_module,kevlar_base_sync_mod_chunk,kevlar_main_module/ed=1/br=1/rs=AGKMywE0RdMJ98P75x25U7GGOrdUxj9qkA/m=QlbBce,De8mUc"
+  },
+  {
+   "id": "g070",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/globe/v4/24px.svg"
+  },
+  {
+   "id": "g071",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/person_circle/v10/24px.svg"
+  },
+  {
+   "id": "g072",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/shield_x/v3/24px.svg"
+  },
+  {
+   "id": "g073",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/alert_triangle/v10/24px.svg"
+  },
+  {
+   "id": "g074",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/chart_bar/v2/24px.svg"
+  },
+  {
+   "id": "g075",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/arrow_trend_up/v2/24px.svg"
+  },
+  {
+   "id": "g076",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/sparkles/v2/24px.svg"
+  },
+  {
+   "id": "g077",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/price_tag/v8/24px.svg"
+  },
+  {
+   "id": "g078",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/audio/v14/12px.svg"
+  },
+  {
+   "id": "g079",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/text_bubble/v4/24px.svg"
+  },
+  {
+   "id": "g080",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/add_circle/v6/24px.svg"
+  },
+  {
+   "id": "g081",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/add_circle/v6/24px.svg"
+  },
+  {
+   "id": "g082",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/_/ytmainappweb/_/js/k=ytmainappweb.kevlar_base.en_US.VRNYTIAj20w.es5.O/am=AAAAAAEAOAJI/d=1/br=1/rs=AGKMywFhyEfY9YAqEOv5D_ZKcqi4Jddpcg/m=kevlar_base_module,kevlar_main_module,kevlar_base_sync_mod_chunk"
+  },
+  {
+   "id": "g083",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "stylesheet",
+   "url": "http://www.youtube.com/s/_/ytmainappweb/_/ss/k=ytmainappweb.kevlar_base.HimicgPxZO0.L.F4.O/am=AAAAAAFgPANM/d=0/br=1/rs=AGKMywF5sixUz04LJb7wBaNZwaS5IZ8Wuw"
+  },
+  {
+   "id": "g084",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://static.doubleclick.net/instream/ad_status.js"
+  },
+  {
+   "id": "g085",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://rr1---sn-q4fl6ns6.googlevideo.com/videoplayback?expire=9530624773&ei=kAsDp2FwoLqxUaNaI-7Z55C&ip=74.15.31.66&id=o-AFQQCK1SuOi3JslW0gOR4B6HtAUJOshJ5hSVLVAYUS11M&itag=18&source=youtube&requiressl=yes&mh=X6&mm=185%2C65451%2C06041&mn=f68vt%2CyuIQS%2CTYXE9&ms=f68vt%2CyuIQS%2CTYXE9&mv=9&mvi=5&pl=92&ctier=L&initcwndbps=9186331&siu=5&spc=HlP-WtrzE3m7ttGytjCZ5E0HRK80n-wGnb2d9ngR0rLH&vprv=5&svpuc=5&mime=video%2Fmp4&ns=l7IfyW03shlnOVD0g4SBWN43&cnr=92&ratebypass=yes&dur=07882081&lmt=7295268466146025&mt=9530624773&fvip=3&c=WEB&txp=9186331&n=gigLDJu7rzYO8zm0&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cctier%2Csiu%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Cns%2Ccnr%2Cratebypass%2Cdur%2Clmt&sig=8LRPhT105he731aQtcq_6YUydZ1y04NmUArUoHP3eyH1FScUdriDI53JY_2n4Eh0xU_31xnlkQuAZV3kufpks79TEBmRC4PqGNeihrH7ZlAY&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=8LRPhT105he731aQtcq_6YUydZ1y04NmUArUoHP3eyH1FScUdriDI53JY_2n4Eh0xU_31xnlkQuAZV3kufpks79TEBmRC4PqGNeihrH7ZlAY"
+  },
+  {
+   "id": "g086",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://rr1---sn-q4fl6ns6.googlevideo.com/videoplayback?expire=9530624773&ei=kAsDp2FwoLqxUaNaI-7Z55C&ip=74.15.31.66&id=o-AFQQCK1SuOi3JslW0gOR4B6HtAUJOshJ5hSVLVAYUS11M&itag=18&source=youtube&requiressl=yes&mh=X6&mm=185%2C65451%2C06041&mn=f68vt%2CyuIQS%2CTYXE9&ms=f68vt%2CyuIQS%2CTYXE9&mv=9&mvi=5&pl=92&initcwndbps=9186331&siu=5&spc=HlP-WtrzE3m7ttGytjCZ5E0HRK80n-wGnb2d9ngR0rLH&vprv=5&svpuc=5&mime=video%2Fmp4&ns=l7IfyW03shlnOVD0g4SBWN43&cnr=92&ratebypass=yes&dur=07882081&lmt=7295268466146025&mt=9530624773&fvip=3&c=WEB&txp=9186331&n=gigLDJu7rzYO8zm0&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Csiu%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Cns%2Ccnr%2Cratebypass%2Cdur%2Clmt&sig=8LRPhT105he731aQtcq_6YUydZ1y04NmUArUoHP3eyH1FScUdriDI53JY_2n4Eh0xU_31xnlkQuAZV3kufpks79TEBmRC4PqGNeihrH7ZlAY&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=8LRPhT105he731aQtcq_6YUydZ1y04NmUArUoHP3eyH1FScUdriDI53JY_2n4Eh0xU_31xnlkQuAZV3kufpks79TEBmRC4PqGNeihrH7ZlAY"
+  },
+  {
+   "id": "g087",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "xhr",
+   "url": "http://googleads.g.doubleclick.net/pagead/id"
+  },
+  {
+   "id": "g088",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "xhr",
+   "url": "http://googleads.g.doubleclick.net/pagead/id?slf_rd=1"
+  },
+  {
+   "id": "g089",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://www.youtube.com/generate_204?ER8emQ"
+  },
+  {
+   "id": "g090",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/rFZHOHl-L8A/hqdefault.jpg?v=6ad62bed&sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCAFjRAXe8XFF0KE7YKi9WxVujqiQ"
+  },
+  {
+   "id": "g091",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/Ie5GGRkjSXE/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCwFfjObH64PA5nZgRgbAVkhkML1g"
+  },
+  {
+   "id": "g092",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/mkcBIu-GyN0/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA0TMzDoHq5TBCNdPEDP8Ra3-fv7A"
+  },
+  {
+   "id": "g093",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/c8_pHieH7Mw/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLB0OxcYbJ7LtnhXnqSwxTfosHy5Bw"
+  },
+  {
+   "id": "g094",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "media",
+   "url": "http://www.youtube.com/s/search/audio/failure.mp3"
+  },
+  {
+   "id": "g095",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "media",
+   "url": "http://www.youtube.com/s/search/audio/no_input.mp3"
+  },
+  {
+   "id": "g096",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "media",
+   "url": "http://www.youtube.com/s/search/audio/open.mp3"
+  },
+  {
+   "id": "g097",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "media",
+   "url": "http://www.youtube.com/s/search/audio/success.mp3"
+  },
+  {
+   "id": "g098",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/qhDO1gDzDhg/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLARFHTv-ySvHW0k21NENPtEbKXPhQ"
+  },
+  {
+   "id": "g099",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/alert_bubble/v2/24px.svg"
+  },
+  {
+   "id": "g100",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/audio/v14/24px.svg"
+  },
+  {
+   "id": "g101",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/audio/v14/24px.svg"
+  },
+  {
+   "id": "g102",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/bag/v7/24px.svg"
+  },
+  {
+   "id": "g103",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/bag/v7/24px.svg"
+  },
+  {
+   "id": "g104",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/bell/v11/24px.svg"
+  },
+  {
+   "id": "g105",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/bell/v11/24px.svg"
+  },
+  {
+   "id": "g106",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/clapperboard/v3/24px.svg"
+  },
+  {
+   "id": "g107",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/clapperboard/v3/24px.svg"
+  },
+  {
+   "id": "g108",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/clock/v10/24px.svg"
+  },
+  {
+   "id": "g109",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/clock/v10/24px.svg"
+  },
+  {
+   "id": "g110",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/copy/v3/24px.svg"
+  },
+  {
+   "id": "g111",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.gstatic.com/youtube/img/icons/web/youtube_fill/creator_studio_red_logo/v2/24px.svg"
+  },
+  {
+   "id": "g112",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/fashion/v4/24px.svg"
+  },
+  {
+   "id": "g113",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/fashion/v4/24px.svg"
+  },
+  {
+   "id": "g114",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/flag/v10/24px.svg"
+  },
+  {
+   "id": "g115",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/flag/v10/24px.svg"
+  },
+  {
+   "id": "g116",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/gaming/v3/24px.svg"
+  },
+  {
+   "id": "g117",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/gaming/v3/24px.svg"
+  },
+  {
+   "id": "g118",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/gear/v10/24px.svg"
+  },
+  {
+   "id": "g119",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/gear/v10/24px.svg"
+  },
+  {
+   "id": "g120",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/help_circle/v2/24px.svg"
+  },
+  {
+   "id": "g121",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/history/v1/24px.svg"
+  },
+  {
+   "id": "g122",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/home/v10/24px.svg"
+  },
+  {
+   "id": "g123",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/home/v10/24px.svg"
+  },
+  {
+   "id": "g124",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/lightbulb/v4/24px.svg"
+  },
+  {
+   "id": "g125",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/lightbulb/v4/24px.svg"
+  },
+  {
+   "id": "g126",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/live/v3/24px.svg"
+  },
+  {
+   "id": "g127",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/mic/v14/24px.svg"
+  },
+  {
+   "id": "g128",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/mic/v14/24px.svg"
+  },
+  {
+   "id": "g129",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/news/v3/24px.svg"
+  },
+  {
+   "id": "g130",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/news/v3/24px.svg"
+  },
+  {
+   "id": "g131",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.gstatic.com/youtube/img/icons/web/youtube_fill/offline_no_content/v1/192px.svg"
+  },
+  {
+   "id": "g132",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/play_square_stack/v1/24px.svg"
+  },
+  {
+   "id": "g133",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/play_square_stack/v1/24px.svg"
+  },
+  {
+   "id": "g134",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/playlist/v5/24px.svg"
+  },
+  {
+   "id": "g135",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/podcast/v6/24px.svg"
+  },
+  {
+   "id": "g136",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/podcast/v6/24px.svg"
+  },
+  {
+   "id": "g137",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/search/v15/24px.svg"
+  },
+  {
+   "id": "g138",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/subscriptions/v12/24px.svg"
+  },
+  {
+   "id": "g139",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/subscriptions/v12/24px.svg"
+  },
+  {
+   "id": "g140",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/thumb_up/v24/24px.svg"
+  },
+  {
+   "id": "g141",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/trash_can/v10/24px.svg"
+  },
+  {
+   "id": "g142",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/trash_can/v10/24px.svg"
+  },
+  {
+   "id": "g143",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/trending/v2/24px.svg"
+  },
+  {
+   "id": "g144",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/trending/v2/24px.svg"
+  },
+  {
+   "id": "g145",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/trophy/v3/24px.svg"
+  },
+  {
+   "id": "g146",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/trophy/v3/24px.svg"
+  },
+  {
+   "id": "g147",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.gstatic.com/youtube/img/icons/web/youtube_fill/unplugged_logo/v2/24px.svg"
+  },
+  {
+   "id": "g148",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/video/v3/24px.svg"
+  },
+  {
+   "id": "g149",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/video_camera_add/v2/24px.svg"
+  },
+  {
+   "id": "g150",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.gstatic.com/youtube/img/icons/web/youtube_fill/youtube_kids_round/v2/24px.svg"
+  },
+  {
+   "id": "g151",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.gstatic.com/youtube/img/icons/web/youtube_fill/youtube_music/v2/24px.svg"
+  },
+  {
+   "id": "g152",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.gstatic.com/youtube/img/icons/web/youtube_fill/youtube_round/v2/24px.svg"
+  },
+  {
+   "id": "g153",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/youtube_shorts/v11/24px.svg"
+  },
+  {
+   "id": "g154",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/youtube_shorts/v11/24px.svg"
+  },
+  {
+   "id": "g155",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/arrow_down/v3/24px.svg"
+  },
+  {
+   "id": "g156",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/pause/v9/24px.svg"
+  },
+  {
+   "id": "g157",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/play/v4/24px.svg"
+  },
+  {
+   "id": "g158",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/share/v12/24px.svg"
+  },
+  {
+   "id": "g159",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/text_bubble/v4/24px.svg"
+  },
+  {
+   "id": "g160",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/thumb_down/v25/24px.svg"
+  },
+  {
+   "id": "g161",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/volume_max/v2/24px.svg"
+  },
+  {
+   "id": "g162",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/volume_max/v2/24px.svg"
+  },
+  {
+   "id": "g163",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/volume_mute/v2/24px.svg"
+  },
+  {
+   "id": "g164",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/volume_mute/v2/24px.svg"
+  },
+  {
+   "id": "g165",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.gstatic.com/youtube/img/icons/web/youtube_outline/waveform/v1/24px.svg"
+  },
+  {
+   "id": "g166",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_outline_experimental/live/v3/12px.svg"
+  },
+  {
+   "id": "g167",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/audio_badge/v3/24px.svg"
+  },
+  {
+   "id": "g168",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/_/ytmainappweb/_/js/k=ytmainappweb.kevlar_base.en_US.VRNYTIAj20w.es5.O/am=AAAAAAEAOAJI/d=1/exm=kevlar_base_module,kevlar_base_sync_mod_chunk,kevlar_main_module/ed=1/br=1/rs=AGKMywFhyEfY9YAqEOv5D_ZKcqi4Jddpcg/m=QlbBce,De8mUc"
+  },
+  {
+   "id": "g169",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://fonts.gstatic.com/s/i/youtube_fill_experimental/hype/v2/24px.svg"
+  },
+  {
+   "id": "g170",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "script",
+   "url": "http://www.youtube.com/s/_/ytmainappweb/_/js/k=ytmainappweb.kevlar_base.en_US.VRNYTIAj20w.es5.O/am=AAAAAAEAOAJI/d=1/exm=De8mUc,QlbBce,kevlar_base_module,kevlar_base_sync_mod_chunk,kevlar_main_module/ed=1/br=1/rs=AGKMywFhyEfY9YAqEOv5D_ZKcqi4Jddpcg/m=yTIahe"
+  },
+  {
+   "id": "g171",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://rr5---sn-q4flrnld.googlevideo.com/videoplayback?expire=2909205800&ei=5YxVKaHoye_9rxhDf9TuS7r&ip=41.8.34.50&id=o-AFcJSyxzO3n8SxmtMOWNHACaDqHhYYQhi58rf9kRsjeNw&itag=18&source=youtube&requiressl=yes&mh=X6&mm=552%2C65977%2C82793&mn=4eUEg%2CXuLk6%2Ctwkcv&ms=4eUEg%2CXuLk6%2Ctwkcv&mv=H&mvi=4&pl=73&ctier=L&initcwndbps=5009703&siu=4&spc=Tn_RlYGagnl36m_zyzPhNEZjrA1l-IGZUSFPbZnldfb9&vprv=4&svpuc=4&mime=video%2Fmp4&ns=hcSzCB0ygvUO9DpADJEEwusb&cnr=73&ratebypass=yes&dur=33283802&lmt=4814915101516374&mt=2909205800&fvip=3&c=WEB&txp=5009703&n=UmFq7Pk6QPIG8xKm&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Cctier%2Csiu%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Cns%2Ccnr%2Cratebypass%2Cdur%2Clmt&sig=D_-HxbJRakahs2QyB3Q-XyNzfqq52nhE7orvf8J1W5nfarNaXDWYewPvjnqnXXjIchc5uDvIEODRLZzYDFkviVZ63F1zAyO1Ge0yLbNWz6Ps&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=D_-HxbJRakahs2QyB3Q-XyNzfqq52nhE7orvf8J1W5nfarNaXDWYewPvjnqnXXjIchc5uDvIEODRLZzYDFkviVZ63F1zAyO1Ge0yLbNWz6Ps"
+  },
+  {
+   "id": "g172",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://rr5---sn-q4flrnld.googlevideo.com/videoplayback?expire=2909205800&ei=5YxVKaHoye_9rxhDf9TuS7r&ip=41.8.34.50&id=o-AFcJSyxzO3n8SxmtMOWNHACaDqHhYYQhi58rf9kRsjeNw&itag=18&source=youtube&requiressl=yes&mh=X6&mm=552%2C65977%2C82793&mn=4eUEg%2CXuLk6%2Ctwkcv&ms=4eUEg%2CXuLk6%2Ctwkcv&mv=H&mvi=4&pl=73&initcwndbps=5009703&siu=4&spc=Tn_RlYGagnl36m_zyzPhNEZjrA1l-IGZUSFPbZnldfb9&vprv=4&svpuc=4&mime=video%2Fmp4&ns=hcSzCB0ygvUO9DpADJEEwusb&cnr=73&ratebypass=yes&dur=33283802&lmt=4814915101516374&mt=2909205800&fvip=3&c=WEB&txp=5009703&n=UmFq7Pk6QPIG8xKm&sparams=expire%2Cei%2Cip%2Cid%2Citag%2Csource%2Crequiressl%2Csiu%2Cspc%2Cvprv%2Csvpuc%2Cmime%2Cns%2Ccnr%2Cratebypass%2Cdur%2Clmt&sig=D_-HxbJRakahs2QyB3Q-XyNzfqq52nhE7orvf8J1W5nfarNaXDWYewPvjnqnXXjIchc5uDvIEODRLZzYDFkviVZ63F1zAyO1Ge0yLbNWz6Ps&lsparams=mh%2Cmm%2Cmn%2Cms%2Cmv%2Cmvi%2Cpl%2Cinitcwndbps&lsig=D_-HxbJRakahs2QyB3Q-XyNzfqq52nhE7orvf8J1W5nfarNaXDWYewPvjnqnXXjIchc5uDvIEODRLZzYDFkviVZ63F1zAyO1Ge0yLbNWz6Ps"
+  },
+  {
+   "id": "g173",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "fetch",
+   "url": "http://www.youtube.com/youtubei/v1/next?prettyPrint=false"
+  },
+  {
+   "id": "g174",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi_lc/ba8I-aR91Os/hqdefault_en.jpg?sqp=CMjl2NYG-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBqLzl_8DMhIwaHR0cHM6Ly9pLnl0aW1nLmNvbS92aS9iYThJLWFSOTFPcy9ocWRlZmF1bHQuanBn&rs=AOn4CLDciMWOmIubyUgveRu02lhn7cmffA"
+  },
+  {
+   "id": "g175",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/wGR3ux7fIBk/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLD38o0Nshz24kK8Mfajw9_rR2JWEA"
+  },
+  {
+   "id": "g176",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/grAnNa1TzPY/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLABuK1k3LFdXoKyAf-Q9WZtZU3RxQ"
+  },
+  {
+   "id": "g177",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/MK6MjpRLPWs/hqdefault.jpg?v=6930158b&sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDrzQ65Ayt55uELurj5y-3ZiZqelg"
+  },
+  {
+   "id": "g178",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/-J9WdzeJmVI/hqdefault.jpg?v=6aa7adf7&sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCQn-QXRf-Vm502882OpQWM-PVseQ"
+  },
+  {
+   "id": "g179",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/bu9i6UgsmHc/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLB9liGkBXyysST4eRBEuoCdNtX77w"
+  },
+  {
+   "id": "g180",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/YZTJN6CZfG0/hqdefault_custom_3.jpg?sqp=CMjl2NYG-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBY1_e0NXAyPKtH9JRD8-keD6a-xA"
+  },
+  {
+   "id": "g181",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "xhr",
+   "url": "http://www.gstatic.com/youtube/img/emojis/emojis-png-7.json"
+  },
+  {
+   "id": "g182",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/Y7AlKeHU8-M/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAl0cMNPfAevdObys-6xvI9DkpLbA"
+  },
+  {
+   "id": "g183",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/AMIPaA7HImQ/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLD5bzqZf0JZDG-WdbL4qvzxlJOuCQ"
+  },
+  {
+   "id": "g184",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/BLun9KmH2Gw/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCx4ZWDPw9QSlZ_N7nVSkJtLmwJdg"
+  },
+  {
+   "id": "g185",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/1lOxNhRwFIA/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLB6ZbkXc8h2pq_pWJ9FdTwv_lZv_g"
+  },
+  {
+   "id": "g186",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/IbLMa2jSPr8/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLD8Aq3cVeF0B2g_x-T0CiTqYh7WbQ"
+  },
+  {
+   "id": "g187",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/rJYy0pHZDxA/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBLAPiWp1dKlJhFAavQCukhfYOzDg"
+  },
+  {
+   "id": "g188",
+   "site": "youtube",
+   "page": "http://www.youtube.com/",
+   "kind": "image",
+   "url": "http://i.ytimg.com/vi/4NhX14XJ9qg/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDACNo8953bxbd4CvfgxECyoKvdpQ"
+  },
+  {
+   "id": "g189",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "font",
+   "url": "http://assets.the-independent.com/fonts/Independent-Serif-Medium.woff2"
+  },
+  {
+   "id": "g190",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "font",
+   "url": "http://assets.the-independent.com/fonts/Independent-Serif-Medium-Italic.woff2"
+  },
+  {
+   "id": "g191",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "font",
+   "url": "http://assets.the-independent.com/fonts/Independent-Sans-Regular.woff2"
+  },
+  {
+   "id": "g192",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "font",
+   "url": "http://assets.the-independent.com/fonts/Independent-Sans-Medium.woff2"
+  },
+  {
+   "id": "g193",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/bombora-rtvi.342153697a4aa13391cc.js"
+  },
+  {
+   "id": "g194",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://assets.monetizationos.com/web-components-latest.js"
+  },
+  {
+   "id": "g195",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/init-firebase.9a14817496339c0a04ba.js"
+  },
+  {
+   "id": "g196",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/react-archipelago.3afeaaaf7360fb5419b1.js"
+  },
+  {
+   "id": "g197",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/react-components-base.4129d5c61d661883f7bd.js"
+  },
+  {
+   "id": "g198",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/sourcepoint.43df64b4441a5ed02785.js"
+  },
+  {
+   "id": "g199",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://cmpv2.independent.co.uk/unified/wrapperMessagingWithoutDetection.js"
+  },
+  {
+   "id": "g200",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/analytics.ff3daa859b91f02dc6a9.js"
+  },
+  {
+   "id": "g201",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/2026/10/09/10/00/Inside-Football-(2).png?quality=75&width=312&crop=2%3A1%2Csmart&auto=webp"
+  },
+  {
+   "id": "g202",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/2026/10/09/14/14/Algorithm.png?quality=75&width=640&crop=640%3A156%2Csmart&auto=webp"
+  },
+  {
+   "id": "g203",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/2026/10/19/8/34/Riots-new.gif?quality=75&width=640&auto=webp"
+  },
+  {
+   "id": "g204",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/2026/10/19/8/06/GettyImages-2260591011-0beb5b29.jpeg?quality=75&width=640&trim=0%2C0%2C0%2C0&auto=webp"
+  },
+  {
+   "id": "g205",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://www.independent.co.uk/img/shortcut-icons/icon-192x192.png"
+  },
+  {
+   "id": "g206",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/bombora.658380453b465c437b79.js"
+  },
+  {
+   "id": "g207",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://securepubads.g.doubleclick.net/tag/js/gpt.js"
+  },
+  {
+   "id": "g208",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://ats-wrapper.privacymanager.io/ats-modules/203e3874-5877-45ec-a8d4-5beaa84bab40/ats.js"
+  },
+  {
+   "id": "g209",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/main.3cc419884365ceb2c3b1.js"
+  },
+  {
+   "id": "g210",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/section.12238ca0f14ea7b8502f.js"
+  },
+  {
+   "id": "g211",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/braze-user-bundle.02a760a68106eed80929.js"
+  },
+  {
+   "id": "g212",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/static-assets/images/MOS+prompts/iPhone+In+the+Room.png"
+  },
+  {
+   "id": "g213",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/static-assets/images/MOS+prompts/iPhone+Harry+article.png"
+  },
+  {
+   "id": "g214",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/static-assets/images/MOS+prompts/Independent+Membership+White.png"
+  },
+  {
+   "id": "g215",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://vi.ml314.com/get?eid=85600&tk=8iMzpmv44Ih7diF5rdVx7hCBBeLRBbxkjS2fip6kHt9Y3d&fp="
+  },
+  {
+   "id": "g216",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://spellknight.com/build/r4uaun_sooo0e.min.js"
+  },
+  {
+   "id": "g217",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "font",
+   "url": "http://assets.the-independent.com/fonts/Independent-Serif-Regular.woff2"
+  },
+  {
+   "id": "g218",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "font",
+   "url": "http://assets.the-independent.com/fonts/Independent-Serif-Bold.woff2"
+  },
+  {
+   "id": "g219",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/s3fs-public/Andrew_Grice.png"
+  },
+  {
+   "id": "g220",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/2026/10/16/13/45/Dr-Sidharth-Kaushal-byline.png"
+  },
+  {
+   "id": "g221",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/2026/09/24/7/23/james-moore-byline-new.png"
+  },
+  {
+   "id": "g222",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/2026/10/18/17/21/GettyImages-2264385089.jpeg?quality=75&width=640&trim=0%2C0%2C0%2C0&auto=webp"
+  },
+  {
+   "id": "g223",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://static.independent.co.uk/2026/08/24/16/2291311273..?quality=75&width=640&trim=0%2C0%2C0%2C0&auto=webp"
+  },
+  {
+   "id": "g224",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://www.independent.co.uk/mos-endpoints/record-homepage-popup"
+  },
+  {
+   "id": "g225",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://cmpv2.independent.co.uk/unified/4.40.3/gdpr-tcf.205218eeda1bb062edfc.bundle.js"
+  },
+  {
+   "id": "g226",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://cmpv2.independent.co.uk/mms/v2/get_site_data?hasCsp=true&href=https%3A%2F%2Fwww.independent.co.uk%2F&account_id=1746"
+  },
+  {
+   "id": "g227",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.googletagmanager.com/gtm.js?id=GTM-5XT7NPD"
+  },
+  {
+   "id": "g228",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://securepubads.g.doubleclick.net/pagead/managed/js/gpt/m202610150101/pubads_impl.js?cb=122881693"
+  },
+  {
+   "id": "g229",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/ga4-shared-event-handlers.23d4a44ddfd03bfcd226.js"
+  },
+  {
+   "id": "g230",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/_build/ga4-section-event-handlers.0c6bb47e63e099e4fbac.js"
+  },
+  {
+   "id": "g231",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://cmpv2.independent.co.uk/wrapper/v2/meta-data?hasCsp=true&accountId=1746&env=prod&metadata=%7B%22gdpr%22%3A%7B%7D%7D&propertyId=17483&scriptVersion=4.40.3&scriptType=unified"
+  },
+  {
+   "id": "g232",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://cmpv2.independent.co.uk/wrapper/v2/messages?hasCsp=true&env=prod&body=%7B%22accountId%22%3A1746%2C%22campaignEnv%22%3A%22prod%22%2C%22campaigns%22%3A%7B%22gdpr%22%3A%7B%22consentStatus%22%3A%7B%7D%2C%22targetingParams%22%3A%7B%22ad_free%22%3Afalse%2C%22registered%22%3Afalse%2C%22premium%22%3Afalse%7D%7D%7D%2C%22clientMMSOrigin%22%3A%22https%3A%2F%2Fcmpv2.independent.co.uk%22%2C%22hasCSP%22%3Atrue%2C%22includeData%22%3A%7B%22localState%22%3A%7B%22type%22%3A%22string%22%7D%2C%22actions%22%3A%7B%22type%22%3A%22RecordString%22%7D%2C%22cookies%22%3A%7B%22type%22%3A%22RecordString%22%7D%7D%2C%22propertyHref%22%3A%22https%3A%2F%2Fwww.independent.co.uk%2F%22%7D&localState=null&metadata=%7B%22gdpr%22%3A%7B%22applies%22%3Atrue%7D%7D&nonKeyedLocalState=null&ch=527251235528543193e1f9&scriptVersion=4.40.3&scriptType=unified"
+  },
+  {
+   "id": "g233",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.npttech.com/advertising.js"
+  },
+  {
+   "id": "g234",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "subdocument",
+   "url": "http://cmpv2.independent.co.uk/index.html?hasCsp=true&message_id=1515508&consentUUID=null&consent_origin=https%3A%2F%2Fcmpv2.independent.co.uk%2Fconsent%2Ftcfv2&preload_message=true&version=v1"
+  },
+  {
+   "id": "g235",
+   "site": "independent",
+   "page": "http://cmpv2.independent.co.uk/",
+   "kind": "stylesheet",
+   "url": "http://cmpv2.independent.co.uk/Notice.9cce2.css"
+  },
+  {
+   "id": "g236",
+   "site": "independent",
+   "page": "http://cmpv2.independent.co.uk/",
+   "kind": "script",
+   "url": "http://cmpv2.independent.co.uk/polyfills.01516.js"
+  },
+  {
+   "id": "g237",
+   "site": "independent",
+   "page": "http://cmpv2.independent.co.uk/",
+   "kind": "script",
+   "url": "http://cmpv2.independent.co.uk/Notice.fcfb9.js"
+  },
+  {
+   "id": "g238",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.independent.co.uk/Agent/GA/UniversalID/IIQUniversalID.js"
+  },
+  {
+   "id": "g239",
+   "site": "independent",
+   "page": "http://cmpv2.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://cmpv2.independent.co.uk/consent/tcfv2/vendor-list/categories?siteId=17483"
+  },
+  {
+   "id": "g240",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://uk-script.dotmetrics.net/door.js?id=6669"
+  },
+  {
+   "id": "g241",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://static.chartbeat.com/js/chartbeat_video.js"
+  },
+  {
+   "id": "g242",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://static.chartbeat.com/js/chartbeat_mab.js"
+  },
+  {
+   "id": "g243",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://5d79bce7-5d2b-427e-a6c4-b89b6c7bf048.edge.permutive.app/8a36876c-0af1-446c-b4da-51399e9ee198-web.js"
+  },
+  {
+   "id": "g244",
+   "site": "independent",
+   "page": "http://cmpv2.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://cmpv2.independent.co.uk/consent/tcfv2/vendor-list/categories?siteId=17483&consentLanguage=en"
+  },
+  {
+   "id": "g245",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://delivery.adrecover.com/49102/adRecover.js"
+  },
+  {
+   "id": "g246",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://client.px-cloud.net/PX5chHLpUs/main.min.js"
+  },
+  {
+   "id": "g247",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://delivery.adrecover.com/block.jpg"
+  },
+  {
+   "id": "g248",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://aax.amazon-adsystem.com/e/dtb/bid/939464.6/0/prebid?adunitid=zaaegs_300x250_234701"
+  },
+  {
+   "id": "g249",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://script.crazyegg.com/pages/scripts/0131/9866.js"
+  },
+  {
+   "id": "g250",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://pub.doubleverify.com/dvtag/34448457/DV1395182/pub.js"
+  },
+  {
+   "id": "g251",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.googletagmanager.com/gtag/js?id=G-PZJCN8L90Z&cx=c&gtm=4e6ae1h1"
+  },
+  {
+   "id": "g252",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://ping.chartbeat.net/ping?h=independent.co.uk&p=%2F&u=DOg0Gimq1KHBHIv7&d=independent.co.uk&g=62356&g0=No%20Section&g1=No%20Author&n=1&f=00001&c=0&x=0&m=0&y=12516&o=1200&w=680&j=45&R=1&W=0&I=0&E=0&e=0&r=&PA=https%3A%2F%2Fwww.independent.co.uk%2F&b=2701&_s=%7B%22l%22%3A%22540707db-e5bb-4e73-b54d-b4ccc77be458%22%2C%22hashed_email%22%3A%22719b54a26e1565a8b5ed3e4af8d9800bb78ca5b301bcb192cb2f3d8301f804eb%22%7D&t=BgM4vCpcXcjCfYZcBChGCbJCbhsxD&V=154&i=News%20%7C%20The%20Independent%20%7C%20Today%27s%20headlines%20and%20latest%20breaking%20news&tz=-120&_acct=anon&sn=1&sv=DUtImBDGUE-uewD1BvK-2RCzRQ3X&sr=external&sd=1&im=067b0fff&_"
+  },
+  {
+   "id": "g253",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://uk-script.dotmetrics.net/hit.gif?id=6669&url=https%3A%2F%2Fwww.independent.co.uk%2F&dom=www.independent.co.uk&r=1792424883414&pvs=1&ecid=42b02825-6d93-4a25-bbcd-94aeb57d5c35&c=false&tzOffset=-120&doorUrl=http%3a%2f%2fuk-script.dotmetrics.net%2fdoor.js%3fid%3d6669&dfph=&ver=370"
+  },
+  {
+   "id": "g254",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://rm-script.dotmetrics.net/hit.gif?id=6669&url=https%3A%2F%2Fwww.independent.co.uk%2F&dom=www.independent.co.uk&r=1792424883414&pvs=1&pvid=42b02825-6d93-4a25-bbcd-94aeb57d5c35&c=false&tzOffset=-120"
+  },
+  {
+   "id": "g255",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://mab.chartbeat.com/mab_strategy/headline_testing/get_strategy/?host=independent.co.uk&domain=independent.co.uk&path=%2F"
+  },
+  {
+   "id": "g256",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://uk-script.dotmetrics.net/Scripts/ncs-script.js?v=370"
+  },
+  {
+   "id": "g257",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://code.jquery.com/jquery-3.7.1.min.js"
+  },
+  {
+   "id": "g258",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://ift.px-cloud.net/ns?c=78568f40-cbd4-11f1-901d-2797f2117bfc"
+  },
+  {
+   "id": "g259",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://collector-px5chhlpus.px-cloud.net/api/v2/collector"
+  },
+  {
+   "id": "g260",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "subdocument",
+   "url": "http://tpc.googlesyndication.com/safeframe/1-0-37/html/container.html"
+  },
+  {
+   "id": "g261",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://merequartz.com/aadetect/px.gif?ch=2&rn=61535&adslot=npzhpl_728x90_"
+  },
+  {
+   "id": "g262",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://dt.adsafeprotected.com/dt?adspot_id=ad_300x250_8001271"
+  },
+  {
+   "id": "g263",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://delivery.adrecover.com/block.jpg?ts=1792424884180"
+  },
+  {
+   "id": "g264",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://pub.doubleverify.com/dvtag/signals/ids/pub.json?ctx=34448457&cmp=DV1395182&url=https%3A%2F%2Findependent.co.uk&ids=1&token=%2F%2B9Q3n%2FcoEaSlsVfYHrJ4dJaANu3ZRm7x6AY8hmqEqBar9YryRYm0iCC5WcMkH8SsMCI5GsRCazeBDl8fxC3J9XBVKdwNC4iuu%2FUALVly74nvsmVsuxe5%2BxjTlPxZvsvOYkzcoNHi9KcBAa0qExwCrW2BpRXxBQ6et1TDS0%3D"
+  },
+  {
+   "id": "g265",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://pub.doubleverify.com/dvtag/signals/bsc/pub.json?ctx=34448457&cmp=DV1395182&url=https%3A%2F%2Findependent.co.uk&bsc=1&abs=1&cbs=1&token=%2F%2B9Q3n%2FcoEaSlsVfYHrJ4dJaANu3ZRm7x6AY8hmqEqBar9YryRYm0iCC5WcMkH8SsMCI5GsRCazeBDl8fxC3J9XBVKdwNC4iuu%2FUALVly74nvsmVsuxe5%2BxjTlPxZvsvOYkzcoNHi9KcBAa0qExwCrW2BpRXxBQ6et1TDS0%3D"
+  },
+  {
+   "id": "g266",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://www.firefox.com/favicon.ico?t=1792424883764"
+  },
+  {
+   "id": "g267",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://script.crazyegg.com/pages/data-scripts/0131/9866/site/www.independent.co.uk.json?t=1"
+  },
+  {
+   "id": "g268",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://script.crazyegg.com/pages/versioned/common-scripts/0890f4eaeb0cb04f734921762ba0d327.js"
+  },
+  {
+   "id": "g269",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://www.googletagmanager.com/gtag/js?id=G-PZJCN8L90Z"
+  },
+  {
+   "id": "g270",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://script.crazyegg.com/pages/data-scripts/0131/9866/sampling/www.independent.co.uk.json?t=1"
+  },
+  {
+   "id": "g271",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://segment.com/favicon.ico?t=1792424885164"
+  },
+  {
+   "id": "g272",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://reddit.com/favicon.ico?t=1792424885164"
+  },
+  {
+   "id": "g273",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://twitter.com/favicon.ico?t=1792424885164"
+  },
+  {
+   "id": "g274",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://www.twilio.com/favicon.ico"
+  },
+  {
+   "id": "g275",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "fetch",
+   "url": "http://spellknight.com/ijctvil4bnuolhcmxh_268gl0"
+  },
+  {
+   "id": "g276",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/bundles/i4ap1mruxpzvuyvhe_bgd8bohro.vendor.js"
+  },
+  {
+   "id": "g277",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/ulyl/ja05ghj0l5aepmtzp3q2swgd2ncpx9o5v4a0/341ybil29eyllabgak6oluutwzh9rhpqjj4/qgotjcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz8gi2jb01tknz46snaexj/2thd7qw2ipp4dpwish1kerlyvyggs/p6c93yafvm97CadLVFYJzH0rVakmnlcm9a7y4y7f60yzv4xaa4s7s1jq1t.json"
+  },
+  {
+   "id": "g278",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/szki/vkyruid3c00ayuf4qswgd2ncpx9o5v4a0341ybil29eyllabgak6oluutwzh9rhpqjj4/qgotjcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz8gi2jb01/tknz46snaexj2thd7qw2ipp4dpwi42uttvldrt56tte8c/hudhld6rd446m6gfront3ld76kzw664j11twpm5alz8Iqgdm/vvE7y38Bwi3Roy7YXX4HNX1ob9Ot58gxbDk0Uu3r4m2grpmwo3y.webm"
+  },
+  {
+   "id": "g279",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/335w/3ytqa40f0r5qz1seagsn8gbfimjwjkqswgd2nc/px9o5v4a0341ybil29eyllabgak6oluutwzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7s/f8p3oepcagkuz8gi2jb01tknz46snaexj2thd7qw2ipp4dpwi2hiuqjlcw0uy3w5t8k/7qs8e34g4e34ek1y0ble8584312r1e99mwjvs9pv63gia/dk259btrwtsz443aas11rxt43529b1le3c4fmyxyvvcf.js"
+  },
+  {
+   "id": "g280",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/268l/aem6wkbe00h6anjih28gfn8g0qswgd2ncpx9o5v/4a0341ybil29eyllabgak6oluutwzh9rhpqjj4qgotjcx1ge/x0fr5lj64u0g3pp7sf8p3oepcagkuz8gi2jb01tknz46/snaexj2thd7qw2ipp4dpwi7jyh8v8efqeejdaaeaa643r4osmjzc4mkdtrtxs/rswrsrsdr1b4gl1aa3jac8dgc337ch94o56sttzzsx0uaaXb.js"
+  },
+  {
+   "id": "g281",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/335w/yvxzi0v7i0jamy822q437ruswgd2ncpx9o5v4a0341ybil/29eyllabgak6oluutwzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7sf/8p3oepcagkuz8gi2jb01tknz46snaexj/2thd7qw2ipp4dpwi2hkrva8s9oht5coeb2pf88e34g4e34ek1/y7fle858431s9uniaagg4iI4jjaa68e6S8k7flkZ4k42k8fefmyxyjuni.js"
+  },
+  {
+   "id": "g282",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/ulyl/3dcsa0kk0iypkczdmswgd2ncpx9o5v4a0341ybil2/9eyllabgak6oluutwzh9rhp/qjj4qgotjcx1gex0fr5lj64u0g3pp7sf8p/3oepcagkuz8gi2jb01tknz46snaexj2thd7qw2ipp4dp/wi21nkm8zv0b0p5ad3qsCPIadwTPyJLZ0e5v.js"
+  },
+  {
+   "id": "g283",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "subdocument",
+   "url": "http://hardsixhockey.net/335w/j5m8110kn3iahdwdqhv3qmnoywh8enc0ygu7rvoschzg3keyswgd2ncpx9o5v4a0341ybil29eyllabgak6oluut/wzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz8gi2jb01tknz46snaexj2/thd7qw2ipp4dpwi2hlqfnkhyib8o2xouby9g8e34g4e34ek2370awozxu1q2z1adffwf7aaj/Yjgrewqerj50mhd4jjaa64ac83a1swswwrz1xm72fej4ekQQEZresu5kya3cd2fej4ekacfi868e2sezvx1ikqc64yndugdi18gn8e34g4e34ekpsghvltg4el2f/ej4ek52wfevhvz57cjgi4cfaa3acd4jjaa64rewqerj50mim4ij8fejemurh69q.html"
+  },
+  {
+   "id": "g284",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/fgd6/7z0vjai0x7avr6lm19o55ayswgd2ncpx9o5v4a0341ybil29/eyllabgak6oluutwzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7s/f8p3oepcagkuz8gi2jb01tknz46snaexj2thd7qw2ipp4dpwi1r/qe7r00wll5z3e88l3fl1c4m4i85p5fnqb1m2btrvuuvvvz/vwya3ZRsu0wszt7nlfsydutqe7s5ant.js"
+  },
+  {
+   "id": "g285",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/ulyl/isyiy0k3c0das86caswgd2ncpx9o5v4a0341ybil29ey/llabgak6oluutwzh9rhpqjj4qgotjcx1gex0fr5/lj64u0g3pp7sf8p3oepcagkuz8gi2jb01tk/nz46snaexj2thd7qw2ipp4dpwish1kerlyvyggsp6c9/3y9vwfhnCadLVFYJzH0rV1rxji.css"
+  },
+  {
+   "id": "g286",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://hardsixhockey.net/335w/00iznajtvu7xfu1rqqs68t6swgd2ncpx9o5v4a0341y/bil29eyllabgak6oluutwzh9rhpqjj4qgot/jcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz/8gi2jb01tknz46snaexj2thd7qw2ipp4dpw/i7cvf860l28sbz8e34g4e34ek1y7jju5jadgl1c8220yqWe3i4nacCi824fmy3zsb0x.png"
+  },
+  {
+   "id": "g287",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://hardsixhockey.net/335w/ma04g7j0l5aenom2eq6yswgd2ncpx9o5v4a0341ybil29/eyllabgak6oluutwzh9rhpqjj4qgotjcx1ge/x0fr5lj64u0g3pp7sf8p3oepcagkuz8gi2jb01tknz46snaexj2thd7/qw2ipp4dpwi7cqhuzh9kip2n8e34g4e34ek15zcjaqaebdhiuq1/m9cp0ti0v9jpk1mhZiadO837aaik7adGaalj7aacad1pc8e4fmy40jgnt.png"
+  },
+  {
+   "id": "g288",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://hardsixhockey.net/335w/a4mljae005g7nkmc91y2swgd2ncpx9o5/v4a0341ybil29eyllabgak6oluutwzh9rhpqjj4qgotjcx1gex0fr5lj64u/0g3pp7sf8p3oepcagkuz8gi2jb01tknz46snaexj2thd7qw2ipp4dp/wi7cqhuzh9kip2n8e34g4e34ek5wj77p2l4z30zt/ahgf2rgt6kvxm7ol9aad4jaddffi4ad1pc8e4ade4nfmy406xqr.png"
+  },
+  {
+   "id": "g289",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://hardsixhockey.net/335w/qy50pa43t0fr9lkpnoektnzuka0usyiswgd2ncpx9o5v4a0341ybil29eyllabgak/6oluutwzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz8gi/2jb01tknz46snaexj2thd7qw2ipp4dpw/i7cqhu7f1qulpr8e34g4e34ek1ylpjkaak82adaajj4kj9y8d/aa64jk0j3e98pgifdgkj23c28L7fe4agtXEeagtXk74agtXNffdfmy405msa.png"
+  },
+  {
+   "id": "g290",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://hardsixhockey.net/335w/q5frp00yt34a9lkpnoektnzukaauecaswgd2ncpx9o5v4a0341ybil29eyllabgak6/oluutwzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz8/gi2jb01tknz46snaexj2thd7qw2ipp4dpw/i7cqhu7f1qulpr8e34g4e34ek1ylpjkaak82adaajj4kj9y8daa64jk0j3e/98pgifdgkj23c28L7fe4agtXDaaiipagtXaaik82c4fmy3zip8q.png"
+  },
+  {
+   "id": "g291",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "image",
+   "url": "http://hardsixhockey.net/335w/p03y4af0tr5q9lkpnoektnzukbyrymyswgd2ncpx9o5v4a0341ybil29eyllabgak6oluut/wzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz8gi2jb01tk/nz46snaexj2thd7qw2ipp4dpwi7cqhu7f1qulpr8e34g4e34ek1ylpjkaak82a/daajj4kj9y8daa64jk0j3e98pgifdgkj1s9uEe34g4e34ekag/tXI4d14ij78gagtXS78k4fmy3zjb6e.png"
+  },
+  {
+   "id": "g292",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://hardsixhockey.net/335w/ltb0ca72n02oh577gw3jc72tzaqiswgd2ncpx9o5v4a0341yb/il29eyllabgak6oluutwzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz/8gi2jb01tknz46snaexj2thd7qw2ipp4dpwi2hjtawx2kuodmmf3rtgl08e34g4e34ekra8cpy39tgs/64kacj8k4ac3aakaadtsh27aajYjg2a2jv7kvjuzrzl1/wb1u8pripdfnufxnt7n3xai8e34g4e34ekjtzc7z0ed96yodwkb71fmq3rla.min.js"
+  },
+  {
+   "id": "g293",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://hardsixhockey.net/335w/j5m8110kn3iahdwdcdm5nc3vmlwcbgqnihui1jarm7mgxp96swgd2ncpx9o5v4a0341ybil29eyllabg/ak6oluutwzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz8gi2jb01tknz46snaexj2thd7qw2ipp/4dpwi2hjtawx2kuodmmf3rtgl08e34g4e34ek1y0bniaagg4i1ze1d4kaaad3aakaa/dzequ7aajYjgrewqerj50mgaa22flekE3460cguente1tu2w7ktwpefjggn1d4kaa3aakaafdyeruoww28/rzd83uj17wegifg4ikpE35gppjkhgxwrcdj2i8gkR4ij8fe12r1e99mwjvse9lj2i8gkPpg4a1le85843Tcjq.webp"
+  },
+  {
+   "id": "g294",
+   "site": "independent",
+   "page": "http://hardsixhockey.net/",
+   "kind": "stylesheet",
+   "url": "http://hardsixhockey.net/335w/5aajeg00ld58t9oydd7eswgd2ncpx9o5v4a/0341ybil29eyllabgak6oluutwzh9rhpqjj4qgowcfer93e2c9drso31a/0r0aq9vbenmwm461qrn460e3rws09m9z021zbjyij5w65df/8kij811c2hlqd82oq8eroyiwmk5ro8e34g4e34ekdr2ow/Jfk8241exueiorsap0doqw6dz.css"
+  },
+  {
+   "id": "g295",
+   "site": "independent",
+   "page": "http://hardsixhockey.net/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/335w/eg5al8da50j0t9psc5cqswgd2ncpx9/o5v4a0341ybil29eyllabgak6oluutwzh9rhpqjj4qgowcfer93/e2c9drso31a0r0aq9vbenmwm461qrn460e3rws/09m9z021zbjyij5w65df8kij811c2hl/qd82oq8eroyiwmk5ro8e34g4e34ekdr23kgfcp58ccj1exp9770zkw0kztn3eu.js"
+  },
+  {
+   "id": "g296",
+   "site": "independent",
+   "page": "http://www.independent.co.uk/",
+   "kind": "xhr",
+   "url": "http://hardsixhockey.net/335w/x6ayzcpw0e4slgixcjxaxkd2oqlwv6qyrsjv07ewz6l3iurgt7ve8xki6atiojha2iraxqji6lbdov49l415ah8hqdv91uuxcvmuccwkh6wxni8f7x8bwm7v1mw3m77p81wvwcb7j4uupw2fbr0b07uldssvp20vcob2k8s51242iswgd2ncpx9o5v4a0341ybil29eyllabgak6oluutwzh9rhpqjj4qgotjcx1gex0fr5lj64u0g3pp7sf8p3oepcagkuz8gi2jb01tknz46snaexj2thd7qw2ipp4dpwi2hjtawx2kuodmmf3rtgl08e34g4e34ek1y0bniaagg4i1ze2d4jjaa64je27vq7aajYjg/mrs70kybtw9q545ban2ldgh6m7djmoqcnj9oyq7lmsaa22flekE34x0qldpxj1yyp2aadgaa86eAem6wnjtjz9io32kzeo2aadgaa86ej9p9w94wp52a41aqzqkg2fej4ekOkaaklj2hpu0ck7aajYfej4ekZaakaayyt3gx2nzt57o02fej4ek43PfWccyyt3gx2nzt57o02fej4ek43PfWepyyt3gx2nzt57o0i4942k43Wep6wniwob6ymn75rnk7aajHf2aacZaakaayyt3gx2nzt57o0/kaai64k8e6Laaiaadj2hpu0ckaa3ac5i44yyt3gx2nzt57o0i468jk4i43yyt3gx2nzt57o0gi4d8ld9p9vucbkoxs6woct0lc2c84ekIIOKi868edmm4rfy3zfi2lglbhh95p78e34g4e34ek10866n5t2g5deds7aajYOL4x0pyajofqf5t8e2cl34Zaakaa2hpu0ckcf2aacOkaak41d47cj94u9rhc6tli2jki8e62hnjex0aa2k8fej1d47cj94u9rhc6tli/2N42fi3Oki8e62hnjex02ffb84j1d47cj94u9rhc6tli2N42fi3Oki8e6hpjc5a2ogifg4ikpDi451d47gzelb1oqfxie528e34g4e34eka1v0azfmshmj50vklm1cf2aacOkaak4ciulm2baas64wetfj28ddjYffb84j2hpu6o4acjgacmsacjjaes9nDvjEWWWWWWWWWEkShfwNG8dKQ1GGD9hImJG2DFrUgRMb36cUfihtJeVQUi7GGKbIacjMxd9OD62M6Pd89xSmfOXXINeb676BRiUnBWGkP9R9NXnWW2hosd38gifg4ikpE3yyt941keg243yod4jjaa64E31rvdswswwrz26tzcrzd4kaa3/aakaa1lfkypqd5hll1lvva2aaggc84j1d47agcvli90yyxoa3efeG4p43Hf2aacOkaak4u611w14r1isinz680acjgacmsac3aakaacm72bsutstutcm537acjgacmsacg1d47gz1yx8g8vflycvwtytwstuwwtzwvus0u4s501xm5j2i8gkR4ij8fe12r1e99mwjvse9lj2i8gkPpg4a1le8584322q3j.json"
+  },
+  {
+   "id": "g297",
+   "site": "independent",
+   "page": "http://hardsixhockey.net/",
+   "kind": "script",
+   "url": "http://hardsixhockey.net/335w/5aajeg00ld58t9oydd7eswgd2ncpx9o5v4a0341yb/il29eyllabgak6oluutwzh9rhpqj/j4qgowcfer93e2c9drso31a0r0aq9vbenmwm461qrn460/e3rws09m9z021zbjyij5w65df8kij811c2hlqd82oq8eroy/iwmk5ro8e34g4e34ekdr2owJfk8241ew11dw976otr3dr94z.js"
+  },
+  {
+   "id": "g298",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://cdn.ziffstatic.com/jst/zdconsent.js"
+  },
+  {
+   "id": "g299",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "font",
+   "url": "http://r.cdnst.net/assets/fonts/Montserrat-VariableFont_wght-kern-latin-BmXyKEOz.woff2"
+  },
+  {
+   "id": "g300",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "font",
+   "url": "http://r.cdnst.net/assets/fonts/gaugemono-regular-webfont-DwJfUwLI.woff2"
+  },
+  {
+   "id": "g301",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://cdn.ziffstatic.com/pg/speedtest2.js"
+  },
+  {
+   "id": "g302",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "stylesheet",
+   "url": "http://cdn.ziffstatic.com/pg/speedtest2.css"
+  },
+  {
+   "id": "g303",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://cdn.ziffstatic.com/pg/speedtest2.prebid.js"
+  },
+  {
+   "id": "g304",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://r.cdnst.net/assets/index-BLbs8Sa6.js"
+  },
+  {
+   "id": "g305",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "stylesheet",
+   "url": "http://r.cdnst.net/assets/index-DbXEWsKD.css"
+  },
+  {
+   "id": "g306",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://r.cdnst.net/assets/en-TSy91Dbd.js"
+  },
+  {
+   "id": "g307",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "image",
+   "url": "http://r.cdnst.net/assets/app-store-en-dark-DbKYSUnc.svg"
+  },
+  {
+   "id": "g308",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "image",
+   "url": "http://r.cdnst.net/assets/google-play-en-CqkrlOgF.svg"
+  },
+  {
+   "id": "g309",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "image",
+   "url": "http://r.cdnst.net/assets/mac-app-store-en-dark-BXhUo-w5.svg"
+  },
+  {
+   "id": "g310",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "image",
+   "url": "http://r.cdnst.net/assets/Get_on_Microsoft_dark-CZot19u7.svg"
+  },
+  {
+   "id": "g311",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "image",
+   "url": "http://r.cdnst.net/assets/apple-tv-en-dark-COPV-u4x.svg"
+  },
+  {
+   "id": "g312",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "image",
+   "url": "http://r.cdnst.net/assets/favicon-CCUn3ywk.svg"
+  },
+  {
+   "id": "g313",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://cdn.ziffstatic.com/jst/zdconsent_eu.js"
+  },
+  {
+   "id": "g314",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "font",
+   "url": "http://r.cdnst.net/assets/fonts/Montserrat-VariableFont_wght-hint-all-DpEGcuYQ.woff2"
+  },
+  {
+   "id": "g315",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://cdn.ziffstatic.com/pg/openads.js"
+  },
+  {
+   "id": "g316",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://config.aps.amazon-adsystem.com/configs/3336"
+  },
+  {
+   "id": "g317",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://client.aps.amazon-adsystem.com/publisher.js"
+  },
+  {
+   "id": "g318",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "xhr",
+   "url": "http://cdn.cookielaw.org/consent/0e4c9041-0c35-490f-b926-1d99a6a6ecc0/0e4c9041-0c35-490f-b926-1d99a6a6ecc0.json"
+  },
+  {
+   "id": "g319",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://btloader.com/tag?o=5075500865683456&upapi=true"
+  },
+  {
+   "id": "g320",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "font",
+   "url": "http://r.cdnst.net/assets/fonts/Montserrat-Regular-kern-latin-BprhUOLI.woff"
+  },
+  {
+   "id": "g321",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "xhr",
+   "url": "http://geolocation.onetrust.com/cookieconsentpub/v1/geo/location"
+  },
+  {
+   "id": "g322",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://www.speedtest.net/api/downdetector-outages?countryCode=DK"
+  },
+  {
+   "id": "g323",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "xhr",
+   "url": "http://www.speedtest.net/api/js/config-sdk?engine=js&limit=10&https_functional=true"
+  },
+  {
+   "id": "g324",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://cdn.ziffstatic.com/jst/otBannerSdk.202604.2.0.js"
+  },
+  {
+   "id": "g325",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://firebaseinstallations.googleapis.com/v1/projects/ookla-speedtest/installations"
+  },
+  {
+   "id": "g326",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://cdn.cookielaw.org/consent/0e4c9041-0c35-490f-b926-1d99a6a6ecc0/019e0d48-f4f8-7028-a250-62c92ca9e2b6/en.json"
+  },
+  {
+   "id": "g327",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://cdn.cookielaw.org/vendorlist/iab2V2Data.json"
+  },
+  {
+   "id": "g328",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://cdn.cookielaw.org/vendorlist/googleData.json"
+  },
+  {
+   "id": "g329",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://cdn.ziffstatic.com/jst/otTCF.202604.2.0.js"
+  },
+  {
+   "id": "g330",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://cdn.cookielaw.org/scripttemplates/202604.2.0/assets/otCenterRounded.json"
+  },
+  {
+   "id": "g331",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://cdn.cookielaw.org/scripttemplates/202604.2.0/assets/otCommonStyles.css"
+  },
+  {
+   "id": "g332",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://cdn.cookielaw.org/logos/static/ot_guard_logo.svg"
+  },
+  {
+   "id": "g333",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://www.googletagmanager.com/gtm.js?id=GTM-K7SNBZ"
+  },
+  {
+   "id": "g334",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://cdn.hadronid.net/hadron.js?url=https%3A%2F%2Fwww.speedtest.net%2F&ref=&_it=amazon&partner_id=700"
+  },
+  {
+   "id": "g335",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://cdn.id5-sync.com/api/1.0/id5-api.js"
+  },
+  {
+   "id": "g336",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://tags.crwdcntrl.net/lt/c/16576/sync.min.js"
+  },
+  {
+   "id": "g337",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "xhr",
+   "url": "http://c.amazon-adsystem.com/bao-csm/aps-comm/aps_csm.js"
+  },
+  {
+   "id": "g338",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://securepubads.g.doubleclick.net/pagead/managed/js/gpt/m202610130101/pubads_impl.js?cb=122881631"
+  },
+  {
+   "id": "g339",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://api.idsequoia.ai/rtd.js?siteId=10f47f30d992127f&session=4316a6bb-d451-49f4-93f8-58e5567cccf2&r=www.speedtest.net"
+  },
+  {
+   "id": "g340",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://firebaseremoteconfig.googleapis.com/v1/projects/ookla-speedtest/namespaces/firebase:fetch?key=AIzaSyDSaO6tE5SQ7J3ZMsKsepon8tNUNy5WA6s"
+  },
+  {
+   "id": "g341",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "subdocument",
+   "url": "http://cdn.btloader.com/cchecker.html?upapi=true"
+  },
+  {
+   "id": "g342",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "subdocument",
+   "url": "http://btloader.com/trustedIframe.html?o=5075500865683456&upapi=true"
+  },
+  {
+   "id": "g343",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=2&e=0.7753636486558106"
+  },
+  {
+   "id": "g344",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad.doubleclick.net/favicon.ico?ad=300x250&ad_box_=1&adnet=1&showad=1&size=250x250&e=0.8611488563393851"
+  },
+  {
+   "id": "g345",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=1&e=0.4086200428908098"
+  },
+  {
+   "id": "g346",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ab.dns-finder.com/meta/dns"
+  },
+  {
+   "id": "g347",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://cdn.api.btloader.com/device?orgid=5075500865683456&upapi=true"
+  },
+  {
+   "id": "g348",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://c.amazon-adsystem.com/aax2/apstag.js?upapi=true"
+  },
+  {
+   "id": "g349",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://api.btloader.com/exd?tid=MRd8LhPLi-AufKgbvcN-a154d9bdd1&sid=7wr9qFqmjA-ELNoQ6ItM-a154d9bdd1&cv=2.1.196&upapi=true"
+  },
+  {
+   "id": "g350",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://api.id5-sync.com/analytics/718/id5-api-js"
+  },
+  {
+   "id": "g351",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=1&e=0.8225386855281537"
+  },
+  {
+   "id": "g352",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad.doubleclick.net/favicon.ico?ad=300x250&ad_box_=1&adnet=1&showad=1&size=250x250&e=0.9017196072368959"
+  },
+  {
+   "id": "g353",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://www.googletagmanager.com/gtag/destination?id=G-KKLSRK6J1Z&cx=c&gtm=4e6ae1"
+  },
+  {
+   "id": "g354",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://www.googletagmanager.com/gtag/js?id=G-KKLSRK6J1Z&cx=c&gtm=4e6ae1"
+  },
+  {
+   "id": "g355",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=2&e=0.9421845900174953"
+  },
+  {
+   "id": "g356",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=2&e=0.5692024149202605"
+  },
+  {
+   "id": "g357",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad.doubleclick.net/favicon.ico?ad=300x250&ad_box_=1&adnet=1&showad=1&size=250x250&e=0.19991433584554974"
+  },
+  {
+   "id": "g358",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=1&e=0.5518449670028297"
+  },
+  {
+   "id": "g359",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=1&e=0.33452625385292734"
+  },
+  {
+   "id": "g360",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=2&e=0.21895221688566002"
+  },
+  {
+   "id": "g361",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad.doubleclick.net/favicon.ico?ad=300x250&ad_box_=1&adnet=1&showad=1&size=250x250&e=0.3895498417248271"
+  },
+  {
+   "id": "g362",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=2&e=0.6114029057908096"
+  },
+  {
+   "id": "g363",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad.doubleclick.net/favicon.ico?ad=300x250&ad_box_=1&adnet=1&showad=1&size=250x250&e=0.13483874757046044"
+  },
+  {
+   "id": "g364",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=2&e=0.9770311705454353"
+  },
+  {
+   "id": "g365",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad.doubleclick.net/favicon.ico?ad=300x250&ad_box_=1&adnet=1&showad=1&size=250x250&e=0.515360696598988"
+  },
+  {
+   "id": "g366",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad-delivery.net/px.gif?ch=2&e=0.02047208192709704"
+  },
+  {
+   "id": "g367",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://ad.doubleclick.net/favicon.ico?ad=300x250&ad_box_=1&adnet=1&showad=1&size=250x250&e=0.649496057712204"
+  },
+  {
+   "id": "g368",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://api.btloader.com/country?o=5075500865683456"
+  },
+  {
+   "id": "g369",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://api.btloader.com/pv?nlf=false&tid=MRd8LhPLi-AufKgbvcN-a154d9bdd1&sid=7wr9qFqmjA-ELNoQ6ItM-a154d9bdd1&cv=2.1.196&upapi=true"
+  },
+  {
+   "id": "g370",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "beacon",
+   "url": "http://stats.g.doubleclick.net/g/collect?v=2&ngs=1&tid=G-KKLSRK6J1Z&cid=123260627.1792424921&gtm=45je6ae1v879908529za20gzb6359835zd6359835xf1&rcb=0&aip=1&dma=1&dma_cps=a&gcs=G111&gcd=13r3rPr2r7l1&npa=1&frm=0&tag_exp=115938465~115938469~118897920~118897930~120213116~120385422~120469145~120469153~121191154~121246026~121246034"
+  },
+  {
+   "id": "g371",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "image",
+   "url": "http://www.google.dk/ads/ga-audiences?v=1&t=sr&slf_rd=1&_r=4&ngs=1&tid=G-KKLSRK6J1Z&cid=123260627.1792424921&gtm=45je6ae1v879908529za20gzb6359835zd6359835xf1&rcb=0&aip=1&dma=1&dma_cps=a&gcs=G111&gcd=13r3rPr2r7l1&npa=1&frm=0&tag_exp=115938465~115938469~118897920~118897930~120213116~120385422~120469145~120469153~121191154~121246026~121246034&z=826605591"
+  },
+  {
+   "id": "g372",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "xhr",
+   "url": "http://bcp.crwdcntrl.net/6/map?xcid=16576"
+  },
+  {
+   "id": "g373",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://diffuser-cdn.app-us1.com/diffuser/diffuser.js"
+  },
+  {
+   "id": "g374",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://id5-sync.com/bounce"
+  },
+  {
+   "id": "g375",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://lbs.eu-1-id5-sync.com/lbs/v1"
+  },
+  {
+   "id": "g376",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://lb.eu-1-id5-sync.com/lb/v1"
+  },
+  {
+   "id": "g377",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://gum.criteo.com/sid/json?origin=prebid&topUrl=https%3A%2F%2Fwww.speedtest.net%2F&domain=www.speedtest.net&cw=1&lsw=1&us_privacy=1---&gdprString=CQsVacAQsVacAAcABBENC1FsAP_gAEPgACiQM9tR_G__bWlr-bb3abtkeYxP9_hr7sQxBgbIkm4FzLvW7JwGx2EaJAyatiIKmRIAu3DBIQNlHBDURUCgKIAFryDMaE2U4TNKJ6BkiEMZIytQCExvm4tjeQCZ4ur_9kc0mB-s6dr-2dzyy6hHH3K5fmS1UJSdIYesDfv-ZhOS-9IE9-x8v4v4_EbpEm0eSVn9pEsp4zc6Yns6dBmxs-Tyff6Pn_f71fS7X_ve_n3zv8oXn7rr6-__f3-7t__-bf-___f-__7Z_zM_37_v_ftb-_-DPYAJhodEAZZECgQKAhBAgAUFYQAUCAIAAEgKICAEwYEOQMAF1hEgBACgACCAEAAIMAAQAACQAIRABAAQCAECAQKAAMACAICABgYAAwAUIgEAAIDoGKQEEAgWACRGFAYIEIACAQEtlQglAwIA4QpFjgEECImCgAARAAKgIBAPCwEJJUSsSCALiC6ABAAAASjBFABSAmAKKAyBaCsCDgMjTAEHzBIkh0EQBMEJGQZEJKgkHimKIEEOQGxSTAHTxBQAy6WSEP9QLNgC5Euw6krCQMgAAAAA.f_wACHwAAAAA.IM9tR_G__bXlv-bb36btkeYxf9_hr7sQxBgbIsm4FzLvW7JwG32EaJEyatiIKmRIAu3DBIQNtHBjURUChKIAVrzDsaE2U4TtKJ-BkiHMZYytQCExvm4tjeQCZ4ur_90d0mR-s6dr-2dzy27hnH3K9fuS1UJydKYetHfv-ZhOS-_IU9_x-_4v4_MbpEm0eSVv9tUst4zc64vv6dpuxs-Tyff6f__f73fS7X__e__33_8qX3_r76-___3__t___ff_________9__-___________-&gdpr=1"
+  },
+  {
+   "id": "g378",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://id5-sync.com/api/config/prebid"
+  },
+  {
+   "id": "g379",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://web-banner.ads.aps.amazon-adsystem.com/e/dtb/bid"
+  },
+  {
+   "id": "g380",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://prism.app-us1.com/?a=478502367&u=https%3A%2F%2Fwww.speedtest.net%2F"
+  },
+  {
+   "id": "g381",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "xhr",
+   "url": "http://id5-sync.com/gm/v3"
+  },
+  {
+   "id": "g382",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "xhr",
+   "url": "http://ep1.adtrafficquality.google/getconfig/sodar?sv=200&tid=gpt&tv=m202610130101&st=env&sjk=3372151055720015"
+  },
+  {
+   "id": "g383",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "subdocument",
+   "url": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/safeframe/1-0-45/html/container.html"
+  },
+  {
+   "id": "g384",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://securepubads.g.doubleclick.net/gampad/ads?pvsid=3372151055720015&correlator=526447917658161&eid=122881631&output=ldjh&gdfp_req=1&vrg=202610130101&ptt=17&impl=fifs&gdpr_consent=CQsVacAQsVacAAcABBENC1FsAP_gAEPgACiQM9tR_G__bWlr-bb3abtkeYxP9_hr7sQxBgbIkm4FzLvW7JwGx2EaJAyatiIKmRIAu3DBIQNlHBDURUCgKIAFryDMaE2U4TNKJ6BkiEMZIytQCExvm4tjeQCZ4ur_9kc0mB-s6dr-2dzyy6hHH3K5fmS1UJSdIYesDfv-ZhOS-9IE9-x8v4v4_EbpEm0eSVn9pEsp4zc6Yns6dBmxs-Tyff6Pn_f71fS7X_ve_n3zv8oXn7rr6-__f3-7t__-bf-___f-__7Z_zM_37_v_ftb-_-DPYAJhodEAZZECgQKAhBAgAUFYQAUCAIAAEgKICAEwYEOQMAF1hEgBACgACCAEAAIMAAQAACQAIRABAAQCAECAQKAAMACAICABgYAAwAUIgEAAIDoGKQEEAgWACRGFAYIEIACAQEtlQglAwIA4QpFjgEECImCgAARAAKgIBAPCwEJJUSsSCALiC6ABAAAASjBFABSAmAKKAyBaCsCDgMjTAEHzBIkh0EQBMEJGQZEJKgkHimKIEEOQGxSTAHTxBQAy6WSEP9QLNgC5Euw6krCQMgAAAAA.f_wACHwAAAAA.IM9tR_G__bXlv-bb36btkeYxf9_hr7sQxBgbIsm4FzLvW7JwG32EaJEyatiIKmRIAu3DBIQNtHBjURUChKIAVrzDsaE2U4TtKJ-BkiHMZYytQCExvm4tjeQCZ4ur_90d0mR-s6dr-2dzy27hnH3K9fuS1UJydKYetHfv-ZhOS-_IU9_x-_4v4_MbpEm0eSVv9tUst4zc64vv6dpuxs-Tyff6f__f73fS7X__e__33_8qX3_r76-___3__t___ff_________9__-___________-&gdpr=1&addtl_consent=2~20.43.46.55.57.61.70.83.89.93.108.117.122.124.135.143.144.147.149.159.161.184.192.196.211.228.230.236.239.255.259.266.272.286.291.311.313.314.320.322.323.327.340.358.367.370.371.385.407.415.424.429.430.436.445.469.486.491.494.495.522.523.550.560.568.574.576.587.591.621.723.737.797.798.802.803.817.820.827.839.864.899.904.922.931.938.955.959.979.981.985.986.1003.1027.1031.1033.1040.1046.1047.1048.1051.1053.1067.1092.1095.1097.1099.1107.1109.1126.1135.1143.1149.1152.1162.1166.1171.1186.1188.1192.1205.1215.1220.1226.1227.1230.1252.1268.1270.1276.1284.1290.1301.1307.1312.1329.1342.1345.1356.1362.1365.1375.1403.1415.1416.1419.1421.1423.1440.1449.1455.1495.1512.1514.1516.1525.1540.1548.1555.1558.1567.1570.1577.1579.1583.1584.1598.1603.1616.1638.1651.1653.1659.1661.1667.1677.1678.1682.1697.1699.1712.1716.1720.1721.1725.1732.1735.1745.1750.1753.1782.1786.1794.1800.1808.1810.1825.1827.1832.1838.1840.1843.1845.1859.1870.1878.1880.1882.1889.1898.1911.1917.1928.1929.1942.1944.1958.1962.1963.1964.1967.1968.1969.1978.1985.1987.2003.2008.2016.2027.2035.2038.2039.2044.2047.2052.2056.2064.2068.2069.2072.2074.2084.2088.2090.2107.2109.2115.2124.2130.2133.2135.2137.2140.2141.2147.2156.2166.2177.2186.2205.2213.2216.2219.2220.2222.2223.2224.2225.2234.2251.2253.2262.2271.2275.2279.2282.2295.2299.2309.2312.2316.2322.2325.2328.2331.2335.2336.2354.2358.2359.2370.2373.2376.2377.2400.2403.2405.2406.2411.2414.2415.2416.2418.2425.2427.2440.2447.2453.2461.2465.2468.2472.2477.2484.2486.2488.2493.2498.2501.2504.2506.2510.2517.2526.2527.2531.2534.2535.2542.2552.2559.2564.2567.2568.2569.2571.2572.2575.2577.2579.2583.2584.2589.2595.2596.2604.2605.2609.2610.2612.2614.2621.2624.2627.2628.2629.2633.2636.2639.2642.2643.2645.2646.2650.2651.2652.2656.2657.2658.2660.2661.2669.2670.2677.2681.2684.2687.2689.2690.2695.2698.2699.2713.2714.2729.2739.2767.2768.2770.2772.2778.2784.2787.2791.2792.2798.2801.2805.2812.2813.2814.2816.2817.2821.2822.2824.2826.2827.2830.2831.2832.2833.2834.2838.2839.2844.2846.2849.2850.2852.2854.2860.2862.2863.2865.2867.2869.2872.2874.2875.2878.2880.2881.2882.2883.2884.2886.2887.2888.2889.2891.2893.2894.2895.2897.2898.2900.2901.2908.2909.2916.2917.2918.2920.2922.2923.2927.2929.2930.2931.2940.2941.2947.2949.2950.2956.2958.2961.2963.2964.2965.2966.2968.2972.2973.2974.2975.2979.2980.2981.2983.2985.2986.2987.2994.2995.2997.2999.3000.3001.3002.3003.3005.3008.3009.3010.3012.3016.3017.3018.3019.3023.3028.3031.3034.3038.3043.3051.3052.3053.3055.3058.3059.3063.3066.3073.3074.3075.3076.3077.3089.3090.3093.3094.3095.3097.3099.3100.3106.3107.3109.3112.3117.3119.3120.3126.3127.3128.3130.3133.3135.3136.3137.3145.3149.3151.3153.3155.3167.3169.3172.3173.3177.3182.3184.3185.3186.3187.3188.3189.3190.3194.3196.3200.3201.3209.3210.3213.3214.3215.3217.3218.3222.3223.3225.3226.3227.3228.3230.3231.3233.3234.3235.3236.3237.3238.3240.3244.3250.3251.3253.3254.3257.3260.3266.3270.3272.3286.3288.3289.3290.3292.3293.3296.3299.3300.3303.3306.3307.3309.3314.3315.3316.3318.3323.3324.3328.3330.3331.3531.3731.3831.4131.4531.4631.4731.4831.5231.6731.6931.7131.7235.7831.7931.8931.10231.10631.10831.11031.11531.11631.13431.13632.13731.14034.14133.14237.15731.16831.16931.21233.21731.23031.25131.25931.26031.26631.27731.27831.28031.28332.28731.29631.30331.30532.30732.32531.33931.34231.34631.34731.36831.39131.39531.40632.41131.41531.43631.43731.43831.45931.47232.47531.48131.49231.49332.49431.50831.52831.54231.55631.56131.56831.56931.57131.57231.57531.57931.58131.58631.59831.59832.60731.60831.60931.61531.61931.63831.63931.64031.64431.64631.66531~dv&us_privacy=1---&trt=2&iu_parts=6692%2Cspeedtest.net%2Cstnext_lowerboard&enc_prev_ius=%2F0%2F1%2F2%2C%2F0%2F1%2F2&prev_iu_szs=728x90%7C320x50%7C320x100%7C300x50%7C300x100%2C970x250%7C970x200%7C970x180%7C970x90%7C728x90%7C200x200%7C250x250%7C300x250%7C336x280&ifi=1&dids=stnext_lowerboard~stnext_footer&adfs=4012278966~2142631178&sfv=1-0-45&fsbs=1%2C1&eri=5&sc=1&cookie_enabled=1&abxe=1&dt=1792424925348&adxs=-12245933%2C-12245933&adys=-12245933%2C-12245933&biw=1200&bih=680&scr_x=0&scr_y=0&btvi=-1%7C-1&ucis=1%7C2&oid=2&u_his=2&u_h=680&u_w=1200&u_ah=680&u_aw=1200&u_cd=24&u_sd=1&u_tz=120&bc=31&nvt=1&url=https%3A%2F%2Fwww.speedtest.net%2F&vis=1&aee=1%7C1&psz=730x110%7C1200x1396&msz=728x110%7C0x0&fws=4%2C132&ohw=728%2C0&a3p=EjQKCnB1YmNpZC5vcmcSJGIyM2NmNzhkLTNkZGYtNDQ0ZS04NzRmLWExMjhmNGU1YTI3ZlgB&ppss=CiUIBRIDNTk2EgM1OTkSAzYwMBIDNjAyEgM2MTkSAzYyNhIDNjE4&dlt=1792424915431&idt=3849&prev_scp=pos%3D1%26rfr%3Dfalse%26ppos%3D4%26npos%3D1%26pogo%3Dmain%26divid%3Dstnext_lowerboard%26gto%3Dfalse%26amznbid%3D1%26amznp%3D1%7Cpos%3D5%26rfr%3Dfalse%26ppos%3D9%26npos%3D1%26pogo%3Dfooter%26divid%3Dstnext_footer%26gto%3Dfalse%26amznbid%3D1%26amznp%3D1&cust_params=template%3Dhomepage%26category%3Dhomepage%26env%3Dwww.speedtest.net%26OOF%3Dfalse%26pv%3D2%26session%3Dd%26subses%3D2%26ref%3D%26zdid%3D10a515ca045c7fa3d65ecae419bc5a61%26content%3Dookla%252Cspeed%252Ctest%252Cspeedtest%252Cspeed-test%252Cbandwidth-speed-test%252Cinternet-speed-test%252Cbroadband-speed-test%252Cspeakeasy%252Cflash%252Ccnet%252Cinternet%252Cnetwork%252Cconnection%252Cbroadband%252Cbandwidth%252Clatency%252Cping%252Cthroughput%252Cdownload%252Cupload%252Cdsl%252Cadsl%252Ccable%252Cisp%252Cvoip%252Cip-address%252Ctcp%26country%3Ddk%26hostname%3Dhttps%252F%252Fwww.speedtest.net%26bucket_test%3D8%26stVersion%3Dst5%26stIspId%3D87196%26stOutage%3D10004%252C34532%252C33695%252C35437%252C20118%26stMiniTest%3Ddisabled%26zdc%3D1&adks=2979763834%2C1612260112&frm=20&eoidce=1&gblpids=%2F6692%2Fspeedtest.net%2Fstnext_lowerboard%23stnext_lowerboard~%2F6692%2Fspeedtest.net%2Fstnext_lowerboard%23stnext_footer&pb_szs=728x90%7C320x50%7C320x100%7C300x50%7C300x100~970x250%7C970x200%7C970x180%7C970x90%7C728x90%7C200x200%7C250x250%7C300x250%7C336x280&pgls=CAk.&pbbce=1&ips=ChEKDTQ1LjEyOS41Ni4xOTYYAQ.."
+  },
+  {
+   "id": "g385",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://id5-sync.com/g/v2/718.json"
+  },
+  {
+   "id": "g386",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "subdocument",
+   "url": "http://aax-eu.amazon-adsystem.com/s/iu3?cm3ppd=1&d=dtb-pub&csif=t&gdpr=1&gdpr_consent=CQsVacAQsVacAAcABBENC1FgAAAAAEPgACiQAAAZ7ABMNDogDLIgUCBQEIIEACgrCACgQBAAAkBRAQAmDAhyBgAusIkAIAUAAQQAgABBgACAAASABCIAIACAQAgQCBQABgAQBAQAMDAAGAChEAgABAdAxSAggECwASIwoDBAhAAQCAlsqEEoGBAHCFIscAggREwUAACIABUBAIB4WAhJKiViQQBcQXQAIAAACUYIoAKQEwBRQGQLQVgQcBkaYAg-YJEkOgiAJghIyDIhJUEg8UxRAghyA2KSYA6eIKAGXSyQh_qBZsAXIl2HUlYSBkAA.YAAACHwAAAAA.IM9tR_G__bXlv-bb36btkeYxf9_hr7sQxBgbIsm4FzLvW7JwG32EaJEyatiIKmRIAu3DBIQNtHBjURUChKIAVrzDsaE2U4TtKJ-BkiHMZYytQCExvm4tjeQCZ4ur_90d0mR-s6dr-2dzy27hnH3K9fuS1UJydKYetHfv-ZhOS-_IU9_x-_4v4_MbpEm0eSVv9tUst4zc64vv6dpuxs-Tyff6f__f73fS7X__e__33_8qX3_r76-___3__t___ff_________9__-___________-&dl=pm-db5_n-onetag_n-Tappx_n-Rise_ox-db5_3lift_rx_sovrn_n-MediaNet_n-index_rbd_smrt"
+  },
+  {
+   "id": "g387",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "fetch",
+   "url": "http://dnacdn.net/dna"
+  },
+  {
+   "id": "g388",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://trackcmp.net/t_prism_sitemessages.php?trackid=478502367&prismid=a7fab7d6-3196-410c-9459-00f8e753c9da&url=https%3A%2F%2Fwww.speedtest.net%2F"
+  },
+  {
+   "id": "g389",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "script",
+   "url": "http://ep2.adtrafficquality.google/sodar/sodar2.js"
+  },
+  {
+   "id": "g390",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "subdocument",
+   "url": "http://aax-eu.amazon-adsystem.com/s/iu3?cm3ppd=1&d=dtb-pub&csif=t&gdpr=1&gdpr_consent=CQsVacAQsVacAAcABBENC1FgAAAAAEPgACiQAAAZ7ABMNDogDLIgUCBQEIIEACgrCACgQBAAAkBRAQAmDAhyBgAusIkAIAUAAQQAgABBgACAAASABCIAIACAQAgQCBQABgAQBAQAMDAAGAChEAgABAdAxSAggECwASIwoDBAhAAQCAlsqEEoGBAHCFIscAggREwUAACIABUBAIB4WAhJKiViQQBcQXQAIAAACUYIoAKQEwBRQGQLQVgQcBkaYAg-YJEkOgiAJghIyDIhJUEg8UxRAghyA2KSYA6eIKAGXSyQh_qBZsAXIl2HUlYSBkAA.YAAACHwAAAAA.IM9tR_G__bXlv-bb36btkeYxf9_hr7sQxBgbIsm4FzLvW7JwG32EaJEyatiIKmRIAu3DBIQNtHBjURUChKIAVrzDsaE2U4TtKJ-BkiHMZYytQCExvm4tjeQCZ4ur_90d0mR-s6dr-2dzy27hnH3K9fuS1UJydKYetHfv-ZhOS-_IU9_x-_4v4_MbpEm0eSVv9tUst4zc64vv6dpuxs-Tyff6f__f73fS7X__e__33_8qX3_r76-___3__t___ff_________9__-___________-&dl=pm-db5_n-onetag_n-Tappx_n-Rise_ox-db5_3lift_rx_sovrn_n-MediaNet_n-index_rbd_smrt&dcc=t"
+  },
+  {
+   "id": "g391",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "subdocument",
+   "url": "http://ep2.adtrafficquality.google/sodar/sodar2/255/runner.html"
+  },
+  {
+   "id": "g392",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "subdocument",
+   "url": "http://www.google.com/recaptcha/api2/aframe"
+  },
+  {
+   "id": "g393",
+   "site": "speedtest",
+   "page": "http://ep2.adtrafficquality.google/",
+   "kind": "script",
+   "url": "http://pagead2.googlesyndication.com/bg/HEjx3T2vFPNzlAOU_OIXv8rutZFOHemhIBBYy52kE84.js"
+  },
+  {
+   "id": "g394",
+   "site": "speedtest",
+   "page": "http://www.google.com/",
+   "kind": "image",
+   "url": "http://pagead2.googlesyndication.com/pagead/sodar?id=sodar2&v=255&li=gpt_m202610130101&jk=3372151055720015&rc="
+  },
+  {
+   "id": "g395",
+   "site": "speedtest",
+   "page": "http://ep2.adtrafficquality.google/",
+   "kind": "image",
+   "url": "http://ep2.adtrafficquality.google/generate_204?qpW4jQ"
+  },
+  {
+   "id": "g396",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "stylesheet",
+   "url": "http://fonts.googleapis.com/css?family=Open%20Sans%3A300%2C400%2C500"
+  },
+  {
+   "id": "g397",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "script",
+   "url": "http://tpc.googlesyndication.com/pagead/js/r20261015/r20110914/client/load_preloaded_resource_fy2021.js"
+  },
+  {
+   "id": "g398",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "script",
+   "url": "http://tpc.googlesyndication.com/pagead/js/r20261015/r20110914/abg_lite_fy2021.js"
+  },
+  {
+   "id": "g399",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "script",
+   "url": "http://tpc.googlesyndication.com/pagead/js/r20261015/r20110914/client/window_focus_fy2021.js"
+  },
+  {
+   "id": "g400",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "script",
+   "url": "http://tpc.googlesyndication.com/pagead/js/r20261015/r20110914/client/qs_click_protection_fy2021.js"
+  },
+  {
+   "id": "g401",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "script",
+   "url": "http://pagead2.googlesyndication.com/pagead/managed/js/activeview/current/ufs_web_display.js"
+  },
+  {
+   "id": "g402",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "script",
+   "url": "http://www.gstatic.com/mysidia/ebcb7083ebd39aa1b086da73d90c3cde.js?tag=addon/mysidia_one_click_handler_one_afma"
+  },
+  {
+   "id": "g403",
+   "site": "speedtest",
+   "page": "http://www.speedtest.net/",
+   "kind": "image",
+   "url": "http://ep1.adtrafficquality.google/pagead/sodar?id=sodar2&v=255&t=2&li=gpt_m202610130101&jk=3372151055720015&bg=!0dKl0rDNAAbjW2v0w1s7AEcBe5WfODKlSyP_RJnRWqcYtPCDcsrWFzMb-zhB2EWvwVx4YVXyfLJbkyZMxsD3KqAteThbpa5qyCmgvpCYWg1dkOyXMSb1ZQIAAADIUgAAAABoAQd-ADaValFCW8HpBfXSvXtzyaJPt4GPqIB4itG3IzdOAGX78_mZP1C00K9BbkjYrZ0u3VcolBDjy-MKAAqilLGubxMamZJMmQJDC97KG_pcNKV-LaMHNf4Qb3gPSlitu9HDJYBa6E4cJ2eTk7izmSHxjBWmLk6HLE6FP3wSBTSF3Z9PSqRDPg47_QzY47mHfRG4pKnvNm7dm5ussqJg5smM5fQdSJww-FOor7XJaOeHIVGM9dVjDvBVjFZ3KhPXezfFZ487NW8xlqsOU0ivvqvCLFuc4a5hfEmq8mgw3kYQjU97mI4JoVeMXV26wW1vj3kZ17s-Rjb3SJkerVr4-oTtvct2jn7H6EpQVrOCTdEWYPTWej1g6XALfKxeO_dQGGK-URMMpQc6GMM3lbGDIS8_N5QsOzpTxBHtXkIEjztNfUF61NhHjMdqAe4WRZ4zQ_QQC4PTDWND5S0MdUYvFsNy-d8KxPm11JQo8ddOfpaQEnQe9hmQz5cM89hJPHMtF1yICJbdwiwsAk1rw1X5hOcjhbc2QfnR2brl8KOiDil2vV5tnVmXqeD2QrBEgU_NvihqeKbt2YdxVlv2CZ6Nkfz0kuE4mbtItXetofkym3vLvvGH9YqjROx1q9yU4n2kb06QleFIsJjKRr-LBCW5E9QSrH0nYJAGSUZtu_0HGoQC7n_2DpIft5DIejyRtku42_iy8JrvoWVo5Yz5iLjBdpe_YS6uN2eUnONOyOGyA_d3-i3-cSsdGYzQZZV4EBOW8DLxFgF6C1PMSrojpkpTrXpe96AvMJejh1vhKrFrcG0wb1fSkiLjKZgSE1_IC7C5MEV3YT8bzdUmdKpn-6Kc65I0-z9Eze66putH4Mp2"
+  },
+  {
+   "id": "g404",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "image",
+   "url": "http://tpc.googlesyndication.com/simgad/612379355705596936/14763004658117789537?w=195&h=102&tw=1&q=75"
+  },
+  {
+   "id": "g405",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "font",
+   "url": "http://fonts.gstatic.com/s/opensans/v44/memvYaGs126MiZpBA-UvWbX2vVnXBbObj2OVTS-muw.woff2"
+  },
+  {
+   "id": "g406",
+   "site": "speedtest",
+   "page": "http://f61b82bd84e94a9ceca9de8266fbde71.safeframe.googlesyndication.com/",
+   "kind": "image",
+   "url": "http://tpc.googlesyndication.com/simgad/4853221951095986351/14763004658117789537?w=600&h=314&tw=1&q=75"
+  }
+ ]
+}
