@@ -18,6 +18,9 @@ const { PasswordVault } = ChromeUtils.importESModule(
 const { displayHost, isFillableOrigin, normalizeOrigin } = ChromeUtils.importESModule(
   "resource://gre/modules/browserwip/PasswordRules.sys.mjs"
 );
+const { isVaultFile } = ChromeUtils.importESModule(
+  "resource://gre/modules/browserwip/PasswordTransfer.sys.mjs"
+);
 
 const STATE_TOPIC = "browserwip:passwords-state";
 const CHANGED_TOPIC = "browserwip:passwords-changed";
@@ -79,7 +82,7 @@ const Page = {
     let unlocked = state == "unlocked";
     $("manager").hidden = !unlocked;
     $("gate").hidden = unlocked;
-    for (let id of ["search-box", "lock", "add"]) {
+    for (let id of ["search-box", "lock", "add", "more-wrap"]) {
       $(id).hidden = !unlocked;
     }
     $("status").hidden = state != "unlocked" && state != "locked";
@@ -92,7 +95,20 @@ const Page = {
     if (unlocked) {
       this.revealed = null;
       this.renderList({ keepSelection: true });
+      // about:passwords#import and #export (from Settings) open the dialog.
+      if (location.hash == "#import" || location.hash == "#export") {
+        let which = location.hash;
+        history.replaceState(null, "", location.pathname);
+        if (which == "#import") {
+          Transfer.openImport();
+        } else {
+          Transfer.openExport();
+        }
+      }
       return;
+    }
+    for (let dialog of document.querySelectorAll("dialog[open]")) {
+      dialog.close();
     }
     this.selectedId = null;
     this.editing = null;
@@ -636,4 +652,421 @@ const Page = {
   },
 };
 
-window.addEventListener("DOMContentLoaded", () => Page.init(), { once: true });
+/**
+ * Import and export (docs/PASSWORDS.md §9), from the ⋯ menu in the header
+ * or about:passwords#import / #export.
+ */
+const Transfer = {
+  exportFormat: "bwv",
+  // Import: "choose", "passphrase", "preview" or "done".
+  step: "choose",
+  bytes: null,
+  plan: null,
+  replace: new Set(),
+
+  init() {
+    $("more").addEventListener("click", () => this._toggleMenu());
+    document.addEventListener("click", e => {
+      if (!$("more-wrap").contains(e.target)) {
+        this._closeMenu();
+      }
+    });
+    $("more-menu").addEventListener("keydown", e => this._menuKey(e));
+    $("menu-import").addEventListener("click", () => {
+      this._closeMenu();
+      this.openImport();
+    });
+    $("menu-export").addEventListener("click", () => {
+      this._closeMenu();
+      this.openExport();
+    });
+    $("menu-settings").addEventListener("click", () => {
+      this._closeMenu();
+      window.browsingContext.topChromeWindow?.gBrowser?.addTab("about:settings#passwords");
+    });
+
+    for (let button of document.querySelectorAll("#export-format [data-format]")) {
+      button.addEventListener("click", () => {
+        this.exportFormat = button.dataset.format;
+        this._syncExport();
+      });
+    }
+    $("export-understand").addEventListener("change", () => this._syncExport());
+    $("export-form").addEventListener("submit", e => {
+      e.preventDefault();
+      this._export();
+    });
+    $("export-cancel").addEventListener("click", () => $("export-dialog").close());
+    $("export-dialog").addEventListener("close", () => this._clearExport());
+
+    $("import-choose").addEventListener("click", () => this._choose());
+    $("import-form").addEventListener("submit", e => {
+      e.preventDefault();
+      this._importNext();
+    });
+    $("import-cancel").addEventListener("click", () => $("import-dialog").close());
+    $("import-dialog").addEventListener("close", () => this._clearImport());
+  },
+
+  // ---- The ⋯ menu ----
+
+  _toggleMenu() {
+    let menu = $("more-menu");
+    if (menu.hidden) {
+      menu.hidden = false;
+      $("more").setAttribute("aria-expanded", "true");
+      menu.querySelector("button").focus();
+    } else {
+      this._closeMenu();
+    }
+  },
+
+  _closeMenu() {
+    $("more-menu").hidden = true;
+    $("more").setAttribute("aria-expanded", "false");
+  },
+
+  _menuKey(event) {
+    let items = [...$("more-menu").querySelectorAll("button")];
+    let index = items.indexOf(document.activeElement);
+    if (event.key == "Escape") {
+      this._closeMenu();
+      $("more").focus();
+    } else if (event.key == "ArrowDown" || event.key == "ArrowUp") {
+      event.preventDefault();
+      let step = event.key == "ArrowDown" ? 1 : -1;
+      items[(index + step + items.length) % items.length].focus();
+    }
+  },
+
+  _message(element, l10n, args) {
+    document.l10n.setAttributes(element, l10n, args);
+    element.hidden = false;
+  },
+
+  _errorId(code) {
+    return (
+      {
+        "wrong-password": "passwords-wrong-password",
+        "too-short": "passwords-too-short",
+        mismatch: "passwords-mismatch",
+        "wrong-passphrase": "passwords-import-wrong-passphrase",
+        "bad-file": "passwords-import-bad-file",
+        BWV_E_FORMAT: "passwords-import-bad-file",
+        BWV_E_OLDER: "passwords-import-bad-file",
+        "no-columns": "passwords-import-no-columns",
+        BWV_E_NEWER: "passwords-import-newer",
+      }[code] ?? "passwords-error"
+    );
+  },
+
+  async _pickFile(mode, title, ext) {
+    let picker = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
+    let [label] = await document.l10n.formatValues([title]);
+    picker.init(window.browsingContext, label, mode);
+    if (mode == Ci.nsIFilePicker.modeSave) {
+      let date = new Date().toISOString().slice(0, 10);
+      picker.defaultString = `passwords-${date}.${ext}`;
+      picker.defaultExtension = ext;
+      picker.appendFilter(ext == "csv" ? "CSV" : "Passwords (.bwv)", `*.${ext}`);
+    } else {
+      picker.appendFilter("Passwords (.csv, .bwv)", "*.csv; *.bwv");
+      picker.appendFilters(Ci.nsIFilePicker.filterAll);
+    }
+    let result = await new Promise(resolve => picker.open(resolve));
+    return result == Ci.nsIFilePicker.returnCancel ? null : picker.file.path;
+  },
+
+  // ---- Export ----
+
+  openExport() {
+    this.exportFormat = "bwv";
+    this._clearExport();
+    this._syncExport();
+    $("export-dialog").showModal();
+    $("export-master").focus();
+  },
+
+  _syncExport() {
+    let csv = this.exportFormat == "csv";
+    for (let button of document.querySelectorAll("#export-format [data-format]")) {
+      button.setAttribute("aria-checked", String(button.dataset.format == this.exportFormat));
+    }
+    $("export-form").toggleAttribute("csv", csv);
+    let submit = $("export-submit");
+    if (csv) {
+      document.l10n.setAttributes(submit, "passwords-export-submit-csv");
+    } else {
+      document.l10n.setAttributes(submit, "passwords-export-submit", { count: PasswordVault.entries().length });
+    }
+    submit.disabled = csv && !$("export-understand").checked;
+    $("export-error").hidden = true;
+  },
+
+  _clearExport() {
+    for (let id of ["export-master", "export-passphrase", "export-confirm"]) {
+      $(id).value = "";
+    }
+    $("export-understand").checked = false;
+    $("export-error").hidden = true;
+    $("export-done").hidden = true;
+    $("export-form").removeAttribute("done");
+    document.l10n.setAttributes($("export-cancel"), "passwords-cancel");
+  },
+
+  async _export() {
+    let form = $("export-form");
+    let csv = this.exportFormat == "csv";
+    let count = PasswordVault.entries().length;
+    $("export-error").hidden = true;
+    form.setAttribute("busy", "true");
+    $("export-submit").disabled = true;
+    let data;
+    try {
+      data = csv
+        ? await PasswordVault.exportCSV($("export-master").value)
+        : await PasswordVault.exportEncrypted(
+            $("export-master").value,
+            $("export-passphrase").value,
+            $("export-confirm").value
+          );
+    } catch (e) {
+      this._message($("export-error"), this._errorId(e.code));
+      form.removeAttribute("busy");
+      this._syncExport();
+      $("export-error").hidden = false;
+      return;
+    }
+    // Typed on purpose for this one export: not kept in the form.
+    for (let id of ["export-master", "export-passphrase", "export-confirm"]) {
+      $(id).value = "";
+    }
+    form.removeAttribute("busy");
+    let path = await this._pickFile(Ci.nsIFilePicker.modeSave, "passwords-export-file-title", csv ? "csv" : "bwv");
+    if (!path) {
+      // Nothing was written.
+      data = null;
+      this._syncExport();
+      return;
+    }
+    try {
+      if (csv) {
+        await IOUtils.writeUTF8(path, data);
+      } else {
+        await IOUtils.write(path, data);
+      }
+    } catch (e) {
+      this._message($("export-error"), "passwords-error");
+      this._syncExport();
+      return;
+    } finally {
+      data = null;
+    }
+    form.setAttribute("done", "true");
+    this._message($("export-done"), "passwords-export-done", { count, path });
+    document.l10n.setAttributes($("export-cancel"), "passwords-close");
+    $("export-cancel").focus();
+  },
+
+  // ---- Import ----
+
+  openImport() {
+    this._clearImport();
+    $("import-dialog").showModal();
+    $("import-choose").focus();
+  },
+
+  _clearImport() {
+    if (this.step == "passphrase" || this.step == "preview") {
+      PasswordVault.cancelImport();
+    }
+    this.step = "choose";
+    this.bytes = null;
+    this.plan = null;
+    this.replace = new Set();
+    $("import-file-name").textContent = "";
+    $("import-passphrase").value = "";
+    $("import-passphrase-row").hidden = true;
+    $("import-preview").hidden = true;
+    $("import-summary").replaceChildren();
+    $("import-duplicates").replaceChildren();
+    $("import-error").hidden = true;
+    $("import-done").hidden = true;
+    $("import-choose").hidden = false;
+    $("import-form").removeAttribute("done");
+    let submit = $("import-submit");
+    submit.hidden = false;
+    submit.disabled = true;
+    document.l10n.setAttributes(submit, "passwords-import-continue");
+    document.l10n.setAttributes($("import-cancel"), "passwords-cancel");
+  },
+
+  async _choose() {
+    let path = await this._pickFile(Ci.nsIFilePicker.modeOpen, "passwords-import-file-title");
+    if (!path) {
+      return;
+    }
+    this._clearImport();
+    $("import-file-name").textContent = PathUtils.filename(path);
+    try {
+      let info = await IOUtils.stat(path);
+      if (info.size > 64 * 1024 * 1024) {
+        throw new Error("too big");
+      }
+      this.bytes = await IOUtils.read(path);
+    } catch (e) {
+      this._message($("import-error"), "passwords-import-bad-file");
+      return;
+    }
+    if (isVaultFile(this.bytes)) {
+      this.step = "passphrase";
+      $("import-passphrase-row").hidden = false;
+      document.l10n.setAttributes($("import-submit"), "passwords-import-open");
+      $("import-submit").disabled = false;
+      $("import-passphrase").focus();
+    } else {
+      await this._read();
+    }
+  },
+
+  async _importNext() {
+    if (this.step == "passphrase") {
+      await this._read();
+    } else if (this.step == "preview") {
+      await this._apply();
+    } else if (this.step == "done") {
+      $("import-dialog").close();
+    }
+  },
+
+  async _read() {
+    let submit = $("import-submit");
+    submit.disabled = true;
+    $("import-error").hidden = true;
+    let result;
+    try {
+      result = await PasswordVault.readImport(this.bytes, $("import-passphrase").value);
+    } catch (e) {
+      $("import-passphrase").value = "";
+      this._message($("import-error"), this._errorId(e.code));
+      submit.disabled = this.step != "passphrase";
+      if (this.step == "passphrase") {
+        $("import-passphrase").focus();
+      }
+      return;
+    }
+    $("import-passphrase").value = "";
+    $("import-passphrase-row").hidden = true;
+    this.bytes = null;
+    if (!result.logins.length) {
+      this._message($("import-error"), "passwords-import-empty");
+      return;
+    }
+    this.step = "preview";
+    this.plan = PasswordVault.planImport(result.logins);
+    this.replace = new Set();
+    this._renderPreview(result.skipped);
+  },
+
+  _renderPreview(skipped) {
+    let plan = this.plan;
+    let summary = $("import-summary");
+    summary.replaceChildren();
+    let line = (l10n, count) => {
+      if (count) {
+        let item = document.createElement("li");
+        document.l10n.setAttributes(item, l10n, { count });
+        summary.append(item);
+      }
+    };
+    line("passwords-import-fresh", plan.fresh.length);
+    line("passwords-import-insecure", plan.insecure);
+    line("passwords-import-skipped", skipped);
+    line("passwords-import-repeated", plan.repeated);
+    // Last, right above the list it asks about.
+    line("passwords-import-duplicates", plan.duplicates.length);
+
+    let list = $("import-duplicates");
+    list.replaceChildren();
+    for (let duplicate of plan.duplicates) {
+      let row = document.createElement("div");
+      row.className = "duplicate";
+      let text = document.createElement("div");
+      text.className = "row-text";
+      let host = document.createElement("span");
+      host.className = "row-host";
+      host.textContent = displayHost(duplicate.existing.origin);
+      let user = document.createElement("span");
+      user.className = "row-user";
+      user.textContent = duplicate.existing.username || "—";
+      text.append(host, user);
+      let choice = document.createElement("div");
+      choice.className = "segmented small";
+      choice.setAttribute("role", "radiogroup");
+      document.l10n.setAttributes(choice, "passwords-import-choice");
+      for (let [value, l10n] of [["mine", "passwords-import-keep-mine"], ["imported", "passwords-import-use-imported"]]) {
+        let button = document.createElement("button");
+        button.type = "button";
+        button.setAttribute("role", "radio");
+        button.dataset.value = value;
+        document.l10n.setAttributes(button, l10n);
+        button.addEventListener("click", () => {
+          if (value == "imported") {
+            this.replace.add(duplicate);
+          } else {
+            this.replace.delete(duplicate);
+          }
+          for (let b of choice.children) {
+            b.setAttribute("aria-checked", String(b == button));
+          }
+          this._syncImportSubmit();
+        });
+        button.setAttribute("aria-checked", String(value == "mine"));
+        choice.append(button);
+      }
+      row.append(text, choice);
+      list.append(row);
+    }
+    $("import-preview").hidden = false;
+    this._syncImportSubmit();
+  },
+
+  _syncImportSubmit() {
+    let count = this.plan.fresh.length + this.replace.size;
+    let submit = $("import-submit");
+    document.l10n.setAttributes(submit, "passwords-import-submit", { count });
+    submit.disabled = !count;
+  },
+
+  async _apply() {
+    let submit = $("import-submit");
+    submit.disabled = true;
+    $("import-error").hidden = true;
+    let count;
+    try {
+      count = await PasswordVault.applyImport(this.plan, this.replace);
+    } catch (e) {
+      this._message($("import-error"), this._errorId(e.code));
+      this.step = "choose";
+      return;
+    }
+    this.step = "done";
+    this.plan = null;
+    $("import-preview").hidden = true;
+    $("import-choose").hidden = true;
+    $("import-form").setAttribute("done", "true");
+    this._message($("import-done"), "passwords-import-done", { count });
+    submit.hidden = true;
+    document.l10n.setAttributes($("import-cancel"), "passwords-close");
+    $("import-cancel").focus();
+  },
+};
+
+window.addEventListener(
+  "DOMContentLoaded",
+  () => {
+    Transfer.init();
+    Page.init();
+  },
+  { once: true }
+);

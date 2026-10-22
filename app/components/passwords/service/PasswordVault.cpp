@@ -141,6 +141,63 @@ bwv_status PasswordKey(const bwv_vault* aVault, const nsCString& aPassword,
   return BWV_OK;
 }
 
+// A new, unlocked vault with one password slot under aPassword (Argon2id
+// with the default parameters): for setup and for an encrypted export.
+bwv_status NewVault(const nsCString& aPassword, bwv_vault** aOut) {
+  bwv_vault* vault = bwv_new();
+  bwv_status st = vault ? bwv_create(vault) : BWV_E_NOMEM;
+  if (st == BWV_OK) {
+    st = bwv_prepare_slot(vault, BWV_SLOT_PASSWORD, &kDefaultKdf);
+  }
+  bwv_kdf_params params;
+  uint8_t inputs[kSlotInputsMax];
+  size_t inputsLen = 0;
+  if (st == BWV_OK) {
+    st = bwv_prepared_inputs(vault, BWV_SLOT_PASSWORD, &params, inputs,
+                             &inputsLen);
+  }
+  bwv_key* key = nullptr;
+  if (st == BWV_OK) {
+    key = bwv_key_new();
+    st = key ? bwv_derive_password_key(&params, inputs, aPassword.get(),
+                                       aPassword.Length(), key)
+             : BWV_E_NOMEM;
+  }
+  if (st == BWV_OK) {
+    st = bwv_set_slot(vault, BWV_SLOT_PASSWORD, key);
+  }
+  bwv_key_free(key);
+  if (st != BWV_OK) {
+    bwv_free(vault);
+    return st;
+  }
+  *aOut = vault;
+  return BWV_OK;
+}
+
+// Copies one password from aFrom (sealed to aFromOrigin) to aTo.
+bwv_status CopySecret(const bwv_vault* aFrom, const nsCString& aFromId,
+                      const nsCString& aFromOrigin, bwv_vault* aTo,
+                      const nsCString& aToId, const nsCString& aToOrigin) {
+  uint8_t from[BWV_ENTRY_ID_BYTES];
+  uint8_t to[BWV_ENTRY_ID_BYTES];
+  if (!DecodeId(aFromId, from) || !DecodeId(aToId, to)) {
+    return BWV_E_ARG;
+  }
+  uint8_t* data = nullptr;
+  size_t len = 0;
+  bwv_status st = bwv_get_secret(aFrom, from, aFromOrigin.get(),
+                                 aFromOrigin.Length(), &data, &len);
+  if (st == BWV_OK) {
+    st = bwv_set_secret(aTo, to, aToOrigin.get(), aToOrigin.Length(), data, len);
+  }
+  bwv_secret_free(data);
+  return st;
+}
+
+// An exported vault is at most this big (a few hundred thousand logins).
+constexpr size_t kMaxImportBytes = 64 * 1024 * 1024;
+
 // A login waiting to be saved: its password, sealed under the capture key.
 struct Box {
   uint8_t* mData = nullptr;
@@ -183,6 +240,8 @@ struct PasswordVault::Core {
   bwv_key* mCaptureKey = nullptr;
   uint64_t mNextCapture = 1;
   nsTHashMap<nsCStringHashKey, UniquePtr<Box>> mCaptures;
+  // An exported vault opened for import, unlocked, beside this one.
+  bwv_vault* mImport = nullptr;
 
   ~Core() { Close(); }
 
@@ -211,6 +270,12 @@ struct PasswordVault::Core {
       bwt_attach(mSession, nullptr);
     }
     DropCaptures();
+    CloseImport();
+  }
+
+  void CloseImport() {
+    bwv_free(mImport);
+    mImport = nullptr;
   }
 
   void Close() {
@@ -389,32 +454,10 @@ PasswordVault::Create(const nsACString& aPassword, const nsACString& aIndex,
           st = BWV_E_STATE;
         }
         bwv_vault* vault = nullptr;
-        bwv_key* key = nullptr;
         if (st == BWV_OK) {
-          vault = bwv_new();
-          st = vault ? bwv_create(vault) : BWV_E_NOMEM;
-        }
-        if (st == BWV_OK) {
-          st = bwv_prepare_slot(vault, BWV_SLOT_PASSWORD, &kDefaultKdf);
-        }
-        bwv_kdf_params params;
-        uint8_t inputs[kSlotInputsMax];
-        size_t inputsLen = 0;
-        if (st == BWV_OK) {
-          st = bwv_prepared_inputs(vault, BWV_SLOT_PASSWORD, &params, inputs,
-                                   &inputsLen);
-        }
-        if (st == BWV_OK) {
-          key = bwv_key_new();
-          st = key ? bwv_derive_password_key(&params, inputs, pw.get(),
-                                             pw.Length(), key)
-                   : BWV_E_NOMEM;
+          st = NewVault(pw, &vault);
         }
         Wipe(pw);
-        if (st == BWV_OK) {
-          st = bwv_set_slot(vault, BWV_SLOT_PASSWORD, key);
-        }
-        bwv_key_free(key);
         if (st == BWV_OK) {
           st = bwv_set_index(vault, reinterpret_cast<const uint8_t*>(index.get()),
                              index.Length());
@@ -729,6 +772,144 @@ PasswordVault::ChangePassword(const nsACString& aCurrent,
                Wipe(fresh);
                return Done(st);
              });
+}
+
+NS_IMETHODIMP
+PasswordVault::ExportVault(const nsACString& aPassphrase,
+                           const nsACString& aIndex,
+                           const nsTArray<nsCString>& aIds,
+                           const nsTArray<nsCString>& aOrigins, JSContext* aCx,
+                           Promise** aPromise) {
+  NS_ENSURE_ARG(aIds.Length() == aOrigins.Length());
+  return Run(
+      aCx, aPromise, "PasswordVault::ExportVault",
+      [pw = Own(aPassphrase), index = Own(aIndex),
+       ids = CopyableTArray<nsCString>(aIds.Clone()),
+       origins = CopyableTArray<nsCString>(aOrigins.Clone())](Core& core) mutable {
+        bwv_vault* source = core.Vault();
+        if (!source) {
+          Wipe(pw);
+          Wipe(index);
+          return Done(BWV_E_LOCKED);
+        }
+        // A copy with its own vault key, under the passphrase only.
+        bwv_vault* copy = nullptr;
+        bwv_status st = NewVault(pw, &copy);
+        Wipe(pw);
+        if (st == BWV_OK) {
+          st = bwv_set_index(copy, reinterpret_cast<const uint8_t*>(index.get()),
+                             index.Length());
+        }
+        Wipe(index);
+        for (size_t i = 0; st == BWV_OK && i < ids.Length(); i++) {
+          st = CopySecret(source, ids[i], origins[i], copy, ids[i], origins[i]);
+        }
+        uint8_t* file = nullptr;
+        size_t len = 0;
+        if (st == BWV_OK) {
+          st = bwv_serialize(copy, &file, &len);
+        }
+        bwv_free(copy);
+        if (st != BWV_OK) {
+          return Done(st);
+        }
+        nsCString encoded;
+        nsresult rv = Base64URLEncode(len, file, Base64URLEncodePaddingPolicy::Omit,
+                                      encoded);
+        bwv_bytes_free(file);
+        return NS_SUCCEEDED(rv) ? Text(std::move(encoded), false)
+                                : Done(BWV_E_NOMEM);
+      });
+}
+
+NS_IMETHODIMP
+PasswordVault::OpenImport(const nsACString& aFile, const nsACString& aPassphrase,
+                          JSContext* aCx, Promise** aPromise) {
+  return Run(
+      aCx, aPromise, "PasswordVault::OpenImport",
+      [file = nsCString(aFile), pw = Own(aPassphrase)](Core& core) mutable {
+        bwv_status st = core.Init();
+        FallibleTArray<uint8_t> bytes;
+        if (st == BWV_OK &&
+            (NS_FAILED(Base64URLDecode(file, Base64URLDecodePaddingPolicy::Ignore,
+                                       bytes)) ||
+             bytes.Length() > kMaxImportBytes)) {
+          st = BWV_E_FORMAT;
+        }
+        bwv_vault* vault = nullptr;
+        if (st == BWV_OK) {
+          vault = bwv_new();
+          st = vault ? bwv_load(vault, bytes.Elements(), bytes.Length())
+                     : BWV_E_NOMEM;
+        }
+        bwv_key* key = nullptr;
+        if (st == BWV_OK) {
+          st = PasswordKey(vault, pw, &key);
+        }
+        Wipe(pw);
+        if (st == BWV_OK) {
+          st = bwv_unlock(vault, BWV_SLOT_PASSWORD, key);
+        }
+        bwv_key_free(key);
+        if (st == BWV_OK) {
+          st = bwv_open_body(vault);
+        }
+        nsCString index;
+        if (st == BWV_OK) {
+          uint8_t* data = nullptr;
+          size_t len = 0;
+          st = bwv_get_index(vault, &data, &len);
+          if (st == BWV_OK) {
+            index.Assign(reinterpret_cast<const char*>(data), len);
+            bwv_secret_free(data);
+          }
+        }
+        if (st != BWV_OK) {
+          bwv_free(vault);
+          return Done(st);
+        }
+        core.CloseImport();
+        core.mImport = vault;
+        return Text(std::move(index), true);
+      });
+}
+
+NS_IMETHODIMP
+PasswordVault::ImportSecrets(const nsTArray<nsCString>& aSrcIds,
+                             const nsTArray<nsCString>& aSrcOrigins,
+                             const nsTArray<nsCString>& aDstIds,
+                             const nsTArray<nsCString>& aDstOrigins,
+                             JSContext* aCx, Promise** aPromise) {
+  NS_ENSURE_ARG(aSrcIds.Length() == aSrcOrigins.Length() &&
+                aSrcIds.Length() == aDstIds.Length() &&
+                aSrcIds.Length() == aDstOrigins.Length());
+  return Run(aCx, aPromise, "PasswordVault::ImportSecrets",
+             [srcIds = CopyableTArray<nsCString>(aSrcIds.Clone()),
+              srcOrigins = CopyableTArray<nsCString>(aSrcOrigins.Clone()),
+              dstIds = CopyableTArray<nsCString>(aDstIds.Clone()),
+              dstOrigins = CopyableTArray<nsCString>(aDstOrigins.Clone())](Core& core) {
+               bwv_vault* vault = core.Vault();
+               if (!vault) {
+                 return Done(BWV_E_LOCKED);
+               }
+               if (!core.mImport) {
+                 return Done(BWV_E_STATE);
+               }
+               bwv_status st = BWV_OK;
+               for (size_t i = 0; st == BWV_OK && i < srcIds.Length(); i++) {
+                 st = CopySecret(core.mImport, srcIds[i], srcOrigins[i], vault,
+                                 dstIds[i], dstOrigins[i]);
+               }
+               return Done(st);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::CloseImport(JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::CloseImport", [](Core& core) {
+    core.CloseImport();
+    return Done(BWV_OK);
+  });
 }
 
 }  // namespace mozilla::browserwip

@@ -211,6 +211,7 @@ settings-passwords-lock-after = Lock after this long without use
 settings-passwords-minutes = { $minutes } min
 settings-passwords-hour = 1 hour
 settings-passwords-hours = 4 hours
+settings-passwords-transfer = Import or export passwords
 settings-passwords-change = Change master password
 settings-passwords-current =
     .placeholder = Current master password
@@ -223,3 +224,100 @@ settings-passwords-repeat =
     .aria-label = Type the new master password again
 settings-passwords-change-button = Change
 settings-passwords-changed = Master password changed.
+
+## Import and export (about:passwords)
+
+passwords-more-actions =
+    .title = Import and export
+    .aria-label = Import and export
+passwords-menu-import = Import…
+passwords-menu-export = Export…
+passwords-menu-settings = Settings
+passwords-close = Close
+
+passwords-export-title = Export passwords
+passwords-export-format =
+    .aria-label = Format
+passwords-export-encrypted = Encrypted file
+passwords-export-csv = Plain text (CSV)
+passwords-export-encrypted-text = A .bwv file that opens in { -brand-short-name } on Linux or Windows. It’s protected by a passphrase you choose now. Your keyring and Windows Hello aren’t included.
+passwords-export-csv-warning = The file isn’t encrypted. Anyone or any program that can read it, including backups and sync folders, gets every password in it. Import it where you need it, then delete it.
+passwords-export-master = Your master password
+passwords-export-passphrase = Passphrase for the file, 12 characters or more
+passwords-export-passphrase-again = Type it again
+passwords-export-understand = I understand anyone who gets this file can read every password.
+# $count (Number)
+passwords-export-submit =
+    { $count ->
+        [one] Export 1 login…
+       *[other] Export { $count } logins…
+    }
+passwords-export-submit-csv = Export as plain text…
+passwords-export-file-title = Save passwords
+# $count (Number), $path (String)
+passwords-export-done =
+    { $count ->
+        [one] Exported 1 login to { $path }.
+       *[other] Exported { $count } logins to { $path }.
+    }
+
+passwords-import-title = Import passwords
+passwords-import-text = A CSV file from Firefox, Chrome, Bitwarden or KeePassXC, or an encrypted .bwv file exported from { -brand-short-name }.
+passwords-import-choose = Choose file…
+passwords-import-file-title = Import passwords
+passwords-import-passphrase = Passphrase for this file
+passwords-import-open = Open
+passwords-import-continue = Continue
+# $count (Number)
+passwords-import-submit =
+    { $count ->
+        [0] Nothing to import
+        [one] Import 1 login
+       *[other] Import { $count } logins
+    }
+# $count (Number)
+passwords-import-fresh =
+    { $count ->
+        [one] 1 new login
+       *[other] { $count } new logins
+    }
+# $count (Number)
+passwords-import-duplicates =
+    { $count ->
+        [one] 1 is already saved, with the same site and username. Choose which to keep:
+       *[other] { $count } are already saved, with the same site and username. Choose which to keep:
+    }
+# $count (Number)
+passwords-import-insecure =
+    { $count ->
+        [one] 1 is for a plain http site: it’s kept, but never filled.
+       *[other] { $count } are for plain http sites: they’re kept, but never filled.
+    }
+# $count (Number)
+passwords-import-skipped =
+    { $count ->
+        [one] 1 row isn’t a website login and is skipped.
+       *[other] { $count } rows aren’t website logins and are skipped.
+    }
+# $count (Number)
+passwords-import-repeated =
+    { $count ->
+        [one] 1 login appears twice in the file; the first is used.
+       *[other] { $count } logins appear twice in the file; the first of each is used.
+    }
+passwords-import-keep-mine = Keep mine
+passwords-import-use-imported = Use imported
+passwords-import-choice =
+    .aria-label = Which to keep
+# $count (Number)
+passwords-import-done =
+    { $count ->
+        [0] Nothing was imported.
+        [one] Imported 1 login.
+       *[other] Imported { $count } logins.
+    }
+passwords-import-wrong-passphrase = That isn’t this file’s passphrase.
+passwords-import-bad-file = This file can’t be read. Import a CSV file or a .bwv file exported from { -brand-short-name }.
+passwords-import-no-columns = This CSV file has no website and password columns.
+passwords-import-newer = This file was made by a newer version of { -brand-short-name }.
+passwords-import-empty = No logins found in this file.

@@ -10,8 +10,8 @@ mockups*).
 
 **Built so far (Stage 2):**
 
-- **Master password only.** The keyring, Windows Hello, the recovery key,
-  export and import are not built yet (§18 parts 3 and 5).
+- **Master password only.** The keyring, Windows Hello and the recovery
+  key are not built yet (§18 part 3).
 - **The bridge to the core:** `components/passwords/service/`
   (`nsIPasswordVault`). The core runs on one background task queue and
   every call returns a Promise.
@@ -30,6 +30,17 @@ mockups*).
   - Standard saving generated passwords with Undo
 - **The manager and Settings:** `about:passwords`
   (`base/content/passwords.html`) and Settings › Passwords.
+- **Export and import (§9),** from the ⋯ menu on about:passwords or from
+  Settings:
+  - the encrypted .bwv export, and the plain-text CSV behind its warning;
+    both ask for the master password every time
+  - import of a .bwv file (with its passphrase), or of CSV files from
+    Firefox, Chrome, Bitwarden or KeePassXC
+  - duplicates listed with Keep mine / Use imported, never overwritten
+    silently
+  - .bwv passwords copied inside `nsIPasswordVault`, never through JS
+  - the column mapping and the import plan in `PasswordTransfer.sys.mjs`
+    (`tests/unit/password-transfer.test.mjs`)
 - **Not built yet:**
   - session-lock signals (§5.4)
   - the passphrase suggestion at setup (it needs the EFF word list)

@@ -130,8 +130,10 @@ window.addEventListener("DOMContentLoaded", () => {
       );
     }
     $("passwords-lock").hidden = !unlocked;
-    // Changing the master password needs the vault unlocked.
+    // Changing the master password needs the vault unlocked; importing and
+    // exporting unlock first, on about:passwords.
     $("passwords-change-box").hidden = !unlocked;
+    $("passwords-transfer-row").hidden = state != "unlocked" && state != "locked";
     $("passwords-offer").setAttribute("aria-checked", String(Services.prefs.getBoolPref(OFFER_PREF, true)));
     let minutes = String(Services.prefs.getIntPref(LOCK_PREF, 15));
     for (let b of document.querySelectorAll("#passwords-lock-after [data-value]")) {
@@ -142,6 +144,11 @@ window.addEventListener("DOMContentLoaded", () => {
   $("passwords-manage").addEventListener("click", () => {
     window.browsingContext.topChromeWindow?.PasswordsUI?.openManager();
   });
+  for (let which of ["import", "export"]) {
+    $(`passwords-${which}`).addEventListener("click", () => {
+      window.browsingContext.topChromeWindow?.PasswordsUI?.openManager(which);
+    });
+  }
   $("passwords-offer").addEventListener("click", () => {
     Services.prefs.setBoolPref(OFFER_PREF, $("passwords-offer").getAttribute("aria-checked") != "true");
     syncPasswords();

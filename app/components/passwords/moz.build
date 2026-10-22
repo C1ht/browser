@@ -9,6 +9,7 @@ EXTRA_JS_MODULES.browserwip += [
     "PasswordRules.sys.mjs",
     "PasswordsChild.sys.mjs",
     "PasswordsParent.sys.mjs",
+    "PasswordTransfer.sys.mjs",
     "PasswordVault.sys.mjs",
 ]
 

@@ -16,7 +16,8 @@
  *
  * Errors thrown to callers carry a `code`: "wrong-password",
  * "too-short", "mismatch", "locked", "no-vault", "needs-master-password",
- * "not-fillable", or the core's status name ("BWV_E_IO", ...).
+ * "not-fillable", "needs-passphrase", "wrong-passphrase", "bad-file",
+ * "no-columns", or the core's status name ("BWV_E_IO", ...).
  */
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
@@ -31,6 +32,12 @@ import {
   parseIndex,
   siteOf,
 } from "resource://gre/modules/browserwip/PasswordRules.sys.mjs";
+import {
+  isVaultFile,
+  loginsFromCSV,
+  planImport,
+  toCSV,
+} from "resource://gre/modules/browserwip/PasswordTransfer.sys.mjs";
 
 const lazy = {};
 XPCOMUtils.defineLazyServiceGetter(
@@ -46,6 +53,7 @@ XPCOMUtils.defineLazyServiceGetter(
   Ci.nsIUserIdleService
 );
 ChromeUtils.defineESModuleGetters(lazy, {
+  CSV: "resource://gre/modules/CSV.sys.mjs",
   PasswordGenerator: "resource://gre/modules/shared/PasswordGenerator.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
 });
@@ -521,6 +529,182 @@ export const PasswordVault = {
     } catch (e) {
       // Nothing readable on the clipboard: nothing of ours to clear.
     }
+  },
+
+  // ---------------------------------------------------------------------
+  // Export and import (§9). Exporting needs the master password every
+  // time (§8), whatever was typed in the last 5 minutes.
+
+  /**
+   * An encrypted copy of every login, as the bytes of a .bwv file: its own
+   * vault key under `passphrase` (12 characters or more), and no keyring
+   * or Windows Hello. Opens in this browser on any OS.
+   */
+  async exportEncrypted(master, passphrase, confirmation) {
+    this._requireUnlocked();
+    await this.confirmMaster(master);
+    this._checkNewMaster(passphrase, confirmation);
+    let entries = this._index.entries;
+    let index = { v: 1, entries: entries.map(e => ({ ...e, also: [...e.also] })), never: [] };
+    let file;
+    try {
+      file = await lazy.core.exportVault(
+        passphrase.normalize("NFC"),
+        JSON.stringify(index),
+        entries.map(e => e.id),
+        entries.map(e => e.origin)
+      );
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    }
+    return new Uint8Array(ChromeUtils.base64URLDecode(file, { padding: "ignore" }));
+  },
+
+  /** Every login in plain text (CSV: url, username, password, httpRealm). */
+  async exportCSV(master) {
+    this._requireUnlocked();
+    await this.confirmMaster(master);
+    let rows = [];
+    for (let entry of this.entries()) {
+      try {
+        rows.push({ ...entry, password: await lazy.core.getSecret(entry.id, entry.origin) });
+      } catch (e) {
+        throw failure(coreCode(e), e);
+      }
+    }
+    return toCSV(rows);
+  },
+
+  /**
+   * Reads a file to import: a .bwv file (opened with `passphrase`, beside
+   * the vault) or a CSV file. Resolves with { kind: "vault" | "csv",
+   * logins, skipped }. Logins from a .bwv file carry no password: it is
+   * copied inside nsIPasswordVault on import.
+   */
+  async readImport(bytes, passphrase) {
+    this._requireUnlocked();
+    if (isVaultFile(bytes)) {
+      if (!passphrase) {
+        throw failure("needs-passphrase");
+      }
+      let json;
+      try {
+        json = await lazy.core.openImport(
+          ChromeUtils.base64URLEncode(bytes, { pad: false }),
+          passphrase.normalize("NFC")
+        );
+      } catch (e) {
+        throw failure(coreCode(e) == "BWV_E_AUTH" ? "wrong-passphrase" : coreCode(e), e);
+      }
+      let index;
+      try {
+        index = parseIndex(json);
+      } catch (e) {
+        throw failure("bad-file", e);
+      }
+      let logins = [];
+      let skipped = 0;
+      for (let e of index.entries) {
+        let origin = normalizeOrigin(e.origin);
+        if (!origin) {
+          skipped++;
+          continue;
+        }
+        logins.push({
+          sourceId: e.id,
+          sourceOrigin: e.origin,
+          origin,
+          username: e.username,
+          also: e.also,
+          realm: e.realm,
+          created: e.created,
+          changed: e.changed,
+        });
+      }
+      return { kind: "vault", logins, skipped };
+    }
+    let rows;
+    try {
+      let text = new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
+      rows = lazy.CSV.parse(text, ",");
+    } catch (e) {
+      throw failure("bad-file", e);
+    }
+    let { logins, skipped } = loginsFromCSV(...rows);
+    return { kind: "csv", logins, skipped };
+  },
+
+  /** What importing these logins would do: { fresh, duplicates, repeated, insecure }. */
+  planImport(logins) {
+    this._requireUnlocked();
+    return planImport(this._index.entries, logins);
+  },
+
+  /**
+   * Imports plan.fresh, and of plan.duplicates those in `replace` (their
+   * saved password and times are replaced; the rest are left alone).
+   * Resolves with how many logins were imported or replaced.
+   */
+  async applyImport(plan, replace = new Set()) {
+    this._requireUnlocked();
+    let now = Date.now();
+    let copies = { src: [], srcOrigins: [], dst: [], dstOrigins: [] };
+    let added = [];
+    let changed = [];
+    let take = async (login, entry) => {
+      if (login.sourceId) {
+        copies.src.push(login.sourceId);
+        copies.srcOrigins.push(login.sourceOrigin);
+        copies.dst.push(entry.id);
+        copies.dstOrigins.push(entry.origin);
+      } else {
+        await lazy.core.setSecret(entry.id, entry.origin, login.password);
+      }
+    };
+    try {
+      for (let login of plan.fresh) {
+        let entry = {
+          id: newEntryId(bytes => crypto.getRandomValues(bytes)),
+          origin: login.origin,
+          also: [...new Set((login.also ?? []).map(normalizeOrigin).filter(o => o && o != login.origin))],
+          realm: login.realm ?? null,
+          username: login.username,
+          created: login.created || now,
+          changed: login.changed || login.created || now,
+          used: 0,
+        };
+        await take(login, entry);
+        added.push(entry);
+      }
+      for (let duplicate of plan.duplicates) {
+        let entry = replace.has(duplicate) && this._index.entries.find(e => e.id == duplicate.existing.id);
+        if (entry) {
+          await take(duplicate.incoming, entry);
+          changed.push(entry);
+        }
+      }
+      if (copies.src.length) {
+        await lazy.core.importSecrets(copies.src, copies.srcOrigins, copies.dst, copies.dstOrigins);
+      }
+    } catch (e) {
+      for (let entry of added) {
+        await lazy.core.removeSecret(entry.id).catch(() => {});
+      }
+      throw failure(e.code ?? coreCode(e), e);
+    } finally {
+      lazy.core.closeImport().catch(() => {});
+    }
+    this._index.entries.push(...added);
+    for (let entry of changed) {
+      entry.changed = now;
+    }
+    await this._save();
+    return added.length + changed.length;
+  },
+
+  /** Forgets a .bwv file opened by readImport (the user cancelled). */
+  cancelImport() {
+    lazy.core.closeImport().catch(() => {});
   },
 
   // ---------------------------------------------------------------------
