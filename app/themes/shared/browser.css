@@ -38,6 +38,9 @@
   --rec-bg: #FBE3E0;
   --panel-bg: #FFFFFF;
   --panel-shadow: 0 8px 28px -6px rgba(15, 20, 25, 0.28), 0 1px 3px rgba(15, 20, 25, 0.12);
+  /* Popups (panels, menus) are windows of their own that can only paint
+     within their margin, so their shadow is kept inside 10px. */
+  --popup-shadow: 0 2px 8px -1px rgba(15, 20, 25, 0.26), 0 0 1px rgba(15, 20, 25, 0.2);
 
   --toolbar-height: 48px;
   --strip-height: 40px;
@@ -66,6 +69,7 @@
     --rec-bg: #3D1F1C;
     --panel-bg: #22282C;
     --panel-shadow: 0 8px 28px -6px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.4);
+    --popup-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.55), 0 0 1px rgba(0, 0, 0, 0.4);
     color-scheme: dark;
   }
 }
@@ -696,13 +700,22 @@ browser:focus-visible {
 
 /* ---------- Panels ---------- */
 
-panel.wip-panel {
-  --panel-background: var(--panel-bg);
-  --panel-color: var(--chrome-fg);
+/* Toolkit's popup.css draws a panel from --panel-background-color,
+   --panel-text-color, --panel-border-color, --panel-border-radius,
+   --panel-padding and --panel-box-shadow (with room for it given by
+   --panel-box-shadow-margin). Folio's colors go in through those. */
+panel.wip-panel,
+menupopup.wip-menu {
+  --panel-background-color: var(--panel-bg);
+  --panel-text-color: var(--chrome-fg);
   --panel-border-color: var(--field-border);
+  --panel-box-shadow: var(--popup-shadow);
+  --panel-box-shadow-margin: 10px;
+}
+
+panel.wip-panel {
   --panel-border-radius: 12px;
   --panel-padding: 14px 16px;
-  --panel-shadow: var(--panel-shadow);
   font: 13px/1.4 var(--font-ui);
 }
 
@@ -1168,12 +1181,8 @@ panel.wip-panel {
 
 /* XUL menus opened from the toolbar. */
 menupopup.wip-menu {
-  --panel-background: var(--panel-bg);
-  --panel-color: var(--chrome-fg);
-  --panel-border-color: var(--field-border);
   --panel-border-radius: 10px;
   --panel-padding: 6px;
-  --panel-shadow: var(--panel-shadow);
   font: 13px var(--font-ui);
 }
 
