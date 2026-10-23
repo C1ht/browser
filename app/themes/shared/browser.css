@@ -1181,7 +1181,11 @@ panel.wip-panel {
 }
 
 /* XUL menus opened from the toolbar. */
+/* Drawn here, like the panels, rather than on Windows 11's Mica menu
+   backdrop: Mica would fill the shadow margin around the menu. */
 menupopup.wip-menu {
+  appearance: none;
+  background-color: transparent;
   --panel-border-radius: 10px;
   --panel-padding: 6px;
   font: 13px var(--font-ui);
