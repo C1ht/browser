@@ -8,6 +8,8 @@
 
 #  include <windows.h>
 #  include <asyncinfo.h>
+#  include <bcrypt.h>
+#  include <ncrypt.h>
 #  include <roapi.h>
 #  include <tbs.h>
 #  include <winstring.h>
@@ -145,6 +147,139 @@ bool HasTpm2() {
 }
 
 }  // namespace
+
+// ---- This computer only ----
+
+namespace {
+
+void DeviceKeyName(const uint8_t aVaultId[BWV_ID_BYTES],
+                   wchar_t aOut[15 + 2 * BWV_ID_BYTES + 1]) {
+  static const wchar_t kHex[] = L"0123456789abcdef";
+  wcscpy_s(aOut, 16, L"BWVAULT-DEVICE-");
+  for (size_t i = 0; i < BWV_ID_BYTES; i++) {
+    aOut[15 + 2 * i] = kHex[aVaultId[i] >> 4];
+    aOut[15 + 2 * i + 1] = kHex[aVaultId[i] & 0xf];
+  }
+  aOut[15 + 2 * BWV_ID_BYTES] = 0;
+}
+
+// SHA-256 of `aContext` then `aData`.
+bool Sha256(const char* aContext, const uint8_t* aData, size_t aLen,
+            uint8_t aOut[32]) {
+  BCRYPT_ALG_HANDLE alg = nullptr;
+  BCRYPT_HASH_HANDLE hash = nullptr;
+  bool ok =
+      BCRYPT_SUCCESS(::BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, nullptr, 0)) &&
+      BCRYPT_SUCCESS(::BCryptCreateHash(alg, &hash, nullptr, 0, nullptr, 0, 0)) &&
+      BCRYPT_SUCCESS(::BCryptHashData(hash, (PUCHAR)aContext, (ULONG)strlen(aContext), 0)) &&
+      BCRYPT_SUCCESS(::BCryptHashData(hash, (PUCHAR)aData, (ULONG)aLen, 0)) &&
+      BCRYPT_SUCCESS(::BCryptFinishHash(hash, aOut, 32, 0));
+  if (hash) {
+    ::BCryptDestroyHash(hash);
+  }
+  if (alg) {
+    ::BCryptCloseAlgorithmProvider(alg, 0);
+  }
+  return ok;
+}
+
+class Provider {
+ public:
+  Provider() {
+    if (FAILED(::NCryptOpenStorageProvider(&mHandle, MS_PLATFORM_CRYPTO_PROVIDER, 0))) {
+      mHandle = 0;
+    }
+  }
+  ~Provider() {
+    if (mHandle) {
+      ::NCryptFreeObject(mHandle);
+    }
+  }
+  NCRYPT_PROV_HANDLE get() const { return mHandle; }
+
+ private:
+  NCRYPT_PROV_HANDLE mHandle = 0;
+};
+
+bool OpenDeviceKey(const Provider& aProvider, const uint8_t aVaultId[BWV_ID_BYTES],
+                   NCRYPT_KEY_HANDLE* aKey) {
+  wchar_t name[15 + 2 * BWV_ID_BYTES + 1];
+  DeviceKeyName(aVaultId, name);
+  return aProvider.get() && SUCCEEDED(::NCryptOpenKey(aProvider.get(), aKey, name, 0, 0));
+}
+
+}  // namespace
+
+bool DeviceBindingAvailable() {
+  Provider provider;
+  return HasTpm2() && provider.get();
+}
+
+bool DeviceKeyExists(const uint8_t aVaultId[BWV_ID_BYTES]) {
+  Provider provider;
+  NCRYPT_KEY_HANDLE key = 0;
+  if (!OpenDeviceKey(provider, aVaultId, &key)) {
+    return false;
+  }
+  ::NCryptFreeObject(key);
+  return true;
+}
+
+bwv_status DeviceCreate(const uint8_t aVaultId[BWV_ID_BYTES]) {
+  Provider provider;
+  if (!HasTpm2() || !provider.get()) {
+    return BWV_E_PROVIDER;
+  }
+  wchar_t name[15 + 2 * BWV_ID_BYTES + 1];
+  DeviceKeyName(aVaultId, name);
+  NCRYPT_KEY_HANDLE key = 0;
+  DWORD length = 2048;
+  bool ok = SUCCEEDED(::NCryptCreatePersistedKey(provider.get(), &key, BCRYPT_RSA_ALGORITHM,
+                                                 name, 0, NCRYPT_OVERWRITE_KEY_FLAG)) &&
+            SUCCEEDED(::NCryptSetProperty(key, NCRYPT_LENGTH_PROPERTY, (PBYTE)&length,
+                                          sizeof(length), 0)) &&
+            SUCCEEDED(::NCryptFinalizeKey(key, 0));
+  if (key) {
+    ::NCryptFreeObject(key);
+  }
+  if (!ok) {
+    DeviceDelete(aVaultId);
+    return BWV_E_PROVIDER;
+  }
+  return BWV_OK;
+}
+
+bwv_status DeviceSecret(const uint8_t aVaultId[BWV_ID_BYTES], uint8_t aOut[32]) {
+  Provider provider;
+  if (!provider.get()) {
+    return BWV_E_PROVIDER;
+  }
+  NCRYPT_KEY_HANDLE key = 0;
+  if (!OpenDeviceKey(provider, aVaultId, &key)) {
+    return BWV_E_NO_SLOT;
+  }
+  // The same challenge every time, from the vault id; PKCS#1 v1.5 signs it
+  // the same way every time.
+  uint8_t challenge[32];
+  uint8_t signature[512];
+  DWORD len = 0;
+  BCRYPT_PKCS1_PADDING_INFO padding = {BCRYPT_SHA256_ALGORITHM};
+  bool ok = Sha256("vault/device/challenge", aVaultId, BWV_ID_BYTES, challenge) &&
+            SUCCEEDED(::NCryptSignHash(key, &padding, challenge, sizeof(challenge), signature,
+                                       sizeof(signature), &len, BCRYPT_PAD_PKCS1)) &&
+            Sha256("vault/device/secret", signature, len, aOut);
+  ::SecureZeroMemory(signature, sizeof(signature));
+  ::NCryptFreeObject(key);
+  return ok ? BWV_OK : BWV_E_PROVIDER;
+}
+
+void DeviceDelete(const uint8_t aVaultId[BWV_ID_BYTES]) {
+  Provider provider;
+  NCRYPT_KEY_HANDLE key = 0;
+  if (OpenDeviceKey(provider, aVaultId, &key)) {
+    ::NCryptDeleteKey(key, 0);  // frees the handle
+  }
+}
 
 bool HelloAvailable() {
   WinRTScope winrt;
@@ -353,6 +488,18 @@ bwv_status HelloSign(void* aCtx, const uint8_t aVaultId[BWV_ID_BYTES],
 }
 
 void HelloDelete(const uint8_t aVaultId[BWV_ID_BYTES]) {}
+
+bool DeviceBindingAvailable() { return false; }
+
+bool DeviceKeyExists(const uint8_t aVaultId[BWV_ID_BYTES]) { return false; }
+
+bwv_status DeviceCreate(const uint8_t aVaultId[BWV_ID_BYTES]) { return BWV_E_PROVIDER; }
+
+bwv_status DeviceSecret(const uint8_t aVaultId[BWV_ID_BYTES], uint8_t aOut[32]) {
+  return BWV_E_NO_SLOT;
+}
+
+void DeviceDelete(const uint8_t aVaultId[BWV_ID_BYTES]) {}
 
 void WatchSessionLock(void (*aCallback)()) {}
 

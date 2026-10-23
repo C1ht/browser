@@ -1774,7 +1774,8 @@ return data.value.QueryInterface(Ci.nsISupportsString).data;"""
         b.js(S + "d.getElementById('passwords-recovery-master').value = arguments[0]; d.getElementById('passwords-recovery-submit').click();", phrase)
         r = b.wait(S + "return !d.getElementById('passwords-recovery-shown').hidden && d.getElementById('passwords-recovery-code').children.length;", timeout=30)
         record(8, "with it, Settings shows the new key once", r == 8, r)
-        secrets.append(b.js(S + "return d.getElementById('passwords-recovery-code').textContent;"))
+        settings_code = b.js(S + "return d.getElementById('passwords-recovery-code').textContent;")
+        secrets.append(settings_code)
         b.js(S + "d.getElementById('passwords-recovery-done').click();")
         r = b.js(S + "return [d.getElementById('passwords-recovery-shown').hidden, d.getElementById('passwords-recovery-code').textContent];")
         record(8, "and forgets it once written down", r == [True, ""], r)
@@ -1788,6 +1789,127 @@ return data.value.QueryInterface(Ci.nsISupportsString).data;"""
         })();""", kept, fresh)
         record(8, "an older vault opened with its master password adds its logins back",
                r == ["ana@example.com", "standard@example.com"], r)
+
+        # -- Password health: reused and weak, worked out in the core.
+        b.js(PV + """return (async () => {
+          await PasswordVault.saveLogin({ origin: "https://one.example", username: "a", password: "same-Password-123!" });
+          await PasswordVault.saveLogin({ origin: "https://two.example", username: "b", password: "same-Password-123!" });
+          await PasswordVault.saveLogin({ origin: "https://weak.example", username: "c", password: "password1" });
+        })();""")
+        secrets += ["same-Password-123!"]
+        r = b.js(PV + """return PasswordVault.health().then(h => PasswordVault.entries()
+          .map(e => [new URL(e.origin).hostname, h.get(e.id).reused, h.get(e.id).weak]).sort());""")
+        record(8, "health: the same password on two sites is reused, a short simple one weak",
+               r and ["one.example", 1, False] in r and ["two.example", 1, False] in r and ["weak.example", 0, True] in r
+               and ["127.0.0.1", 0, False] in r, r)
+        close_tabs()
+        load("about:passwords", "")
+        r = b.wait("let d = gBrowser.selectedBrowser.contentDocument; let s = d?.getElementById('health-summary');"
+                   "return s && !s.hidden && s.textContent && [s.textContent, d.querySelectorAll('.health-badge').length];",
+                   timeout=15)
+        record(8, "about:passwords sums it up and marks the logins", r == ["2 reused · 1 weak", 3], r)
+
+        # -- Show and copy: Windows Hello offered where it's set up; if its
+        # slot is gone, it says so and the master password still works.
+        b.js(PV + "PasswordVault._revealUntil = 0; PasswordVault.hello = { available: true, enrolled: true };")
+        b.js("let d = gBrowser.selectedBrowser.contentDocument; d.querySelector('#detail [data-action=show]').click();")
+        r = b.wait("let d = gBrowser.selectedBrowser.contentDocument; let h = d.querySelector('#inline-slot .confirm-hello');"
+                   "return h && d.activeElement == h;", timeout=5)
+        record(8, "with Windows Hello, Show offers it first", r)
+        b.js("gBrowser.selectedBrowser.contentDocument.querySelector('#inline-slot .confirm-hello').click();")
+        r = b.wait("let d = gBrowser.selectedBrowser.contentDocument; let e = d.querySelector('#inline-slot .error');"
+                   "return e && !e.hidden && [e.textContent, d.querySelector('#inline-slot .confirm-hello').hidden];", timeout=15)
+        record(8, "a Hello that can't open the vault falls back to the master password", r and "Windows Hello" in r[0] and r[1], r)
+        b.js("let d = gBrowser.selectedBrowser.contentDocument; d.querySelector('#inline-slot').replaceChildren();")
+        b.js(PV + "return PasswordVault._refreshHello();")
+
+        # -- Replace encryption key: the new recovery key shown before the
+        # swap; saves wait meanwhile; afterwards only the new key works.
+        code_new = b.js(PV + "return PasswordVault.replacePrepare(arguments[0]);", phrase)
+        secrets.append(code_new)
+        record(8, "replacing the key makes a new recovery key, shown before the swap",
+               bool(re.fullmatch(r"([A-Z2-7]{4}-){7}[A-Z2-7]{4}", code_new or "")), code_new)
+        r = b.js(PV + """let saved = false;
+          PasswordVault.saveLogin({ origin: "https://during.example", username: "d", password: "saved-during-replace" }).then(() => saved = true);
+          return new Promise(r => setTimeout(() => r(saved), 1500));""")
+        record(8, "a save during the replacement waits for it", r is False, r)
+        r = b.js(PV + "return PasswordVault.replaceCommit();")
+        record(8, "committing puts the new vault in use", r == "done", r)
+        r = b.wait(PV + "return PasswordVault.entries().some(e => e.username == 'd');", timeout=10)
+        record(8, "and the waiting save lands in it", r)
+        b.js(PV + "return PasswordVault.lock();")
+        r = b.js(PV + "return PasswordVault.recover(arguments[0], 'whatever whatever', 'whatever whatever').then(() => 'ok', e => e.code);",
+                 settings_code)
+        record(8, "the old recovery key no longer works", r == "wrong-recovery-key", r)
+        r = b.js(PV + "return PasswordVault.unlock(arguments[0]).then(() => PasswordVault.entries().length, e => e.code);", phrase)
+        record(8, "the master password opens the new vault, with every login", r == 6, r)
+
+        # The same from Settings, with a password change: "my old password
+        # may have been exposed".
+        load("about:settings#passwords", "")
+        b.wait(S + "return d?.readyState == 'complete' && !d.getElementById('passwords-change-box').hidden;", timeout=15)
+        renewed = "a renewed master password"
+        secrets.append(renewed)
+        b.js(S + """d.getElementById('passwords-change-box').open = true;
+          d.getElementById('passwords-current').value = arguments[0];
+          d.getElementById('passwords-new').value = arguments[1];
+          d.getElementById('passwords-repeat').value = arguments[1];
+          d.getElementById('passwords-exposed').checked = true;
+          d.getElementById('passwords-change-submit').click();""", phrase, renewed)
+        r = b.wait(S + "return !d.getElementById('passwords-replace-shown').hidden && d.getElementById('passwords-replace-code').children.length;",
+                   timeout=60)
+        record(8, "a change with “may have been exposed” shows the new recovery key first", r == 8, r)
+        code_renewed = b.js(S + "return d.getElementById('passwords-replace-code').textContent;")
+        secrets.append(code_renewed)
+        b.js(S + "d.getElementById('passwords-replace-stored').click();")
+        r = b.wait(S + "let r = d.getElementById('passwords-change-result'), done = d.getElementById('passwords-replace-done');"
+                   "return !r.hidden && !done.hidden && [r.textContent, d.getElementById('passwords-replace-done-text').textContent];",
+                   timeout=60)
+        record(8, "“I have stored it” finishes it", r and r[0] == "Master password changed." and "old recovery key no longer works" in r[1], r)
+        phrase = renewed
+        code_new = code_renewed
+
+        # -- This computer only (a real TPM: Windows with a TPM 2.0).
+        device = b.js(PV + "return PasswordVault.device;")
+        if not device["available"]:
+            print("     no TPM 2.0 here: “only on this computer” not checked")
+        else:
+            r = b.js(PV + "return PasswordVault.enableDeviceBinding('not the password').then(() => 'ok', e => e.code);")
+            record(8, "binding to this computer needs the master password", r == "wrong-password", r)
+            r = b.js(PV + "return PasswordVault.enableDeviceBinding(arguments[0]).then(() => PasswordVault.device.bound, e => e.code);", phrase)
+            record(8, "with it, the vault is bound to this computer's TPM", r is True, r)
+            b.js(PV + "return PasswordVault.lock();")
+            r = b.js(PV + "return PasswordVault.unlock(arguments[0]).then(() => PasswordVault.entries().length, e => e.code);", phrase)
+            record(8, "here, the master password still opens it", r == 6, r)
+            r = b.js(PV + "return PasswordVault.disableDeviceBinding(arguments[0]).then(() => PasswordVault.device.bound, e => e.code);", phrase)
+            record(8, "turning it off unbinds it", r is False, r)
+            b.js(PV + "return PasswordVault.lock();")
+            r = b.js(PV + "return PasswordVault.unlock(arguments[0]).then(() => 'ok', e => e.code);", phrase)
+            record(8, "and the master password alone opens it again", r == "ok", r)
+            b.js(PV + "return PasswordVault.enableDeviceBinding(arguments[0]);", phrase)
+            b.js(PV + "return PasswordVault.lock();")
+            # Another computer: the same file without this TPM key.
+            data = vault_file.read_bytes()
+            pos, vault_id = 16, None
+            while pos + 3 <= 16 + int.from_bytes(data[10:12], "little"):
+                kind, size = data[pos], int.from_bytes(data[pos + 1:pos + 3], "little")
+                if kind == 0x01:
+                    vault_id = data[pos + 3:pos + 3 + size].hex()
+                    break
+                pos += 3 + size
+            deleted = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "Add-Type -AssemblyName System.Core; "
+                 "$p = New-Object System.Security.Cryptography.CngProvider('Microsoft Platform Crypto Provider'); "
+                 f"[System.Security.Cryptography.CngKey]::Open('BWVAULT-DEVICE-{vault_id}', $p).Delete()"],
+                capture_output=True)
+            record(8, "(the test removes the TPM key, as on another computer)", deleted.returncode == 0,
+                   deleted.stderr.decode(errors="replace")[-300:])
+            r = b.js(PV + "return PasswordVault.unlock(arguments[0]).then(() => 'ok', e => e.code);", phrase)
+            record(8, "without this computer's TPM key, the master password alone doesn't open it", r == "wrong-password", r)
+            r = b.js(PV + "return PasswordVault.recover(arguments[0], arguments[1], arguments[1]).then(() => [PasswordVault.state, PasswordVault.device.bound], e => e.code);",
+                     code_new, phrase)
+            record(8, "the recovery key still does, and leaves it unbound", r == ["unlocked", False], r)
 
         log = (b.profile / "browser.log").read_text(errors="replace")
         leaked = [s for s in secrets if s and s in log]

@@ -143,6 +143,14 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!unlocked) {
       $("passwords-hello-form").hidden = true;
     }
+    // This computer only: where there's a TPM; needs a recovery key first.
+    let device = PasswordVault.device;
+    $("passwords-device-row").hidden = !device.available || state == "none";
+    $("passwords-device").setAttribute("aria-checked", String(device.bound));
+    $("passwords-device").disabled = !unlocked;
+    if (!unlocked) {
+      $("passwords-device-form").hidden = true;
+    }
     // The recovery key: making one needs the vault unlocked and the master
     // password (§6).
     $("passwords-recovery-row").hidden = state == "none";
@@ -168,6 +176,55 @@ window.addEventListener("DOMContentLoaded", () => {
       b.setAttribute("aria-checked", String(b.dataset.value == minutes));
     }
   };
+  let deviceResult = l10n => {
+    document.l10n.setAttributes($("passwords-device-result"), l10n);
+    $("passwords-device-result").hidden = false;
+  };
+  $("passwords-device").addEventListener("click", () => {
+    $("passwords-device-result").hidden = true;
+    let bound = PasswordVault.device.bound;
+    if (!bound && !PasswordVault.hasRecoveryKey) {
+      deviceResult("settings-passwords-device-needs-recovery");
+      return;
+    }
+    document.l10n.setAttributes(
+      $("passwords-device-submit"),
+      bound ? "settings-passwords-device-off" : "settings-passwords-device-on"
+    );
+    $("passwords-device-form").hidden = false;
+    $("passwords-device-master").focus();
+  });
+  $("passwords-device-label").addEventListener("click", e => {
+    e.preventDefault();
+    $("passwords-device").click();
+  });
+  $("passwords-device-cancel").addEventListener("click", () => {
+    $("passwords-device-master").value = "";
+    $("passwords-device-form").hidden = true;
+  });
+  $("passwords-device-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    let submit = $("passwords-device-submit");
+    let bound = PasswordVault.device.bound;
+    submit.disabled = true;
+    try {
+      let master = $("passwords-device-master").value;
+      await (bound ? PasswordVault.disableDeviceBinding(master) : PasswordVault.enableDeviceBinding(master));
+      $("passwords-device-form").hidden = true;
+      deviceResult(bound ? "settings-passwords-device-is-off" : "settings-passwords-device-is-on");
+    } catch (err) {
+      deviceResult(
+        {
+          "wrong-password": "passwords-wrong-password",
+          "needs-recovery-key": "settings-passwords-device-needs-recovery",
+        }[err.code] ?? "settings-passwords-device-error"
+      );
+    } finally {
+      $("passwords-device-master").value = "";
+      submit.disabled = false;
+      syncPasswords();
+    }
+  });
   let hideRecoveryKey = () => {
     $("passwords-recovery-code").replaceChildren();
     $("passwords-recovery-shown").hidden = true;
@@ -283,17 +340,108 @@ window.addEventListener("DOMContentLoaded", () => {
       syncPasswords();
     });
   }
+  // Replace encryption key (docs/PASSWORDS.md §4.2): from its own form
+  // (the same master password) or from a password change with "my old
+  // password may have been exposed" ticked (the new one). Resolves true
+  // once the new vault is in use.
+  let replaceKey = async (current, fresh, confirmation) => {
+    let status = $("passwords-replace-status");
+    $("passwords-replace-done").hidden = true;
+    document.l10n.setAttributes(
+      status,
+      PasswordVault.replacementHelloPrompts ? "settings-passwords-replace-working-hello" : "settings-passwords-replace-working"
+    );
+    status.hidden = false;
+    let code;
+    try {
+      code = await PasswordVault.replacePrepare(current, fresh, confirmation);
+    } finally {
+      status.hidden = true;
+    }
+    if (code) {
+      // The new recovery key, before anything changes: it works only once
+      // the replacement is done, and "I have stored it" is what does it.
+      $("passwords-replace-code").replaceChildren(
+        ...code.split("-").map(group => {
+          let span = document.createElement("span");
+          span.textContent = group;
+          return span;
+        })
+      );
+      $("passwords-replace-shown").hidden = false;
+      $("passwords-replace-stored").focus();
+      let stored = await new Promise(resolve => {
+        $("passwords-replace-stored").onclick = () => resolve(true);
+        $("passwords-replace-cancel").onclick = () => resolve(false);
+      });
+      $("passwords-replace-code").replaceChildren();
+      $("passwords-replace-shown").hidden = true;
+      if (!stored) {
+        await PasswordVault.replaceAbort();
+        return false;
+      }
+    }
+    await PasswordVault.replaceCommit();
+    document.l10n.setAttributes(
+      $("passwords-replace-done-text"),
+      code ? "settings-passwords-replaced-recovery" : "settings-passwords-replaced"
+    );
+    $("passwords-replace-done").hidden = false;
+    return true;
+  };
+  let replaceError = err =>
+    ({
+      "wrong-password": "passwords-wrong-password",
+      "too-short": "passwords-too-short",
+      mismatch: "passwords-mismatch",
+      cancelled: "settings-passwords-replace-cancelled",
+    })[err.code] ?? "passwords-error";
+  $("passwords-replace-print").addEventListener("click", () => window.print());
+  $("passwords-replace-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    let submit = $("passwords-replace-submit");
+    let result = $("passwords-change-result");
+    let master = $("passwords-replace-master").value;
+    $("passwords-replace-master").value = "";
+    submit.disabled = true;
+    result.hidden = true;
+    try {
+      if (!(await replaceKey(master, master))) {
+        result.removeAttribute("error");
+        document.l10n.setAttributes(result, "settings-passwords-replace-aborted");
+        result.hidden = false;
+      }
+    } catch (err) {
+      result.setAttribute("error", "true");
+      document.l10n.setAttributes(result, replaceError(err));
+      result.hidden = false;
+    } finally {
+      submit.disabled = false;
+    }
+  });
   $("passwords-change-form").addEventListener("submit", async e => {
     e.preventDefault();
     let result = $("passwords-change-result");
     let submit = $("passwords-change-submit");
     submit.disabled = true;
     try {
-      await PasswordVault.changeMasterPassword(
-        $("passwords-current").value,
-        $("passwords-new").value,
-        $("passwords-repeat").value
-      );
+      if ($("passwords-exposed").checked) {
+        // The new password wraps a new key: copies of the vault made with
+        // the old password don't open the vault from now on.
+        result.hidden = true;
+        if (!(await replaceKey($("passwords-current").value, $("passwords-new").value, $("passwords-repeat").value))) {
+          result.removeAttribute("error");
+          document.l10n.setAttributes(result, "settings-passwords-replace-aborted");
+          return;
+        }
+        $("passwords-exposed").checked = false;
+      } else {
+        await PasswordVault.changeMasterPassword(
+          $("passwords-current").value,
+          $("passwords-new").value,
+          $("passwords-repeat").value
+        );
+      }
       result.removeAttribute("error");
       document.l10n.setAttributes(result, "settings-passwords-changed");
       for (let id of ["passwords-current", "passwords-new", "passwords-repeat"]) {
@@ -306,7 +454,7 @@ window.addEventListener("DOMContentLoaded", () => {
         "too-short": "passwords-too-short",
         mismatch: "passwords-mismatch",
       };
-      document.l10n.setAttributes(result, ids[err.code] ?? "passwords-error");
+      document.l10n.setAttributes(result, ids[err.code] ?? replaceError(err));
     } finally {
       result.hidden = false;
       submit.disabled = false;

@@ -42,6 +42,31 @@ bwv_status HelloSign(void* aCtx, const uint8_t aVaultId[BWV_ID_BYTES],
 // slot is gone from the vault either way.
 void HelloDelete(const uint8_t aVaultId[BWV_ID_BYTES]);
 
+// ---- This computer only (device binding) ----
+//
+// A per-user RSA key in the TPM (Microsoft Platform Crypto Provider, no
+// prompt, not exportable), named "BWVAULT-DEVICE-<vault id hex>". Its
+// signature over a challenge made from the vault id gives a 32-byte
+// secret that is added to the master password before Argon2id: a copy of
+// the vault file then doesn't open anywhere else, even with the password.
+// The key existing is what says the vault is bound. The recovery key isn't
+// bound, so a cleared TPM or a new computer still has a way in.
+
+// A TPM 2.0 and its key storage provider are there.
+bool DeviceBindingAvailable();
+
+// Whether this vault's key exists on this computer.
+bool DeviceKeyExists(const uint8_t aVaultId[BWV_ID_BYTES]);
+
+// Creates this vault's key (replacing any old one).
+bwv_status DeviceCreate(const uint8_t aVaultId[BWV_ID_BYTES]);
+
+// The secret, from this vault's key. BWV_E_NO_SLOT if there's no key.
+bwv_status DeviceSecret(const uint8_t aVaultId[BWV_ID_BYTES], uint8_t aOut[32]);
+
+// Deletes this vault's key. Failures are ignored.
+void DeviceDelete(const uint8_t aVaultId[BWV_ID_BYTES]);
+
 // ---- Session lock (§5.4) ----
 //
 // Calls aCallback on the main thread when this Windows session is locked or

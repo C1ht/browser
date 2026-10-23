@@ -23,6 +23,8 @@ if CONFIG["OS_ARCH"] == "WINNT":
     # Windows Hello (KeyCredentialManager through WinRT), the TPM check, and
     # session lock notifications.
     OS_LIBS += [
+        "bcrypt",
+        "ncrypt",
         "runtimeobject",
         "tbs",
         "wtsapi32",

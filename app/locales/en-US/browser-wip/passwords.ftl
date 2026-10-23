@@ -329,7 +329,7 @@ passwords-hello-waiting = Waiting for Windows Hello…
 passwords-or-master = or your master password
 passwords-hello-failed = Windows Hello couldn’t unlock. Use your master password.
 settings-passwords-hello-label = Unlock with Windows Hello
-settings-passwords-hello-help = Face, fingerprint or PIN, backed by this computer’s security chip. Showing, copying and exporting passwords still ask for the master password.
+settings-passwords-hello-help = Face, fingerprint or PIN, backed by this computer’s security chip. It can also confirm showing and copying a password; exporting and changing settings still ask for the master password.
 settings-passwords-hello-confirm = Turn on
 settings-passwords-hello-master =
     .placeholder = Master password, to turn it on
@@ -377,3 +377,48 @@ settings-passwords-recovery-master =
 settings-passwords-recovery-confirm = Make it
 settings-passwords-older = Open an older vault…
 settings-passwords-older-help = Vaults kept by Start over. Opening one with its master password adds its logins back.
+
+## Replace encryption key
+
+settings-passwords-exposed = My old password may have been exposed (also replace the encryption key)
+settings-passwords-replace-help = Replace the encryption key if you think someone may have copied your passwords file and learned a master password. Everything is encrypted again under a new key.
+settings-passwords-replace = Replace encryption key
+settings-passwords-replace-working = Encrypting everything again…
+settings-passwords-replace-working-hello = Encrypting everything again… Windows Hello will ask twice.
+settings-passwords-replace-code = Your new recovery key. It works once the replacement is done; keep your current one until then.
+settings-passwords-replace-stored = I have stored it
+settings-passwords-replace-cancelled = Windows Hello was cancelled. Nothing changed; try again, or turn Windows Hello off first.
+settings-passwords-replaced = Replacement complete.
+settings-passwords-replaced-recovery = Replacement complete. Your old recovery key no longer works and can be destroyed.
+settings-passwords-replace-copies = Copies of your passwords saved before now, such as backups, still open with the password you used then.
+settings-passwords-replace-aborted = Nothing changed.
+
+## Password health (checked on this computer only)
+
+passwords-health-ok = No reused or weak passwords
+passwords-health-summary = { $reused ->
+    [one] 1 reused
+   *[other] { $reused } reused
+  } · { $weak ->
+    [one] 1 weak
+   *[other] { $weak } weak
+  }
+passwords-health-reused-badge = Reused
+passwords-health-weak-badge = Weak
+passwords-health-reused = { $count ->
+    [one] The same password is saved for another login. If one site leaks it, both accounts are open: change it on this site, with a generated one.
+   *[other] The same password is saved for { $count } other logins. If one site leaks it, all of them are open: change it on this site, with a generated one.
+  }
+passwords-health-weak = This password is short or simple, so it’s easy to guess. Change it on this site, with a generated one.
+
+## This computer only
+
+settings-passwords-device-label = Only open on this computer
+settings-passwords-device-help = Your master password works only together with a key in this computer’s security chip, so a copy of your passwords file is useless anywhere else, even with the password. If the chip is cleared or the computer replaced, only your recovery key opens it. Exports still work anywhere.
+settings-passwords-device-on = Turn on
+settings-passwords-device-off = Turn off
+settings-passwords-device-is-on = Your passwords now open only on this computer.
+settings-passwords-device-is-off = Your master password alone opens your passwords again, on any computer.
+settings-passwords-device-needs-recovery = Make a recovery key first: it’s the way back in if this computer’s security chip is cleared.
+settings-passwords-device-error = This computer’s security chip couldn’t be used. Nothing changed.
+passwords-device-failed = This computer’s security chip didn’t answer, so your master password can’t open your passwords. Try again, or use your recovery key (Forgot password?).

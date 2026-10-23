@@ -49,6 +49,17 @@
   gap: 8px;
 }
 
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.check-row input {
+  margin: 3px 0 0;
+}
+
 .stacked {
   display: grid;
   gap: 2px;

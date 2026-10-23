@@ -77,3 +77,10 @@ assert(index.entries.length == 1 && Array.isArray(index.never) && index.entries[
 let threw = false;
 try { rules.parseIndex('{"v":2,"entries":[]}'); } catch { threw = true; }
 assert(threw, "parseIndex refuses an index version it doesn't know");
+
+// Password health: weak passwords.
+const weak = rules.isWeakPassword;
+assert(weak(6, 1 | 2 | 4 | 8), "under 8 characters is weak, whatever it has");
+assert(weak(10, 1 | 4) && !weak(10, 1 | 2 | 4), "under 12 needs three kinds of character");
+assert(weak(14, 1) && !weak(14, 1 | 4), "under 16 needs two kinds");
+assert(!weak(20, 1 | 2 | 4 | 8) && !weak(25, 1), "generated passwords and long passphrases are fine");

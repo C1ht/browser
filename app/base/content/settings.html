@@ -64,6 +64,22 @@
         </div>
       </form>
       <p id="passwords-hello-result" role="status" hidden="hidden"></p>
+      <div id="passwords-device-row" class="toggle-row" hidden="hidden">
+        <div>
+          <label id="passwords-device-label" for="passwords-device" data-l10n-id="settings-passwords-device-label"></label>
+          <span id="passwords-device-help" class="help" data-l10n-id="settings-passwords-device-help"></span>
+        </div>
+        <button id="passwords-device" class="switch" type="button" role="switch" aria-labelledby="passwords-device-label"
+                aria-describedby="passwords-device-help"></button>
+      </div>
+      <form id="passwords-device-form" class="change-form" hidden="hidden">
+        <input id="passwords-device-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-recovery-master"/>
+        <div class="button-row">
+          <button id="passwords-device-submit" class="primary" type="submit"></button>
+          <button id="passwords-device-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
+        </div>
+      </form>
+      <p id="passwords-device-result" role="status" hidden="hidden"></p>
       <div class="inline-row">
         <span id="passwords-lock-after-label" data-l10n-id="settings-passwords-lock-after"></span>
         <div id="passwords-lock-after" class="segmented" role="radiogroup" aria-labelledby="passwords-lock-after-label">
@@ -115,9 +131,32 @@
           <input id="passwords-current" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-current"/>
           <input id="passwords-new" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-new"/>
           <input id="passwords-repeat" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-repeat"/>
+          <label class="check-row">
+            <input id="passwords-exposed" type="checkbox"/>
+            <span data-l10n-id="settings-passwords-exposed"></span>
+          </label>
           <p id="passwords-change-result" role="status" hidden="hidden"></p>
           <div><button id="passwords-change-submit" class="primary" type="submit" data-l10n-id="settings-passwords-change-button"></button></div>
         </form>
+        <form id="passwords-replace-form" class="change-form">
+          <span class="help" data-l10n-id="settings-passwords-replace-help"></span>
+          <input id="passwords-replace-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-recovery-master"/>
+          <div><button id="passwords-replace-submit" class="secondary" type="submit" data-l10n-id="settings-passwords-replace"></button></div>
+        </form>
+        <p id="passwords-replace-status" class="help" role="status" hidden="hidden"></p>
+        <div id="passwords-replace-shown" class="recovery-box" hidden="hidden">
+          <p class="muted" data-l10n-id="settings-passwords-replace-code"></p>
+          <p id="passwords-replace-code" class="recovery-code"></p>
+          <div class="button-row">
+            <button id="passwords-replace-print" class="secondary" type="button" data-l10n-id="passwords-recovery-print"></button>
+            <button id="passwords-replace-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
+            <button id="passwords-replace-stored" class="primary" type="button" data-l10n-id="settings-passwords-replace-stored"></button>
+          </div>
+        </div>
+        <div id="passwords-replace-done" class="recovery-box" role="status" hidden="hidden">
+          <p id="passwords-replace-done-text"></p>
+          <p class="muted" data-l10n-id="settings-passwords-replace-copies"></p>
+        </div>
       </details>
       <p class="muted" data-l10n-id="passwords-protects-text"></p>
     </section>

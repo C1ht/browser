@@ -451,7 +451,7 @@ var PasswordsUI = {
         this._setBusy($("passwords-unlock-form"), false);
         doc.l10n.setAttributes($("passwords-unlock-submit"), "passwords-unlock");
         // Windows Hello first where it's set up (it unlocks for filling;
-        // the master password is still asked to show or copy).
+        // showing or copying asks again).
         let hello = vault.canUnlockWithHello;
         $("passwords-unlock-hello").hidden = !hello;
         $("passwords-unlock-hello").disabled = false;
@@ -662,7 +662,7 @@ var PasswordsUI = {
       doc.l10n.setAttributes($("passwords-unlock-submit"), "passwords-unlock");
       field.value = "";
       let error = $("passwords-unlock-error");
-      doc.l10n.setAttributes(error, e.code == "wrong-password" ? "passwords-wrong-password" : "passwords-error");
+      doc.l10n.setAttributes(error, { "wrong-password": "passwords-wrong-password", "device-failed": "passwords-device-failed" }[e.code] ?? "passwords-error");
       error.hidden = false;
       field.focus();
       return;

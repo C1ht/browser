@@ -21,8 +21,9 @@
  * "wrong-recovery-key", "no-recovery-key", "not-confirmed", or the core's
  * status name ("BWV_E_IO", ...).
  *
- * Windows Hello (§5.3) is a second way to unlock, for filling only: showing,
- * copying and exporting still ask for the master password.
+ * Windows Hello (§5.3) is a second way to unlock, for filling. Showing and
+ * copying ask again, with Hello or the master password; exporting, a new
+ * recovery key and password changes take the master password only.
  */
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
@@ -31,6 +32,7 @@ import {
   emptyIndex,
   findLogin,
   isFillableOrigin,
+  isWeakPassword,
   matchEntries,
   newEntryId,
   normalizeOrigin,
@@ -172,6 +174,7 @@ export const PasswordVault = {
   },
 
   _changed() {
+    this._generation++;
     Services.obs.notifyObservers(null, CHANGED_TOPIC);
   },
 
@@ -222,7 +225,8 @@ export const PasswordVault = {
         this._failures++;
         throw failure("wrong-password");
       }
-      throw failure(coreCode(e), e);
+      // Bound to this computer, and its TPM didn't answer.
+      throw failure(coreCode(e) == "BWV_E_PROVIDER" && this.device.bound ? "device-failed" : coreCode(e), e);
     }
     this._index = parseIndex(json);
     this._failures = 0;
@@ -238,13 +242,20 @@ export const PasswordVault = {
   hello: { available: false, enrolled: false },
   // Whether the vault has a recovery key (§6).
   hasRecoveryKey: false,
+  // This computer only: { available: a TPM 2.0, bound: this vault is }.
+  device: { available: false, bound: false },
 
   async _refreshHello() {
-    let slots = { hello: false, recovery: false };
+    let slots = { hello: false, recovery: false, device: false };
     try {
       slots = JSON.parse(await lazy.core.slots());
     } catch (e) {}
     this.hasRecoveryKey = slots.recovery;
+    let deviceAvailable = false;
+    try {
+      deviceAvailable = await lazy.core.deviceBindingAvailable();
+    } catch (e) {}
+    this.device = { available: deviceAvailable, bound: !!slots.device };
     try {
       this.hello = {
         available: await lazy.core.helloAvailable(),
@@ -292,6 +303,7 @@ export const PasswordVault = {
 
   /** Adds Windows Hello; needs the master password (§5.1). Hello asks once or twice. */
   async enableHello(master) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     if (!this.hello.available) {
       throw failure("hello-unavailable");
@@ -308,6 +320,7 @@ export const PasswordVault = {
   },
 
   async disableHello() {
+    await this._waitForReplacement();
     this._requireUnlocked();
     try {
       await lazy.core.disableHello();
@@ -327,6 +340,7 @@ export const PasswordVault = {
    * Resolves with the key, to show once and never again.
    */
   async newRecoveryKey(master) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     let code;
     try {
@@ -368,6 +382,8 @@ export const PasswordVault = {
       }
       throw failure(c == "BWV_E_NO_SLOT" ? "no-recovery-key" : c, e);
     }
+    // Recovering on a computer without the TPM key unbinds it.
+    await this._refreshHello();
     this._index = parseIndex(json);
     this._failures = 0;
     this._revealUntil = Date.now() + REVEAL_GRACE_MS;
@@ -418,11 +434,81 @@ export const PasswordVault = {
     return names.sort().reverse();
   },
 
+  // ---------------------------------------------------------------------
+  // Replace encryption key (§4.2)
+
+  // While a replacement waits between prepare and commit, changes to the
+  // vault wait too: the replacement was made from a copy, and committing it
+  // would drop them.
+  _replacing: null,
+
+  async _waitForReplacement() {
+    await this._replacing?.promise;
+  },
+
+  /** How many Windows Hello prompts a replacement causes (0 or 2). */
+  get replacementHelloPrompts() {
+    return this.hello.available && this.hello.enrolled ? 2 : 0;
+  },
+
+  /**
+   * Builds the vault again under a new key, wrapped under `fresh` (the
+   * same master password from Settings, a new one from a password change),
+   * and checks it from disk. Resolves with the new recovery key to show
+   * ("" when the vault has none); then replaceCommit() or replaceAbort().
+   */
+  async replacePrepare(current, fresh = current, confirmation = fresh) {
+    this._requireUnlocked();
+    if (fresh !== current) {
+      this._checkNewMaster(fresh, confirmation);
+    }
+    await this._waitForReplacement();
+    let done;
+    this._replacing = { promise: new Promise(resolve => (done = resolve)), done };
+    try {
+      return await lazy.core.replacePrepare(current.normalize("NFC"), fresh.normalize("NFC"));
+    } catch (e) {
+      this._endReplacement();
+      let code = coreCode(e);
+      throw failure(
+        code == "BWV_E_AUTH" ? "wrong-password" : code == "BWV_E_CANCELLED" ? "cancelled" : code,
+        e
+      );
+    }
+  },
+
+  /** The new vault takes over. Resolves with "done" or "cleanup" (in use; tidied at the next start). */
+  async replaceCommit() {
+    try {
+      return await lazy.core.replaceCommit();
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    } finally {
+      this._endReplacement();
+      this._revealUntil = Date.now() + REVEAL_GRACE_MS;
+      await this._refreshHello();
+      this._changed();
+    }
+  },
+
+  async replaceAbort() {
+    await lazy.core.replaceAbort().catch(() => {});
+    this._endReplacement();
+  },
+
+  _endReplacement() {
+    this._replacing?.done();
+    this._replacing = null;
+  },
+
   async lock() {
     if (this.state != "unlocked") {
       return;
     }
+    // Locking drops a prepared replacement (the core aborts it).
+    this._endReplacement();
     this._index = null;
+    this._health = null;
     this._revealUntil = 0;
     this._setState("locked");
     this._clearClipboardNow();
@@ -449,7 +535,114 @@ export const PasswordVault = {
     this._revealUntil = Date.now() + REVEAL_GRACE_MS;
   },
 
+  /** Whether show and copy can be confirmed with Windows Hello. */
+  get canConfirmWithHello() {
+    return this.state == "unlocked" && this.hello.available && this.hello.enrolled;
+  },
+
+  /**
+   * Windows Hello in place of the master password to show or copy (one
+   * prompt; the same 5 minutes). Export, a new recovery key and password
+   * changes still ask for the master password.
+   */
+  async confirmWithHello() {
+    this._requireUnlocked();
+    if (!this.canConfirmWithHello) {
+      throw failure("hello-unavailable");
+    }
+    let ok;
+    try {
+      ok = await lazy.core.checkHello();
+    } catch (e) {
+      if (coreCode(e) == "BWV_E_NO_SLOT") {
+        await this._refreshHello();
+      }
+      throw failure(coreCode(e) == "BWV_E_CANCELLED" ? "cancelled" : "hello-failed", e);
+    }
+    if (!ok) {
+      throw failure("hello-failed");
+    }
+    this._revealUntil = Date.now() + REVEAL_GRACE_MS;
+  },
+
+  // Bumped on every change to the logins: the health cache's key.
+  _generation: 0,
+
+  /**
+   * Password health, all on this computer: Map of entry id to
+   * { reused: how many other logins have the same password, weak }.
+   * Worked out inside nsIPasswordVault; cached until the logins change.
+   */
+  async health() {
+    this._requireUnlocked();
+    let generation = this._generation;
+    if (this._health?.generation == generation) {
+      return this._health.result;
+    }
+    let entries = this._index.entries.map(e => ({ id: e.id, origin: e.origin }));
+    let json;
+    try {
+      json = await lazy.core.health(
+        entries.map(e => e.id),
+        entries.map(e => e.origin)
+      );
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    }
+    let result = new Map();
+    JSON.parse(json).forEach((h, i) => {
+      result.set(entries[i].id, {
+        reused: h.reused,
+        weak: h.length > 0 && isWeakPassword(h.length, h.classes),
+      });
+    });
+    if (generation == this._generation) {
+      this._health = { generation, result };
+    }
+    return result;
+  },
+
+  /**
+   * This computer only: the master password works only together with a key
+   * in this computer's TPM, so a copy of the vault file doesn't open
+   * elsewhere. Needs a recovery key first: it is the way in if the TPM is
+   * cleared or the computer replaced. Export still makes a portable copy.
+   */
+  async enableDeviceBinding(master) {
+    this._requireUnlocked();
+    await this._waitForReplacement();
+    if (!this.hasRecoveryKey) {
+      throw failure("needs-recovery-key");
+    }
+    try {
+      await lazy.core.enableDeviceBinding(master.normalize("NFC"));
+    } catch (e) {
+      let code = coreCode(e);
+      throw failure(
+        code == "BWV_E_AUTH" ? "wrong-password" : code == "BWV_E_NO_SLOT" ? "needs-recovery-key" : code,
+        e
+      );
+    } finally {
+      await this._refreshHello();
+      this._changed();
+    }
+  },
+
+  async disableDeviceBinding(master) {
+    this._requireUnlocked();
+    await this._waitForReplacement();
+    try {
+      await lazy.core.disableDeviceBinding(master.normalize("NFC"));
+    } catch (e) {
+      throw failure(coreCode(e) == "BWV_E_AUTH" ? "wrong-password" : coreCode(e), e);
+    } finally {
+      await this._refreshHello();
+      this._changed();
+    }
+  },
+
   async changeMasterPassword(current, fresh, confirmation) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     this._checkNewMaster(fresh, confirmation);
     try {
@@ -556,6 +749,7 @@ export const PasswordVault = {
 
   /** "Also use here": entry id fills on origin from now on. */
   async addAlso(id, origin) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     let entry = this._index.entries.find(e => e.id == id);
     origin = normalizeOrigin(origin);
@@ -575,6 +769,7 @@ export const PasswordVault = {
    * is given (password). Resolves with the entry id.
    */
   async saveLogin({ origin, username, password, captureId, also = [] }) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     let normal = normalizeOrigin(origin);
     if (!normal) {
@@ -625,6 +820,7 @@ export const PasswordVault = {
    * another origin seals its password again for that origin.
    */
   async updateEntry(id, changes) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     let entry = this._index.entries.find(e => e.id == id);
     if (!entry) {
@@ -658,6 +854,7 @@ export const PasswordVault = {
   },
 
   async removeEntry(id) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     if (!this._index.entries.some(e => e.id == id)) {
       return;
@@ -851,6 +1048,7 @@ export const PasswordVault = {
    * Resolves with how many logins were imported or replaced.
    */
   async applyImport(plan, replace = new Set()) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     let now = Date.now();
     let copies = { src: [], srcOrigins: [], dst: [], dstOrigins: [] };
@@ -920,6 +1118,7 @@ export const PasswordVault = {
   },
 
   async addNever(origin) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     if (!this._index.never.includes(origin)) {
       this._index.never.push(origin);
@@ -928,6 +1127,7 @@ export const PasswordVault = {
   },
 
   async removeNever(origin) {
+    await this._waitForReplacement();
     this._requireUnlocked();
     if (this._unnever(origin)) {
       await this._save();

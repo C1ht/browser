@@ -11,6 +11,10 @@
 
 #include "sodium.h"
 
+#ifdef _WIN32
+#  include <windows.h>
+#endif
+
 /* ---- Format constants. None of these may ever change for this version;
  * they deliberately don't contain the app's codename, which
  * tools/rename.sh rewrites. ---- */
@@ -187,6 +191,42 @@ static uint8_t* secret_alloc(size_t len) {
 
 /* ---- Keys ---- */
 
+/* Keys are left out of crash dumps. On Linux libsodium's guarded memory is
+ * already MADV_DONTDUMP; on Windows, Windows Error Reporting is told to
+ * skip each key (looked up at run time: Windows 8.1 and later; at most 512
+ * blocks per process, so a failure is ignored: between uses the key's page
+ * is no-access, which a dump can't read anyway). */
+#ifdef _WIN32
+typedef HRESULT(WINAPI* wer_add_fn)(const void*, DWORD);
+typedef HRESULT(WINAPI* wer_remove_fn)(const void*);
+
+static FARPROC wer_proc(const char* name) {
+  HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
+  return kernel32 ? GetProcAddress(kernel32, name) : NULL;
+}
+
+static void exclude_from_dumps(const void* p, size_t len) {
+  wer_add_fn add = (wer_add_fn)(void*)wer_proc("WerRegisterExcludedMemoryBlock");
+  if (add) {
+    add(p, (DWORD)len);
+  }
+}
+
+static void include_in_dumps(const void* p) {
+  wer_remove_fn remove = (wer_remove_fn)(void*)wer_proc("WerUnregisterExcludedMemoryBlock");
+  if (remove) {
+    remove(p);
+  }
+}
+#else
+static void exclude_from_dumps(const void* p, size_t len) {
+  (void)p;
+  (void)len;
+}
+
+static void include_in_dumps(const void* p) { (void)p; }
+#endif
+
 bwv_key* bwv_key_new(void) {
   bwv_key* key = (bwv_key*)calloc(1, sizeof(*key));
   if (!key) {
@@ -199,6 +239,7 @@ bwv_key* bwv_key_new(void) {
   }
   sodium_memzero(key->k, BWV_KEY_BYTES);
   sodium_mprotect_noaccess(key->k);
+  exclude_from_dumps(key->k, BWV_KEY_BYTES);
   return key;
 }
 
@@ -206,6 +247,7 @@ void bwv_key_free(bwv_key* key) {
   if (!key) {
     return;
   }
+  include_in_dumps(key->k);
   sodium_free(key->k); /* zeroes first; also undoes noaccess */
   free(key);
 }

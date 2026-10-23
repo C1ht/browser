@@ -21,6 +21,16 @@ const FILL_SCHEME = "https:";
  * The normal form of an origin, or null. Accepts a full URL, an origin, or
  * a bare host (taken as https).
  */
+/**
+ * Whether a saved password is weak (password health): short, or short
+ * with few kinds of character. `classes` is a bit set: 1 lower case,
+ * 2 upper case, 4 digits, 8 anything else.
+ */
+export function isWeakPassword(length, classes) {
+  let kinds = [1, 2, 4, 8].filter(bit => classes & bit).length;
+  return length < 8 || (length < 12 && kinds < 3) || (length < 16 && kinds < 2);
+}
+
 export function normalizeOrigin(input) {
   if (typeof input != "string") {
     return null;

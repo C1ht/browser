@@ -154,8 +154,8 @@ const Page = {
       (PasswordVault.hasRecoveryKey ? $("recover-code") : $("start-over-confirm")).focus();
     } else if (card == "locked") {
       $("unlock-error").hidden = true;
-      // Windows Hello unlocks for filling; showing and copying still ask
-      // for the master password.
+      // Windows Hello unlocks for filling; showing and copying ask again
+      // (Hello or the master password).
       $("unlock-hello").parentNode.hidden = !PasswordVault.canUnlockWithHello;
       $("unlock-hello").hidden = !PasswordVault.canUnlockWithHello;
       $("unlock-password").focus();
@@ -175,7 +175,7 @@ const Page = {
       await PasswordVault.unlock(field.value);
       history.replaceState(null, "", location.pathname);
     } catch (e) {
-      document.l10n.setAttributes(error, e.code == "wrong-password" ? "passwords-wrong-password" : "passwords-error");
+      document.l10n.setAttributes(error, { "wrong-password": "passwords-wrong-password", "device-failed": "passwords-device-failed" }[e.code] ?? "passwords-error");
       error.hidden = false;
       field.select();
     } finally {
@@ -342,6 +342,62 @@ const Page = {
     this._markSelected();
     if (!this.editing) {
       this.renderDetail();
+    }
+    this._loadHealth();
+  },
+
+  // -----------------------------------------------------------------------
+  // Password health: reused and weak passwords, worked out on this
+  // computer inside nsIPasswordVault (no password reaches this page).
+
+  health: null,
+
+  async _loadHealth() {
+    let health;
+    try {
+      health = await PasswordVault.health();
+    } catch (e) {
+      return;
+    }
+    if (PasswordVault.state != "unlocked") {
+      return;
+    }
+    this.health = health;
+    let reused = 0;
+    let weak = 0;
+    for (let h of health.values()) {
+      reused += h.reused > 0;
+      weak += h.weak;
+    }
+    let summary = $("health-summary");
+    summary.hidden = !health.size;
+    document.l10n.setAttributes(
+      summary,
+      reused || weak ? "passwords-health-summary" : "passwords-health-ok",
+      { reused, weak }
+    );
+    for (let row of $("list").children) {
+      row.querySelector(".health-badge")?.remove();
+      let h = health.get(row.dataset.id);
+      if (h?.reused || h?.weak) {
+        let badge = this._el("span", "badge-warn health-badge", h.reused ? "passwords-health-reused-badge" : "passwords-health-weak-badge");
+        row.querySelector(".row-host").append(badge);
+      }
+    }
+    this._applyHealth();
+  },
+
+  _applyHealth() {
+    let slot = $("health-note");
+    let h = slot && this.health?.get(this.selectedId);
+    if (!slot) {
+      return;
+    }
+    slot.hidden = !(h?.reused || h?.weak);
+    if (h?.reused) {
+      document.l10n.setAttributes(slot.lastChild, "passwords-health-reused", { count: h.reused });
+    } else if (h?.weak) {
+      document.l10n.setAttributes(slot.lastChild, "passwords-health-weak");
     }
   },
 
@@ -561,7 +617,15 @@ const Page = {
 
     let inline = this._el("div", "inline-slot");
     inline.id = "inline-slot";
-    detail.replaceChildren(head, fields, inline, note);
+    let health = this._el("div", "warning health-note");
+    health.id = "health-note";
+    health.hidden = true;
+    let warn = this._el("img", "warning-icon");
+    warn.src = "chrome://browser-wip/skin/icons/warning.svg";
+    warn.alt = "";
+    health.append(warn, this._el("span"));
+    detail.replaceChildren(head, fields, health, inline, note);
+    this._applyHealth();
   },
 
   _copyButton(action) {
@@ -607,6 +671,31 @@ const Page = {
     let row = this._el("div", "card-row");
     row.append(input, submit, cancel);
     form.append(text, row, error);
+    // Windows Hello, where it's set up, instead of typing the master
+    // password (a keylogger then has nothing to catch).
+    if (PasswordVault.canConfirmWithHello) {
+      let hello = this._button("passwords-use-hello", async () => {
+        hello.disabled = true;
+        error.hidden = true;
+        try {
+          await PasswordVault.confirmWithHello();
+        } catch (err) {
+          hello.disabled = false;
+          hello.hidden = !PasswordVault.canConfirmWithHello;
+          if (err.code != "cancelled") {
+            document.l10n.setAttributes(error, "passwords-hello-failed");
+            error.hidden = false;
+          }
+          input.focus();
+          return;
+        }
+        slot.replaceChildren();
+        await action();
+      });
+      hello.className = "primary small confirm-hello";
+      submit.className = "secondary small";
+      form.insertBefore(hello, row);
+    }
     form.addEventListener("submit", async e => {
       e.preventDefault();
       submit.disabled = true;
@@ -625,7 +714,7 @@ const Page = {
       await action();
     });
     slot.replaceChildren(form);
-    input.focus();
+    (form.querySelector(".confirm-hello") ?? input).focus();
   },
 
   _addAlso(entry, site, dd) {

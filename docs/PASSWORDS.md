@@ -59,6 +59,29 @@ mockups*).
   - .bwv passwords copied inside `nsIPasswordVault`, never through JS
   - the column mapping and the import plan in `PasswordTransfer.sys.mjs`
     (`tests/unit/password-transfer.test.mjs`)
+- **Replace encryption key (§4.2):** Settings › Passwords, and the "My
+  old password may have been exposed" box on a password change. The new
+  recovery key is shown before the swap ("I have stored it" commits);
+  Windows Hello signs again (two prompts). Saves wait while a replacement
+  is pending.
+- **Windows Hello for show and copy** (a change from §5.3/§6, asked for
+  after Stage 2): where Hello is set up it confirms show and copy, by
+  opening the Hello slot as an unlock would, so the master password is
+  typed less often. Export, a new recovery key and password changes still
+  take the master password.
+- **Keys out of crash dumps:** Gecko's crash reporter is off in this
+  project; libsodium's memory is MADV_DONTDUMP on Linux, and on Windows
+  each vault key is registered with WerRegisterExcludedMemoryBlock.
+- **Password health:** reused and weak passwords in about:passwords,
+  worked out inside nsIPasswordVault (`health()`), so no password reaches
+  JS. Nothing is sent anywhere (no breach lookups).
+- **Only open on this computer (new, optional):** a per-user RSA key in
+  the TPM (Microsoft Platform Crypto Provider, `BWVAULT-DEVICE-<id>`)
+  signs a challenge made from the vault id; SHA-256 of the signature is
+  appended to the master password before Argon2id. The key existing is
+  the switch. It needs a recovery key first (not bound: the way in after
+  a TPM clear or on a new computer); exports stay portable. No format
+  change: the password slot simply holds a different key.
 - **Runtime checks:** `tools/runtime/check.py --part 8` (§15 part 7's
   list, plus the recovery key, Start over and the passphrase). Frames
   from another site run in a second profile without Fission: headless
