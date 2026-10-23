@@ -96,6 +96,20 @@ bwv_status bwt_change_password(bwt_session* session, const char* current,
                                size_t current_len, const char* fresh,
                                size_t fresh_len);
 
+/* Forgotten master password (§6): the recovery key `code` is checked
+ * first, then the vault key is re-wrapped under `fresh`, as a password
+ * change would. The recovery key keeps working. */
+bwv_status bwt_reset_password(bwt_session* session, const char* code,
+                              size_t code_len, const char* fresh,
+                              size_t fresh_len);
+
+/* A new recovery key, replacing any old one (the old one stops working).
+ * `current` (the master password) is checked first; `code` receives the
+ * new key, to show once. */
+bwv_status bwt_new_recovery_key(bwt_session* session, const char* current,
+                                size_t current_len,
+                                char code[BWV_RECOVERY_CHARS + 1]);
+
 /* How many Hello prompts a replacement will cause (0 or 2), to say so
  * before the first. */
 int bwt_hello_prompts(const bwt_session* session);

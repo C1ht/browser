@@ -961,12 +961,17 @@ NS_IMETHODIMP
 PasswordVault::Slots(JSContext* aCx, Promise** aPromise) {
   return Run(aCx, aPromise, "PasswordVault::Slots", [](Core& core) {
     bool hello = false;
+    bool recovery = false;
     bwv_vault* vault = nullptr;
     if (core.mStore && LoadFile(core.mStore, &vault) == BWV_OK) {
       hello = bwv_has_slot(vault, BWV_SLOT_HELLO);
+      recovery = bwv_has_slot(vault, BWV_SLOT_RECOVERY);
     }
     bwv_free(vault);
-    return Text(nsCString(hello ? R"({"hello":true})" : R"({"hello":false})"), false);
+    return Text(nsCString(nsPrintfCString(R"({"hello":%s,"recovery":%s})",
+                                          hello ? "true" : "false",
+                                          recovery ? "true" : "false")),
+                false);
   });
 }
 
@@ -1099,6 +1104,157 @@ PasswordVault::UnlockWithHello(JSContext* aCx, Promise** aPromise) {
     bwt_attach(core.mSession, vault);
     return Text(std::move(index), true);
   });
+}
+
+NS_IMETHODIMP
+PasswordVault::NewRecoveryKey(const nsACString& aMasterPassword, JSContext* aCx,
+                              Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::NewRecoveryKey",
+             [pw = Own(aMasterPassword)](Core& core) mutable {
+               if (!core.Vault()) {
+                 Wipe(pw);
+                 return Done(BWV_E_LOCKED);
+               }
+               char code[BWV_RECOVERY_CHARS + 1];
+               bwv_status st =
+                   bwt_new_recovery_key(core.mSession, pw.get(), pw.Length(), code);
+               Wipe(pw);
+               nsCString out;
+               if (st == BWV_OK) {
+                 out.Assign(code);
+               }
+               Wipe(code, sizeof(code));
+               return st == BWV_OK ? Text(std::move(out), true) : Done(st);
+             });
+}
+
+NS_IMETHODIMP
+PasswordVault::UnlockWithRecovery(const nsACString& aCode,
+                                  const nsACString& aNewPassword, JSContext* aCx,
+                                  Promise** aPromise) {
+  return Run(
+      aCx, aPromise, "PasswordVault::UnlockWithRecovery",
+      [code = Own(aCode), fresh = Own(aNewPassword)](Core& core) mutable {
+        bwv_status st = core.mSession ? BWV_OK : BWV_E_STATE;
+        bwv_vault* vault = nullptr;
+        if (st == BWV_OK) {
+          st = LoadFile(core.mStore, &vault);
+        }
+        if (st == BWV_OK && !bwv_has_slot(vault, BWV_SLOT_RECOVERY)) {
+          st = BWV_E_NO_SLOT;
+        }
+        bwv_kdf_params params;
+        uint8_t salt[kSlotInputsMax];
+        size_t saltLen = 0;
+        if (st == BWV_OK) {
+          st = bwv_slot_inputs(vault, BWV_SLOT_RECOVERY, &params, salt, &saltLen);
+        }
+        bwv_key* key = nullptr;
+        if (st == BWV_OK) {
+          key = bwv_key_new();
+          st = key ? bwv_derive_recovery_key(&params, salt, code.get(),
+                                             code.Length(), key)
+                   : BWV_E_NOMEM;
+        }
+        if (st == BWV_OK) {
+          st = bwv_unlock(vault, BWV_SLOT_RECOVERY, key);
+        }
+        bwv_key_free(key);
+        if (st == BWV_OK) {
+          st = bwv_open_body(vault);
+        }
+        nsCString index;
+        if (st == BWV_OK) {
+          uint8_t* data = nullptr;
+          size_t len = 0;
+          st = bwv_get_index(vault, &data, &len);
+          if (st == BWV_OK) {
+            index.Assign(reinterpret_cast<const char*>(data), len);
+            bwv_secret_free(data);
+          }
+        }
+        if (st != BWV_OK) {
+          Wipe(code);
+          Wipe(fresh);
+          bwv_free(vault);
+          return Done(st);
+        }
+        // The recovery key is a full replacement for the master password,
+        // so it sets a new one at once (§6); until that's written, nothing
+        // stays unlocked.
+        bwt_attach(core.mSession, vault);
+        st = bwt_reset_password(core.mSession, code.get(), code.Length(),
+                                fresh.get(), fresh.Length());
+        Wipe(code);
+        Wipe(fresh);
+        if (st != BWV_OK) {
+          core.Lock();
+          Wipe(index);
+          return Done(st);
+        }
+        return Text(std::move(index), true);
+      });
+}
+
+NS_IMETHODIMP
+PasswordVault::StartOver(const nsACString& aDate, JSContext* aCx,
+                         Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::StartOver",
+             [date = nsCString(aDate)](Core& core) {
+               if (!core.mSession) {
+                 return Done(BWV_E_STATE);
+               }
+               // YYYY-MM-DD, so the name stays a plain file name.
+               bool valid = date.Length() == 10;
+               for (size_t i = 0; valid && i < date.Length(); i++) {
+                 char c = date[i];
+                 valid = (i == 4 || i == 7) ? c == '-' : c >= '0' && c <= '9';
+               }
+               if (!valid) {
+                 return Done(BWV_E_ARG);
+               }
+               if (!bws_exists(core.mStore, BWS_VAULT)) {
+                 return Done(BWV_E_NOT_FOUND);
+               }
+               core.Lock();
+               bwv_vault* old = nullptr;
+               uint8_t id[BWV_ID_BYTES];
+               bool haveId = LoadFile(core.mStore, &old) == BWV_OK;
+               if (haveId) {
+                 bwv_get_id(old, id);
+               }
+               bwv_free(old);
+               nsCString name;
+               for (int n = 1; n < 100; n++) {
+                 name = n == 1 ? nsPrintfCString("vault-forgotten-%s", date.get())
+                               : nsPrintfCString("vault-forgotten-%s-%d", date.get(), n);
+                 if (!bws_exists(core.mStore, nsCString(name + ".bwv"_ns).get()) &&
+                     !bws_exists(core.mStore, nsCString(name + "-backup.bwv"_ns).get())) {
+                   break;
+                 }
+                 name.Truncate();
+               }
+               if (name.IsEmpty()) {
+                 return Done(BWV_E_IO);
+               }
+               bwv_status st =
+                   bws_rename(core.mStore, BWS_VAULT, nsCString(name + ".bwv"_ns).get());
+               if (st != BWV_OK) {
+                 return Done(st);
+               }
+               // The backup is the same vault one save earlier: kept too, so
+               // nothing restores it over the new vault.
+               if (bws_exists(core.mStore, BWS_BACKUP)) {
+                 bws_rename(core.mStore, BWS_BACKUP, nsCString(name + "-backup.bwv"_ns).get());
+               }
+               bws_remove(core.mStore, BWS_STAGED);
+               if (haveId) {
+                 // Hello can't open it any more anyway: only its master
+                 // password can (Settings › Open an older vault…).
+                 windows_unlock::HelloDelete(id);
+               }
+               return Text(nsCString(name + ".bwv"_ns), false);
+             });
 }
 
 }  // namespace mozilla::browserwip

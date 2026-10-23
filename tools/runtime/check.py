@@ -4,7 +4,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Runtime checks against a built browser-wip.
 
-    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4 5 6 7] [--shots DIR]
+    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4 5 6 7 8] [--shots DIR]
 
 Starts the browser (headless, fresh profile, Marionette on a local port),
 runs privileged JavaScript in its window and reports pass/fail per check.
@@ -18,7 +18,9 @@ import re
 import http.server
 import json
 import os
+import shutil
 import socket
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -1361,10 +1363,449 @@ def part7(bindir, base):
             b.quit()
 
 
+# ---------------------------------------------------------------------------
+# Part 8: the password manager (docs/PASSWORDS.md §15)
+#
+# Login pages are served over HTTPS with a certificate made for the run;
+# the test profile trusts it through the certificate override service. A
+# second server on another port and one on another loopback host (127.0.0.2)
+# are "another site".
+
+PW_STYLE = ("<style>body{margin:0;font:14px sans-serif}input{position:absolute;left:40px;width:260px;"
+            "height:30px;box-sizing:border-box}button{position:absolute;left:40px;top:220px}"
+            "iframe{position:absolute;left:0;top:0;width:400px;height:300px;border:0}</style>")
+# Each page reports its fields in its title (and, in a frame, to the top
+# page): the username, the password's length, whether the confirmation
+# matches.
+PW_REPORT = """<script>
+function report() {
+  let c = document.getElementById("c");
+  let t = `u=${u.value} p=${p.value.length}` + (c ? ` same=${p.value == c.value}` : "");
+  document.title = t;
+  if (parent != window) parent.postMessage(t, "*");
+}
+for (let f of document.querySelectorAll("input")) f.addEventListener("input", report);
+</script>"""
+PW_PAGES = {
+    "/login": f"""<!doctype html><meta charset=utf-8><title>login</title>{PW_STYLE}
+<form action="/welcome" method="post">
+<input id=u name=username autocomplete=username style="top:40px">
+<input id=p name=password type=password autocomplete=current-password style="top:100px">
+<button id=go>Sign in</button></form>{PW_REPORT}""",
+    "/signup": f"""<!doctype html><meta charset=utf-8><title>signup</title>{PW_STYLE}
+<form action="/welcome" method="post">
+<input id=u name=email type=email autocomplete=email style="top:40px">
+<input id=p name=new type=password autocomplete=new-password style="top:100px">
+<input id=c name=confirm type=password autocomplete=new-password style="top:160px">
+<button id=go>Create account</button></form>{PW_REPORT}""",
+    # The username field is off-screen: only the password is filled.
+    "/offscreen": f"""<!doctype html><meta charset=utf-8><title>offscreen</title>{PW_STYLE}
+<form action="/welcome" method="post">
+<input id=u name=username autocomplete=username style="top:40px;left:-10000px">
+<input id=p name=password type=password autocomplete=current-password style="top:100px">
+<button id=go>Sign in</button></form>{PW_REPORT}""",
+    # Focused by the page's script, not the user: no dropdown.
+    "/autofocus": f"""<!doctype html><meta charset=utf-8><title>autofocus</title>{PW_STYLE}
+<form action="/welcome" method="post">
+<input id=u name=username autocomplete=username style="top:40px">
+<input id=p name=password type=password autocomplete=current-password style="top:100px">
+<button id=go>Sign in</button></form>{PW_REPORT}
+<script>setTimeout(() => {{ u.focus(); u.click(); document.title = "focused"; }}, 300);</script>""",
+    "/welcome": "<!doctype html><meta charset=utf-8><title>welcome</title><p>Signed in.",
+}
+
+
+class PasswordPageHandler(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        path, _, query = self.path.partition("?")
+        if path == "/frame":
+            src = urllib.parse.parse_qs(query).get("src", [""])[0]
+            body = (f"<!doctype html><meta charset=utf-8><title>frame</title>{PW_STYLE}"
+                    f"<iframe src='{src}'></iframe><script>addEventListener('message', e => "
+                    f"document.title = 'frame:' + e.data);</script>")
+        else:
+            body = PW_PAGES.get(path)
+        data = (body or "not found").encode()
+        self.send_response(200 if body else 404)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        self.path = "/welcome"
+        self.do_GET()
+
+
+def make_certificate(directory):
+    """A self-signed certificate for the run, or None without openssl."""
+    openssl = shutil.which("openssl")
+    if not openssl and sys.platform == "win32":
+        git = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git/usr/bin/openssl.exe"
+        openssl = str(git) if git.exists() else None
+    if not openssl:
+        return None
+    cert, key = Path(directory) / "cert.pem", Path(directory) / "key.pem"
+    result = subprocess.run(
+        [openssl, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2", "-keyout", str(key),
+         "-out", str(cert), "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1,IP:127.0.0.2"],
+        capture_output=True,
+    )
+    return (cert, key) if result.returncode == 0 else None
+
+
+def serve_https(host, certificate, plain=False):
+    server = http.server.ThreadingHTTPServer((host, 0), PasswordPageHandler)
+    if not plain:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(*certificate)
+        server.socket = ctx.wrap_socket(server.socket, server_side=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    scheme = "http" if plain else "https"
+    return server, f"{scheme}://{host}:{server.server_address[1]}"
+
+
+PV = 'const { PasswordVault } = ChromeUtils.importESModule("resource://gre/modules/browserwip/PasswordVault.sys.mjs");'
+PM = 'const { PrivacyModes } = ChromeUtils.importESModule("resource://gre/modules/browserwip/PrivacyModes.sys.mjs");'
+# Keys, as the user types them (nsITextInputProcessor: trusted events).
+PW_TYPE = """let [text, key] = arguments;
+let tip = Cc["@mozilla.org/text-input-processor;1"].createInstance(Ci.nsITextInputProcessor);
+if (!tip.beginInputTransactionForTests(window)) throw new Error("no TIP");
+let send = init => { let ev = new KeyboardEvent("", init); tip.keydown(ev); tip.keyup(ev); };
+if (key) {
+  send({ key, code: key, keyCode: KeyboardEvent["DOM_VK_" + { Enter: "RETURN", ArrowDown: "DOWN" }[key]] });
+} else {
+  for (let ch of text) send({ key: ch });
+}"""
+PW_PANEL = """let p = document.getElementById("passwords-panel"), b = document.getElementById("passwords-button");
+return { state: p.state, view: p.getAttribute("view"), button: !b.hidden, pending: b.hasAttribute("pending") };"""
+PW_DROPDOWN = """let d = document.getElementById("passwords-dropdown");
+return { state: d.state, rows: [...d.querySelectorAll(".passwords-option, .passwords-dropdown-header")]
+  .map(r => r.textContent.replace(/\\s+/g, " ").trim()) };"""
+
+
+def part8_frame(bindir, site, other_host):
+    """A login form in a cross-origin frame (§7.1.4). Headless Gecko doesn't
+    route a click synthesized in the window into an out-of-process frame, so
+    this profile keeps frames in the page's process; the rule under test
+    depends on the frame's origin, not its process."""
+    secret = "frame-secret-pass"
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True, "fission.autostart": False})
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js('Cc["@mozilla.org/security/certoverride;1"].getService(Ci.nsICertOverrideService)'
+             '.setDisableAllSecurityChecksAndLetAttackersInterceptMyData(true);')
+        b.js(PV + """return (async () => {
+          await PasswordVault.setup("correct horse battery", "correct horse battery");
+          await PasswordVault.saveLogin({ origin: arguments[0], username: "frame@example.com", password: arguments[1] });
+        })();""", other_host, secret)
+        url = f"{site}/frame?src={urllib.parse.quote(other_host + '/login')}"
+        b.js("gBrowser.selectTab(gBrowser.addTab(arguments[0], "
+             "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));", url)
+        b.wait("return gBrowser.selectedBrowser.browsingContext.children[0]?.currentWindowGlobal?.documentTitle == 'login';",
+               timeout=15)
+        time.sleep(1)
+        r = b.js("return document.getElementById('passwords-dropdown').state;")
+        record(8, "a cross-origin frame opens nothing by itself", r == "closed", r)
+        b.m.click(60, 55)
+        r = b.wait("return document.getElementById('passwords-dropdown').state == 'open';", timeout=5)
+        d = b.js(PW_DROPDOWN)
+        host = urllib.parse.urlsplit(other_host).netloc
+        record(8, "a click in it opens the dropdown, naming the frame's site",
+               r and d["rows"] and host in d["rows"][0] and any(row.startswith("frame@example.com") for row in d["rows"]), d)
+        b.js("document.querySelector('#passwords-dropdown .passwords-option')?.click();")
+        r = b.wait("return gBrowser.selectedBrowser.contentTitle == arguments[0];",
+                   f"frame:u=frame@example.com p={len(secret)}", timeout=5)
+        record(8, "and picking the login fills the frame", r, b.js("return gBrowser.selectedBrowser.contentTitle;"))
+    finally:
+        b.quit()
+
+
+def part8(bindir, base, shots):
+    work = tempfile.mkdtemp(prefix="wip-pw-")
+    certificate = make_certificate(work)
+    if not certificate:
+        record(8, "openssl makes the test server's certificate", False, "openssl not found or failed")
+        return
+    servers = []
+    try:
+        for host in ["127.0.0.1", "127.0.0.1", "127.0.0.2"]:
+            servers.append(serve_https(host, certificate))
+        servers.append(serve_https("127.0.0.1", certificate, plain=True))
+    except OSError as e:
+        record(8, "test servers start", False, repr(e))
+        return
+    site, other_port, other_host, plain = (url for _, url in servers)
+    master, fresh = "correct horse battery", "a brand new master pass"
+    secret = "hunter2-but-longer"
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True})
+    secrets = [master, fresh, secret]
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js('Cc["@mozilla.org/security/certoverride;1"].getService(Ci.nsICertOverrideService)'
+             '.setDisableAllSecurityChecksAndLetAttackersInterceptMyData(true);')
+        title = lambda: b.js("return gBrowser.selectedBrowser.contentTitle;")
+        typ = lambda text: b.js(PW_TYPE, text, None)
+        key = lambda k: b.js(PW_TYPE, "", k)
+        panel = lambda: b.js(PW_PANEL)
+        dropdown = lambda: b.js(PW_DROPDOWN)
+        vault_file = b.profile / "passwords" / "vault.bwv"
+
+        def load(url, expected, timeout=15):
+            b.js("gBrowser.selectTab(gBrowser.addTab(arguments[0], "
+                 "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));", url)
+            return b.wait("return gBrowser.selectedBrowser.contentTitle == arguments[0];", expected, timeout=timeout)
+
+        def close_tabs():
+            b.js("for (let t of gBrowser.tabs.slice(1)) gBrowser.removeTab(t);")
+
+        def open_dropdown(x, y):
+            b.m.click(x, y)
+            return b.wait("return document.getElementById('passwords-dropdown').state == 'open';", timeout=5)
+
+        def sign_in(url, username, password):
+            load(url, "login")
+            b.wait("return !document.getElementById('passwords-button').hidden;", timeout=10)
+            b.m.click(60, 55)
+            typ(username)
+            b.m.click(60, 115)
+            typ(password)
+            b.wait("return gBrowser.selectedBrowser.contentTitle.startsWith(arguments[0]);", f"u={username}", timeout=5)
+            b.js("document.getElementById('passwords-dropdown').hidePopup();")
+            key("Enter")
+
+        # -- No vault until setup; Hello not set up means the master password.
+        load(site + "/login", "login")
+        r = b.wait("return !document.getElementById('passwords-button').hidden;", timeout=10)
+        record(8, "the key button shows on an HTTPS login page", r)
+        record(8, "no vault file in the profile until setup", not vault_file.exists())
+        r = b.js(PV + "return (async () => { await PasswordVault.init(); return [PasswordVault.state, PasswordVault.canUnlockWithHello]; })();")
+        record(8, "a new profile has no vault and no Windows Hello unlock", r == ["none", False], r)
+
+        # -- Setup, with a recovery key.
+        code = b.js(PV + "return (async () => { await PasswordVault.setup(arguments[0], arguments[0]); "
+                    "return PasswordVault.newRecoveryKey(arguments[0]); })();", master)
+        secrets.append(code)
+        record(8, "setup writes the vault", vault_file.exists())
+        record(8, "a recovery key is 8 groups of 4", bool(re.fullmatch(r"([A-Z2-7]{4}-){7}[A-Z2-7]{4}", code or "")), code)
+
+        # -- Saving: the prompt after signing in.
+        close_tabs()
+        sign_in(site + "/login", "ana@example.com", secret)
+        r = b.wait("let p = document.getElementById('passwords-panel'); return p.state == 'open' && p.getAttribute('view');", timeout=15)
+        record(8, "signing in offers to save the login", r == "save", panel())
+        b.js("document.getElementById('passwords-save-confirm').click();")
+        r = b.wait(PV + "let e = PasswordVault.entries(); return e.length && e.map(x => [x.origin, x.username]);", timeout=10)
+        record(8, "Save puts it in the vault", r == [[site, "ana@example.com"]], r)
+
+        # -- Filling on the exact origin only.
+        close_tabs()
+        load(site + "/login", "login")
+        b.wait("return !document.getElementById('passwords-button').hidden;", timeout=10)
+        r = open_dropdown(60, 55)
+        d = dropdown()
+        record(8, "the dropdown lists the login on its own origin", r and d["rows"][:1] and d["rows"][0].startswith("ana@example.com"), d)
+        key("ArrowDown")
+        key("Enter")
+        r = b.wait("return gBrowser.selectedBrowser.contentTitle == arguments[0];", f"u=ana@example.com p={len(secret)}", timeout=5)
+        record(8, "picking it fills username and password", r, title())
+        for label, url in [("another port", other_port), ("another host", other_host)]:
+            close_tabs()
+            load(url + "/login", "login")
+            b.wait("return !document.getElementById('passwords-button').hidden;", timeout=10)
+            open_dropdown(60, 55)
+            d = dropdown()
+            record(8, f"nothing offered on {label}", not any("ana@example.com" in row for row in d["rows"]), d)
+            b.js("document.getElementById('passwords-dropdown').hidePopup();")
+        close_tabs()
+        load(plain + "/login", "login")
+        time.sleep(1)
+        b.m.click(60, 55)
+        time.sleep(1)
+        r = b.js("return [document.getElementById('passwords-button').hidden, document.getElementById('passwords-dropdown').state];")
+        record(8, "nothing on HTTP: no key button, no dropdown", r == [True, "closed"], r)
+
+        # -- Script focus opens nothing; off-screen fields aren't filled.
+        close_tabs()
+        load(site + "/autofocus", "focused")
+        time.sleep(1)
+        r = b.js("return document.getElementById('passwords-dropdown').state;")
+        record(8, "a field focused and clicked by script opens no dropdown", r == "closed", r)
+        close_tabs()
+        load(site + "/offscreen", "offscreen")
+        b.wait("return !document.getElementById('passwords-button').hidden;", timeout=10)
+        open_dropdown(60, 115)
+        key("ArrowDown")
+        key("Enter")
+        r = b.wait("return gBrowser.selectedBrowser.contentTitle == arguments[0];", f"u= p={len(secret)}", timeout=5)
+        record(8, "an off-screen username field isn't filled; the password is", r, title())
+
+        # -- Never for this site.
+        close_tabs()
+        sign_in(other_port + "/login", "bob@example.com", "never-saved-password")
+        secrets.append("never-saved-password")
+        r = b.wait("let p = document.getElementById('passwords-panel'); return p.state == 'open' && p.getAttribute('view');", timeout=15)
+        b.js("document.getElementById('passwords-never').doCommand();")
+        b.wait("return document.getElementById('passwords-panel').state == 'closed';", timeout=5)
+        close_tabs()
+        sign_in(other_port + "/login", "bob@example.com", "never-saved-password")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'welcome';", timeout=10)
+        time.sleep(1.5)
+        p = panel()
+        r = b.js(PV + "return PasswordVault.entries().some(e => e.username == 'bob@example.com');")
+        record(8, "after Never for this site, signing in there asks nothing", r is False and p["state"] == "closed" and not p["pending"], p)
+
+        # -- Generated passwords: Standard saves them with Undo, Strict asks.
+        for mode, view in [("strict", "save"), ("standard", "saved")]:
+            b.js(PM + "PrivacyModes.setMode(arguments[0]);", mode)
+            close_tabs()
+            load(site + "/signup", "signup")
+            b.wait("return !document.getElementById('passwords-button').hidden;", timeout=10)
+            b.m.click(60, 55)
+            typ(f"{mode}@example.com")
+            open_dropdown(60, 115)
+            b.js("document.querySelector('#passwords-dropdown .passwords-option.generator').click();")
+            b.wait("return gBrowser.selectedBrowser.contentTitle.endsWith('p=20 same=true');", timeout=5)
+            b.m.click(60, 175)
+            key("Enter")
+            r = b.wait("let p = document.getElementById('passwords-panel'); return p.state == 'open' && p.getAttribute('view');", timeout=15)
+            record(8, f"{mode.capitalize()}: a generated password is {'offered' if view == 'save' else 'saved, with Undo'}", r == view, panel())
+            b.js("document.getElementById('passwords-panel').hidePopup();")
+        b.js(PM + "PrivacyModes.setMode('standard');")
+
+        # -- The clipboard is cleared after 30 s (checked further down).
+        b.js(PV + "return PasswordVault.copyPassword(PasswordVault.entries().find(e => e.username == 'ana@example.com').id);")
+        copied_at = time.time()
+        CLIPBOARD = """let t = Cc["@mozilla.org/widget/transferable;1"].createInstance(Ci.nsITransferable);
+t.init(null); t.addDataFlavor("text/plain");
+try { Services.clipboard.getData(t, Ci.nsIClipboard.kGlobalClipboard, null); } catch (e) { return ""; }
+let data = {}; try { t.getTransferData("text/plain", data); } catch (e) { return ""; }
+return data.value.QueryInterface(Ci.nsISupportsString).data;"""
+        record(8, "Copy puts the password on the clipboard", b.js(CLIPBOARD) == secret)
+
+        # -- Locking: on idle (the idle service's observer, at the pref's
+        # time) and when Windows locks.
+        b.js("Services.prefs.setIntPref('browserwip.passwords.lockAfterMinutes', 1);")
+        r = b.wait(PV + "return PasswordVault._idleArmed;", timeout=5)
+        record(8, "unlocked, the vault waits for the set idle time", r == 60, r)
+        b.js(PV + "PasswordVault.observe(null, 'idle');")
+        r = b.wait(PV + "return PasswordVault.state == 'locked';", timeout=5)
+        record(8, "idle locks the vault", r)
+        b.js(PV + "return PasswordVault.unlock(arguments[0]);", master)
+        b.js("Services.obs.notifyObservers(null, 'browserwip:session-locked');")
+        r = b.wait(PV + "return PasswordVault.state == 'locked';", timeout=5)
+        record(8, "the Windows session locking locks the vault", r)
+        close_tabs()
+        load(site + "/login", "login")
+        b.wait("return !document.getElementById('passwords-button').hidden;", timeout=10)
+        b.js("PasswordsUI.openPanel();")
+        r = b.wait("let p = document.getElementById('passwords-panel'); return p.getAttribute('view') == 'unlock' && "
+                   "[document.getElementById('passwords-unlock-hello').hidden, document.activeElement?.id];", timeout=5)
+        record(8, "without Windows Hello, unlocking asks for the master password", r and r[0], r)
+        b.js("document.getElementById('passwords-panel').hidePopup();")
+
+        # -- Forgot password: the recovery key sets a new one.
+        close_tabs()
+        load("about:passwords#forgot", "")
+        r = b.wait("let d = gBrowser.selectedBrowser.contentDocument; return d?.readyState == 'complete' && "
+                   "!d.getElementById('card-forgot').hidden && !d.getElementById('recover-form').hidden;", timeout=15)
+        record(8, "Forgot password offers the recovery key", r)
+        r = b.js(PV + "return PasswordVault.recover(arguments[0], arguments[1], arguments[1]).then(() => 'ok', e => e.code);",
+                 "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG-HHHH", fresh)
+        record(8, "a wrong recovery key is refused", r == "wrong-recovery-key", r)
+        r = b.js(PV + "return PasswordVault.recover(arguments[0], arguments[1], arguments[1]).then(() => PasswordVault.state, e => e.code);",
+                 code.lower(), fresh)
+        record(8, "the recovery key unlocks and sets a new master password", r == "unlocked", r)
+        b.js(PV + "return PasswordVault.lock();")
+        r = b.js(PV + "return PasswordVault.unlock(arguments[0]).then(() => 'ok', e => e.code);", master)
+        record(8, "the old master password no longer opens it", r == "wrong-password", r)
+        r = b.js(PV + "return PasswordVault.unlock(arguments[0]).then(() => PasswordVault.entries().length, e => e.code);", fresh)
+        record(8, "the new one does, with every login", r == 2, r)
+
+        # -- The clipboard, 30 s after the copy.
+        time.sleep(max(0, copied_at + 32 - time.time()))
+        record(8, "the clipboard is cleared after 30 s", b.js(CLIPBOARD) != secret)
+
+        # -- Start over: the old vault kept, a new one set up from the page.
+        b.js(PV + "return PasswordVault.lock();")
+        r = b.js(PV + "return PasswordVault.startOver('start').then(() => 'ok', e => e.code);")
+        record(8, "Start over needs “start over” typed", r == "not-confirmed", r)
+        r = b.js(PV + "return PasswordVault.startOver('Start over').then(n => [n, PasswordVault.state], e => e.code);")
+        kept = r[0] if isinstance(r, list) else ""
+        record(8, "Start over keeps the old vault and leaves none in use",
+               isinstance(r, list) and r[1] == "none" and not vault_file.exists() and (vault_file.parent / kept).exists(), r)
+        r = b.js(PV + "return PasswordVault.olderVaults();")
+        record(8, "Settings can find the kept vault", r == [kept], r)
+        close_tabs()
+        load("about:passwords", "")
+        b.wait("let d = gBrowser.selectedBrowser.contentDocument; return d?.readyState == 'complete' && !d.getElementById('card-setup').hidden;", timeout=15)
+        b.js("gBrowser.selectedBrowser.contentDocument.getElementById('setup-suggest').click();")
+        r = b.js("let d = gBrowser.selectedBrowser.contentDocument, a = d.getElementById('setup-password'), c = d.getElementById('setup-confirm');"
+                 "return [a.type, c.type, a.value == c.value, a.value.split('-').length];")
+        record(8, "Suggest a passphrase fills both fields, shown, with five words", r and r[:3] == ["text", "text", True] and r[3] >= 5, r)
+        phrase = b.js("return gBrowser.selectedBrowser.contentDocument.getElementById('setup-password').value;")
+        secrets.append(phrase)
+        b.js("gBrowser.selectedBrowser.contentDocument.getElementById('setup-submit').click();")
+        r = b.wait("let d = gBrowser.selectedBrowser.contentDocument; return d.getElementById('recovery-dialog').open && "
+                   "d.getElementById('recovery-code').children.length;", timeout=30)
+        record(8, "setting up offers a recovery key, shown once in 8 groups", r == 8, r)
+        secrets.append(b.js("return gBrowser.selectedBrowser.contentDocument.getElementById('recovery-code').textContent;"))
+        b.js("gBrowser.selectedBrowser.contentDocument.getElementById('recovery-done').click();")
+        r = b.js("let d = gBrowser.selectedBrowser.contentDocument; return [d.getElementById('recovery-dialog').open, d.getElementById('recovery-code').textContent];")
+        record(8, "“I’ve written it down” closes it and forgets the key", r == [False, ""], r)
+        r = b.js(PV + "return [PasswordVault.state, PasswordVault.hasRecoveryKey, PasswordVault.entries().length];")
+        record(8, "the new vault is empty and has its recovery key", r == ["unlocked", True, 0], r)
+
+        # -- Settings: the recovery key (again, with the master password),
+        # and the kept vault.
+        load("about:settings#passwords", "")
+        S = "let d = gBrowser.selectedBrowser.contentDocument; "
+        r = b.wait(S + "return d?.readyState == 'complete' && !d.getElementById('passwords-recovery-row').hidden && "
+                   "[d.getElementById('passwords-recovery').textContent, d.getElementById('passwords-older-row').hidden];", timeout=15)
+        record(8, "Settings offers a new recovery key and the older vault", r and r[0] == "Make a new one" and r[1] is False, r)
+        b.js(S + "d.getElementById('passwords-recovery').click();")
+        b.js(S + "d.getElementById('passwords-recovery-master').value = 'not the password'; d.getElementById('passwords-recovery-submit').click();")
+        r = b.wait(S + "let e = d.getElementById('passwords-recovery-result'); return !e.hidden && e.textContent;", timeout=15)
+        record(8, "a new recovery key needs the master password", r == "That isn’t the master password.", r)
+        b.js(S + "d.getElementById('passwords-recovery-master').value = arguments[0]; d.getElementById('passwords-recovery-submit').click();", phrase)
+        r = b.wait(S + "return !d.getElementById('passwords-recovery-shown').hidden && d.getElementById('passwords-recovery-code').children.length;", timeout=30)
+        record(8, "with it, Settings shows the new key once", r == 8, r)
+        secrets.append(b.js(S + "return d.getElementById('passwords-recovery-code').textContent;"))
+        b.js(S + "d.getElementById('passwords-recovery-done').click();")
+        r = b.js(S + "return [d.getElementById('passwords-recovery-shown').hidden, d.getElementById('passwords-recovery-code').textContent];")
+        record(8, "and forgets it once written down", r == [True, ""], r)
+
+        # -- Open an older vault: its logins come back with its password.
+        r = b.js(PV + """return (async () => {
+          let bytes = await IOUtils.read(PathUtils.join(PasswordVault.directory, arguments[0]));
+          let { logins } = await PasswordVault.readImport(bytes, arguments[1]);
+          await PasswordVault.applyImport(PasswordVault.planImport(logins));
+          return PasswordVault.entries().map(e => e.username).sort();
+        })();""", kept, fresh)
+        record(8, "an older vault opened with its master password adds its logins back",
+               r == ["ana@example.com", "standard@example.com"], r)
+
+        log = (b.profile / "browser.log").read_text(errors="replace")
+        leaked = [s for s in secrets if s and s in log]
+        record(8, "no secrets in the browser log", not leaked, f"{len(leaked)} found")
+    finally:
+        b.quit()
+    try:
+        part8_frame(bindir, site, other_host)
+    finally:
+        for server, _ in servers:
+            server.shutdown()
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("bindir")
-    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5, 6, 7])
+    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5, 6, 7, 8])
     parser.add_argument("--shots", help="directory for screenshots")
     args = parser.parse_args()
     if args.shots:
@@ -1373,7 +1814,7 @@ def main():
     parts = {1: lambda: part1(args.bindir, base), 2: lambda: part2(args.bindir, base),
              3: lambda: part3(args.bindir, base, args.shots), 4: lambda: part4(args.bindir, base, args.shots),
              5: lambda: part5(args.bindir, base), 6: lambda: part6(args.bindir, base),
-             7: lambda: part7(args.bindir, base)}
+             7: lambda: part7(args.bindir, base), 8: lambda: part8(args.bindir, base, args.shots)}
     for p in args.part:
         try:
             parts[p]()

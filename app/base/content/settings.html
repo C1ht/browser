@@ -81,6 +81,34 @@
           <button id="passwords-export" class="secondary" type="button" data-l10n-id="passwords-menu-export"></button>
         </div>
       </div>
+      <div id="passwords-recovery-row" class="inline-row" hidden="hidden">
+        <div class="stacked">
+          <span data-l10n-id="settings-passwords-recovery-label"></span>
+          <span id="passwords-recovery-status" class="help"></span>
+        </div>
+        <button id="passwords-recovery" class="secondary" type="button"></button>
+      </div>
+      <form id="passwords-recovery-form" class="change-form" hidden="hidden">
+        <input id="passwords-recovery-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-recovery-master"/>
+        <p id="passwords-recovery-result" role="status" hidden="hidden"></p>
+        <div class="button-row">
+          <button id="passwords-recovery-submit" class="primary" type="submit" data-l10n-id="settings-passwords-recovery-confirm"></button>
+          <button id="passwords-recovery-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
+        </div>
+      </form>
+      <div id="passwords-recovery-shown" class="recovery-box" hidden="hidden">
+        <p class="muted" data-l10n-id="passwords-recovery-text"></p>
+        <p id="passwords-recovery-code" class="recovery-code"></p>
+        <p class="muted" data-l10n-id="passwords-recovery-keep"></p>
+        <div class="button-row">
+          <button id="passwords-recovery-print" class="secondary" type="button" data-l10n-id="passwords-recovery-print"></button>
+          <button id="passwords-recovery-done" class="primary" type="button" data-l10n-id="passwords-recovery-done"></button>
+        </div>
+      </div>
+      <div id="passwords-older-row" class="inline-row" hidden="hidden">
+        <span class="help" data-l10n-id="settings-passwords-older-help"></span>
+        <button id="passwords-older" class="secondary" type="button" data-l10n-id="settings-passwords-older"></button>
+      </div>
       <details id="passwords-change-box" class="advanced" hidden="hidden">
         <summary data-l10n-id="settings-passwords-change"></summary>
         <form id="passwords-change-form" class="change-form">

@@ -1321,6 +1321,68 @@ static void test_change_password(void) {
   teardown(&in);
 }
 
+/* Forgot password: the recovery key sets a new one (§6). */
+static void test_reset_password(void) {
+  initial_t in;
+  setup(&in, "reset");
+  bws_store* store;
+  bwt_session* s = start(in.dir, &store, PASSWORD, NULL);
+  char other[BWV_RECOVERY_CHARS + 1];
+  bwv_recovery_code_generate(other);
+  CHECK_STATUS(bwt_reset_password(s, other, strlen(other), PASSWORD2, strlen(PASSWORD2)),
+               BWV_E_AUTH);
+  CHECK_STATUS(bwt_reset_password(s, "not a code", 10, PASSWORD2, strlen(PASSWORD2)),
+               BWV_E_ARG);
+  CHECK_STATUS(bwt_reset_password(s, in.code, strlen(in.code), PASSWORD2,
+                                  strlen(PASSWORD2)),
+               BWV_OK);
+  CHECK(FAKE.sign_calls == 0);
+  stop(s, store);
+  state_t st = inspect(&in);
+  CHECK(changed(&st)); /* the new password; the recovery key still works */
+  if (!changed(&st)) {
+    print_state("after reset", &st);
+  }
+  teardown(&in);
+}
+
+static void test_reset_without_recovery_key(void) {
+  initial_t in;
+  setup(&in, "reset-none");
+  bws_store* store;
+  bwt_session* s = start(in.dir, &store, PASSWORD, NULL);
+  CHECK_STATUS(bwv_remove_slot(bwt_vault(s), BWV_SLOT_RECOVERY), BWV_OK);
+  CHECK_STATUS(bwt_save(s), BWV_OK);
+  CHECK_STATUS(bwt_reset_password(s, in.code, strlen(in.code), PASSWORD2,
+                                  strlen(PASSWORD2)),
+               BWV_E_NO_SLOT);
+  stop(s, store);
+  teardown(&in);
+}
+
+/* A new recovery key replaces the old one; it needs the master password. */
+static void test_new_recovery_key(void) {
+  initial_t in;
+  setup(&in, "new-recovery");
+  bws_store* store;
+  bwt_session* s = start(in.dir, &store, PASSWORD, NULL);
+  char code[BWV_RECOVERY_CHARS + 1];
+  CHECK_STATUS(bwt_new_recovery_key(s, "wrong", 5, code), BWV_E_AUTH);
+  CHECK(code[0] == 0);
+  CHECK_STATUS(bwt_new_recovery_key(s, PASSWORD, strlen(PASSWORD), code), BWV_OK);
+  CHECK(strlen(code) == BWV_RECOVERY_CHARS);
+  CHECK(strcmp(code, in.code) != 0);
+  save_code(&in, code);
+  CHECK(FAKE.sign_calls == 0);
+  stop(s, store);
+  state_t st = inspect(&in);
+  CHECK(st.password && !st.old_code && st.new_code && st.keyring);
+  if (!(st.password && !st.old_code && st.new_code)) {
+    print_state("after new recovery key", &st);
+  }
+  teardown(&in);
+}
+
 static void test_replace(void) {
   initial_t in;
   setup(&in, "replace");
@@ -1979,6 +2041,9 @@ int main(int argc, char** argv) {
       {"owner-only permissions", test_permissions},
       {"staged leftover removed, not promoted", test_staged_leftover},
       {"password change keeps recovery, keyring, Hello", test_change_password},
+      {"recovery key sets a new master password", test_reset_password},
+      {"reset without a recovery key refused", test_reset_without_recovery_key},
+      {"new recovery key replaces the old one", test_new_recovery_key},
       {"replacement: new key, old recovery and unlocks dead", test_replace},
       {"password change with replacement", test_change_with_replacement},
       {"replacement without a recovery key makes none", test_no_recovery_key},

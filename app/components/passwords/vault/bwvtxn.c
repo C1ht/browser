@@ -171,9 +171,19 @@ static bwv_status password_key(const bwv_vault* vault, const char* pw,
   return st == BWV_OK ? bwv_derive_password_key(&params, salt, pw, len, out) : st;
 }
 
-/* The file on disk opens with this password: the master password check
- * before a change. */
-static bwv_status check_current(bwt_session* s, const char* pw, size_t len) {
+/* Derive a recovery key from `vault`'s recovery-slot inputs. */
+static bwv_status recovery_key(const bwv_vault* vault, const char* code,
+                               size_t len, bwv_key* out) {
+  bwv_kdf_params params;
+  uint8_t salt[BWV_SALT_BYTES];
+  bwv_status st = bwv_slot_inputs(vault, BWV_SLOT_RECOVERY, &params, salt, NULL);
+  return st == BWV_OK ? bwv_derive_recovery_key(&params, salt, code, len, out) : st;
+}
+
+/* The file on disk opens with this password (or, for the recovery slot,
+ * this recovery key): the check before a change. */
+static bwv_status check_slot(bwt_session* s, bwv_slot_type type,
+                             const char* pw, size_t len) {
   uint8_t* data;
   size_t data_len;
   bwv_status st = bws_read(s->store, BWS_VAULT, &data, &data_len);
@@ -187,16 +197,21 @@ static bwv_status check_current(bwt_session* s, const char* pw, size_t len) {
   } else {
     st = bwv_load(v, data, data_len);
     if (st == BWV_OK) {
-      st = password_key(v, pw, len, key);
+      st = type == BWV_SLOT_RECOVERY ? recovery_key(v, pw, len, key)
+                                     : password_key(v, pw, len, key);
     }
     if (st == BWV_OK) {
-      st = bwv_unlock(v, BWV_SLOT_PASSWORD, key);
+      st = bwv_unlock(v, type, key);
     }
   }
   bwv_key_free(key);
   bwv_free(v);
   bwv_bytes_free(data);
   return st;
+}
+
+static bwv_status check_current(bwt_session* s, const char* pw, size_t len) {
+  return check_slot(s, BWV_SLOT_PASSWORD, pw, len);
 }
 
 /* Prepare `type` with `params` (or none), derive its key with `derive`,
@@ -364,9 +379,11 @@ bwv_status bwt_save(bwt_session* s) {
 
 /* ---- Master password change: re-wrap only ---- */
 
-bwv_status bwt_change_password(bwt_session* s, const char* current,
-                               size_t current_len, const char* fresh,
-                               size_t fresh_len) {
+/* `current` opens `via` (the password slot for a change, the recovery
+ * slot for a reset). */
+static bwv_status change_password(bwt_session* s, bwv_slot_type via,
+                                  const char* current, size_t current_len,
+                                  const char* fresh, size_t fresh_len) {
   if (!s->vault) {
     return BWV_E_STATE;
   }
@@ -384,7 +401,7 @@ bwv_status bwt_change_password(bwt_session* s, const char* current,
   bwv_kdf_params params;
   int promoted = 0;
 
-  bwv_status st = DO_STEP("change:verify-current", check_current(s, current, current_len));
+  bwv_status st = DO_STEP("change:verify-current", check_slot(s, via, current, current_len));
   if (st == BWV_OK) {
     clone = bwv_clone(s->vault);
     st = DO_STEP("change:clone", clone ? BWV_OK : BWV_E_NOMEM);
@@ -441,6 +458,84 @@ bwv_status bwt_change_password(bwt_session* s, const char* current,
   bwv_bytes_free(file);
   bwv_bytes_free(staged);
   s->busy = 0;
+  return st;
+}
+
+bwv_status bwt_change_password(bwt_session* s, const char* current,
+                               size_t current_len, const char* fresh,
+                               size_t fresh_len) {
+  return change_password(s, BWV_SLOT_PASSWORD, current, current_len, fresh,
+                         fresh_len);
+}
+
+bwv_status bwt_reset_password(bwt_session* s, const char* code,
+                              size_t code_len, const char* fresh,
+                              size_t fresh_len) {
+  if (s->vault && !bwv_has_slot(s->vault, BWV_SLOT_RECOVERY)) {
+    return BWV_E_NO_SLOT;
+  }
+  return change_password(s, BWV_SLOT_RECOVERY, code, code_len, fresh,
+                         fresh_len);
+}
+
+/* ---- A new recovery key ---- */
+
+bwv_status bwt_new_recovery_key(bwt_session* s, const char* current,
+                                size_t current_len,
+                                char code[BWV_RECOVERY_CHARS + 1]) {
+  code[0] = 0;
+  if (!s->vault) {
+    return BWV_E_STATE;
+  }
+  if (s->busy) {
+    return BWV_E_BUSY;
+  }
+  bwv_status st = DO_STEP("recovery:verify-current", check_current(s, current, current_len));
+  /* On a copy, so a failed write leaves the old key (or none) in use. */
+  bwv_vault* clone = NULL;
+  if (st == BWV_OK) {
+    clone = bwv_clone(s->vault);
+    st = clone ? BWV_OK : BWV_E_NOMEM;
+  }
+  bwv_kdf_params params;
+  if (st == BWV_OK) {
+    /* The master password's parameters: the code has 160 bits anyway. */
+    st = bwv_slot_inputs(clone, BWV_SLOT_PASSWORD, &params, NULL, NULL);
+  }
+  if (st == BWV_OK) {
+    st = bwv_prepare_slot(clone, BWV_SLOT_RECOVERY, &params);
+  }
+  bwv_key* key = bwv_key_new();
+  if (st == BWV_OK && !key) {
+    st = BWV_E_NOMEM;
+  }
+  if (st == BWV_OK) {
+    bwv_kdf_params p;
+    uint8_t salt[BWV_SALT_BYTES];
+    bwv_recovery_code_generate(code);
+    st = bwv_prepared_inputs(clone, BWV_SLOT_RECOVERY, &p, salt, NULL);
+    if (st == BWV_OK) {
+      st = bwv_derive_recovery_key(&p, salt, code, strlen(code), key);
+    }
+  }
+  if (st == BWV_OK) {
+    st = DO_STEP("recovery:set", bwv_set_slot(clone, BWV_SLOT_RECOVERY, key));
+  }
+  bwv_key_free(key);
+  if (st == BWV_OK) {
+    bwv_vault* old = s->vault;
+    s->vault = clone;
+    st = bwt_save(s);
+    if (st == BWV_OK) {
+      clone = old;
+    } else {
+      s->vault = old;
+    }
+  }
+  bwv_free(clone); /* wiped */
+  if (st != BWV_OK) {
+    sodium_memzero(code, BWV_RECOVERY_CHARS + 1);
+  }
   return st;
 }
 

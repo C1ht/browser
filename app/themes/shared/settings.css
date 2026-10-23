@@ -49,6 +49,48 @@
   gap: 8px;
 }
 
+.stacked {
+  display: grid;
+  gap: 2px;
+}
+
+/* The recovery key, shown once after it's made. */
+.recovery-box {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line, color-mix(in srgb, currentColor 15%, transparent));
+  border-radius: 12px;
+}
+
+.recovery-box p {
+  margin: 0;
+}
+
+.recovery-code {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
+  padding: 14px;
+  border-radius: 10px;
+  background-color: var(--surface, color-mix(in srgb, currentColor 6%, transparent));
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  user-select: all;
+}
+
+/* Printing while the recovery key is shown prints only the key. */
+@media print {
+  body:has(#passwords-recovery-shown:not([hidden])) :is(nav, header, section:not(#passwords)),
+  body:has(#passwords-recovery-shown:not([hidden])) #passwords > :not(#passwords-recovery-shown),
+  #passwords-recovery-shown .button-row {
+    display: none !important;
+  }
+}
+
 .change-form {
   display: grid;
   gap: 10px;

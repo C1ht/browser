@@ -17,8 +17,9 @@
  * Errors thrown to callers carry a `code`: "wrong-password",
  * "too-short", "mismatch", "locked", "no-vault", "needs-master-password",
  * "not-fillable", "needs-passphrase", "wrong-passphrase", "bad-file",
- * "no-columns", "cancelled", "hello-unavailable", "hello-failed", or the
- * core's status name ("BWV_E_IO", ...).
+ * "no-columns", "cancelled", "hello-unavailable", "hello-failed",
+ * "wrong-recovery-key", "no-recovery-key", "not-confirmed", or the core's
+ * status name ("BWV_E_IO", ...).
  *
  * Windows Hello (§5.3) is a second way to unlock, for filling only: showing,
  * copying and exporting still ask for the master password.
@@ -42,6 +43,7 @@ import {
   planImport,
   toCSV,
 } from "resource://gre/modules/browserwip/PasswordTransfer.sys.mjs";
+import { suggestPassphrase } from "resource://gre/modules/browserwip/PasswordWords.sys.mjs";
 
 const lazy = {};
 XPCOMUtils.defineLazyServiceGetter(
@@ -127,11 +129,20 @@ export const PasswordVault = {
     return lazy.offerToSave;
   },
 
+  /** The vault's directory in the profile (§10). */
+  get directory() {
+    return PathUtils.join(PathUtils.profileDir, "passwords");
+  },
+
+  /** A 5-word passphrase from the EFF long list, to suggest at setup. */
+  suggestPassphrase() {
+    return suggestPassphrase();
+  },
+
   /** Opens the vault directory; resolves with the state. Safe to call often. */
   init() {
     this._opening ??= (async () => {
-      let dir = PathUtils.join(PathUtils.profileDir, "passwords");
-      let info = JSON.parse(await lazy.core.open(dir));
+      let info = JSON.parse(await lazy.core.open(this.directory));
       Services.obs.addObserver(this, "sleep_notification");
       Services.obs.addObserver(this, "quit-application-granted");
       Services.obs.addObserver(this, "browserwip:session-locked");
@@ -225,12 +236,19 @@ export const PasswordVault = {
   // { available: Hello can unlock on this machine, enrolled: the vault has
   // a Hello slot }
   hello: { available: false, enrolled: false },
+  // Whether the vault has a recovery key (§6).
+  hasRecoveryKey: false,
 
   async _refreshHello() {
+    let slots = { hello: false, recovery: false };
+    try {
+      slots = JSON.parse(await lazy.core.slots());
+    } catch (e) {}
+    this.hasRecoveryKey = slots.recovery;
     try {
       this.hello = {
         available: await lazy.core.helloAvailable(),
-        enrolled: JSON.parse(await lazy.core.slots()).hello,
+        enrolled: slots.hello,
       };
     } catch (e) {
       this.hello = { available: false, enrolled: false };
@@ -299,6 +317,105 @@ export const PasswordVault = {
       await this._refreshHello();
       this._changed();
     }
+  },
+
+  // ---------------------------------------------------------------------
+  // Forgotten master password (§6)
+
+  /**
+   * A new recovery key, replacing any old one; needs the master password.
+   * Resolves with the key, to show once and never again.
+   */
+  async newRecoveryKey(master) {
+    this._requireUnlocked();
+    let code;
+    try {
+      code = await lazy.core.newRecoveryKey(master.normalize("NFC"));
+    } catch (e) {
+      throw failure(coreCode(e) == "BWV_E_AUTH" ? "wrong-password" : coreCode(e), e);
+    }
+    this.hasRecoveryKey = true;
+    this._revealUntil = Date.now() + REVEAL_GRACE_MS;
+    this._changed();
+    return code;
+  },
+
+  /**
+   * Forgot password: the recovery key unlocks and sets `password` as the
+   * new master password. The recovery key keeps working.
+   */
+  async recover(code, password, confirmation) {
+    await this.init();
+    if (this.state == "none") {
+      throw failure("no-vault");
+    }
+    this._checkNewMaster(password, confirmation);
+    if (this._failures >= FREE_TRIES) {
+      await new Promise(resolve => lazy.setTimeout(resolve, TRY_DELAY_MS));
+    }
+    if (this.state == "unlocked") {
+      // Unlocked through Hello: the recovery key still has to be typed.
+      await this.lock();
+    }
+    let json;
+    try {
+      json = await lazy.core.unlockWithRecovery(code.trim(), password.normalize("NFC"));
+    } catch (e) {
+      let c = coreCode(e);
+      if (c == "BWV_E_AUTH" || c == "BWV_E_ARG") {
+        this._failures++;
+        throw failure("wrong-recovery-key");
+      }
+      throw failure(c == "BWV_E_NO_SLOT" ? "no-recovery-key" : c, e);
+    }
+    this._index = parseIndex(json);
+    this._failures = 0;
+    this._revealUntil = Date.now() + REVEAL_GRACE_MS;
+    this._setState("unlocked");
+  },
+
+  /**
+   * Start over: the vault is kept as vault-forgotten-<date>.bwv and a new
+   * one can be set up. `typed` must be "start over". Resolves with the
+   * kept file's name.
+   */
+  async startOver(typed) {
+    await this.init();
+    if (this.state == "none") {
+      throw failure("no-vault");
+    }
+    if (typed?.trim().toLowerCase() != "start over") {
+      throw failure("not-confirmed");
+    }
+    await this.lock();
+    let now = new Date();
+    let date = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+      .map((n, i) => String(n).padStart(i ? 2 : 4, "0"))
+      .join("-");
+    let name;
+    try {
+      name = await lazy.core.startOver(date);
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    }
+    this._failures = 0;
+    await this._refreshHello();
+    this._setState("none");
+    return name;
+  },
+
+  /** The vaults kept by Start over, newest first (for "Open an older vault…"). */
+  async olderVaults() {
+    let names = [];
+    try {
+      for (let path of await IOUtils.getChildren(this.directory)) {
+        let name = PathUtils.filename(path);
+        if (/^vault-forgotten-[0-9-]+\.bwv$/.test(name) && !name.endsWith("-backup.bwv")) {
+          names.push(name);
+        }
+      }
+    } catch (e) {}
+    return names.sort().reverse();
   },
 
   async lock() {

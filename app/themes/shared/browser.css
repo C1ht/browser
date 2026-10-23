@@ -1299,6 +1299,7 @@ menupopup.wip-menu menuseparator {
 #passwords-panel[view="saved"] #passwords-saved-view,
 #passwords-panel[view="unlock"] #passwords-unlock-view,
 #passwords-panel[view="setup"] #passwords-setup-view,
+#passwords-panel[view="recovery"] #passwords-recovery-view,
 #passwords-panel[view="site"] #passwords-site-view,
 #passwords-panel[view="intro"] #passwords-intro-view {
   display: flex;
@@ -1494,6 +1495,38 @@ menupopup.wip-menu menuseparator {
 
 .passwords-error[hidden] {
   display: none;
+}
+
+.passwords-suggest {
+  justify-self: start;
+}
+
+.passwords-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.passwords-check input {
+  margin: 1px 0 0;
+  accent-color: var(--accent, AccentColor);
+}
+
+.passwords-recovery-code {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 12px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: var(--field-bg, color-mix(in srgb, currentColor 6%, transparent));
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  user-select: all;
 }
 
 .passwords-note {

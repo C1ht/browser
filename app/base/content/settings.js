@@ -143,12 +143,80 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!unlocked) {
       $("passwords-hello-form").hidden = true;
     }
+    // The recovery key: making one needs the vault unlocked and the master
+    // password (§6).
+    $("passwords-recovery-row").hidden = state == "none";
+    document.l10n.setAttributes(
+      $("passwords-recovery-status"),
+      PasswordVault.hasRecoveryKey ? "settings-passwords-recovery-set" : "settings-passwords-recovery-none"
+    );
+    document.l10n.setAttributes(
+      $("passwords-recovery"),
+      PasswordVault.hasRecoveryKey ? "settings-passwords-recovery-replace" : "settings-passwords-recovery-create"
+    );
+    $("passwords-recovery").disabled = !unlocked || !$("passwords-recovery-shown").hidden;
+    if (!unlocked) {
+      $("passwords-recovery-form").hidden = true;
+      hideRecoveryKey();
+    }
+    PasswordVault.olderVaults().then(names => {
+      $("passwords-older-row").hidden = !names.length || state == "none";
+    });
     $("passwords-offer").setAttribute("aria-checked", String(Services.prefs.getBoolPref(OFFER_PREF, true)));
     let minutes = String(Services.prefs.getIntPref(LOCK_PREF, 15));
     for (let b of document.querySelectorAll("#passwords-lock-after [data-value]")) {
       b.setAttribute("aria-checked", String(b.dataset.value == minutes));
     }
   };
+  let hideRecoveryKey = () => {
+    $("passwords-recovery-code").replaceChildren();
+    $("passwords-recovery-shown").hidden = true;
+  };
+  $("passwords-recovery").addEventListener("click", () => {
+    $("passwords-recovery-result").hidden = true;
+    $("passwords-recovery-form").hidden = false;
+    $("passwords-recovery-master").focus();
+  });
+  $("passwords-recovery-cancel").addEventListener("click", () => {
+    $("passwords-recovery-master").value = "";
+    $("passwords-recovery-form").hidden = true;
+  });
+  $("passwords-recovery-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    let submit = $("passwords-recovery-submit");
+    submit.disabled = true;
+    try {
+      let code = await PasswordVault.newRecoveryKey($("passwords-recovery-master").value);
+      $("passwords-recovery-form").hidden = true;
+      $("passwords-recovery-code").replaceChildren(
+        ...code.split("-").map(group => {
+          let span = document.createElement("span");
+          span.textContent = group;
+          return span;
+        })
+      );
+      $("passwords-recovery-shown").hidden = false;
+      $("passwords-recovery-done").focus();
+    } catch (err) {
+      document.l10n.setAttributes(
+        $("passwords-recovery-result"),
+        err.code == "wrong-password" ? "passwords-wrong-password" : "passwords-error"
+      );
+      $("passwords-recovery-result").hidden = false;
+    } finally {
+      $("passwords-recovery-master").value = "";
+      submit.disabled = false;
+      syncPasswords();
+    }
+  });
+  $("passwords-recovery-print").addEventListener("click", () => window.print());
+  $("passwords-recovery-done").addEventListener("click", () => {
+    hideRecoveryKey();
+    syncPasswords();
+  });
+  $("passwords-older").addEventListener("click", () => {
+    window.browsingContext.topChromeWindow?.PasswordsUI?.openManager("open-older");
+  });
   $("passwords-lock").addEventListener("click", () => PasswordVault.lock());
   $("passwords-manage").addEventListener("click", () => {
     window.browsingContext.topChromeWindow?.PasswordsUI?.openManager();

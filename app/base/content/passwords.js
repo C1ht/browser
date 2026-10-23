@@ -86,6 +86,19 @@ var PasswordsUI = {
       e.preventDefault();
       this._setup();
     });
+    $("passwords-setup-suggest").addEventListener("click", () => this._suggest());
+    for (let id of ["passwords-setup-password", "passwords-setup-confirm"]) {
+      $(id).addEventListener("input", () => {
+        if ($(id).type == "text" && $(id).value != this._suggested) {
+          $("passwords-setup-password").type = $("passwords-setup-confirm").type = "password";
+          $("passwords-setup-suggested").hidden = true;
+        }
+      });
+    }
+    $("passwords-recovery-done").addEventListener("click", () => {
+      $("passwords-recovery-code").replaceChildren();
+      this._afterSetup();
+    });
     $("passwords-setup-cancel").addEventListener("click", () => {
       if (this._pendingFor(gBrowser.selectedBrowser)) {
         this._showView("save");
@@ -355,6 +368,12 @@ var PasswordsUI = {
 
   _panelHidden() {
     this.button.removeAttribute("open");
+    // A recovery key is shown once; closing the panel is the end of it
+    // (Settings can make a new one).
+    this.$("passwords-recovery-code").replaceChildren();
+    for (let id of ["passwords-setup-password", "passwords-setup-confirm"]) {
+      this.$(id).type = "password";
+    }
     if (this._view == "saved") {
       // "Login saved · Undo" was only a notice; once closed it's done.
       let info = this._tabs.get(gBrowser.selectedBrowser);
@@ -441,10 +460,17 @@ var PasswordsUI = {
         this._focusSoon(hello ? $("passwords-unlock-hello") : $("passwords-unlock-password"));
         break;
       }
+      case "recovery":
+        doc.l10n.setAttributes(this.title, "passwords-recovery-title");
+        doc.l10n.setAttributes(this.text, "passwords-recovery-text");
+        this._focusSoon($("passwords-recovery-done"));
+        break;
       case "setup":
         doc.l10n.setAttributes(this.title, "passwords-setup-title");
         doc.l10n.setAttributes(this.text, "passwords-setup-intro");
         $("passwords-setup-error").hidden = true;
+        $("passwords-setup-suggested").hidden = true;
+        $("passwords-setup-password").type = $("passwords-setup-confirm").type = "password";
         this._setBusy($("passwords-setup-form"), false);
         doc.l10n.setAttributes($("passwords-setup-create"), "passwords-setup-create");
         $("passwords-setup-cancel").hidden = false;
@@ -721,13 +747,53 @@ var PasswordsUI = {
     }
     $("passwords-setup-password").value = "";
     $("passwords-setup-confirm").value = "";
+    $("passwords-setup-password").type = $("passwords-setup-confirm").type = "password";
+    $("passwords-setup-suggested").hidden = true;
+    this._suggested = null;
     this._setBusy(form, false);
+    // The recovery key, offered at setup (§6): shown once, here.
+    if ($("passwords-setup-recovery").checked) {
+      let code = null;
+      try {
+        code = await PasswordsLazy.PasswordVault.newRecoveryKey(password);
+      } catch (e) {
+        console.error("browser-wip: no recovery key", e.code);
+      }
+      if (code) {
+        $("passwords-recovery-code").replaceChildren(
+          ...code.split("-").map(group => {
+            let span = doc.createElement("span");
+            span.textContent = group;
+            return span;
+          })
+        );
+        this._showView("recovery");
+        return;
+      }
+    }
+    await this._afterSetup();
+  },
+
+  async _afterSetup() {
     if (this._pendingFor(gBrowser.selectedBrowser)) {
       this._view = "save";
       await this._save();
     } else {
       this._showView("site");
     }
+  },
+
+  _suggest() {
+    let $ = this.$;
+    this._suggested = PasswordsLazy.PasswordVault.suggestPassphrase();
+    for (let id of ["passwords-setup-password", "passwords-setup-confirm"]) {
+      $(id).type = "text";
+      $(id).value = this._suggested;
+    }
+    $("passwords-setup-suggested").hidden = false;
+    $("passwords-setup-error").hidden = true;
+    $("passwords-setup-password").focus();
+    $("passwords-setup-password").select();
   },
 
   openManager(section) {

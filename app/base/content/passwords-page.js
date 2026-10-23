@@ -48,6 +48,31 @@ const Page = {
       e.preventDefault();
       this.setup();
     });
+    $("setup-suggest").addEventListener("click", () => this.suggest());
+    for (let id of ["setup-password", "setup-confirm"]) {
+      $(id).addEventListener("input", () => {
+        // Typing their own: back to dots.
+        if ($("setup-password").type == "text" && $(id).value != this.suggested) {
+          $("setup-password").type = $("setup-confirm").type = "password";
+          $("setup-suggested").hidden = true;
+        }
+      });
+    }
+    $("recover-form").addEventListener("submit", e => {
+      e.preventDefault();
+      this.recover();
+    });
+    $("start-over-confirm").addEventListener("input", () => {
+      $("start-over-submit").disabled = $("start-over-confirm").value.trim().toLowerCase() != "start over";
+    });
+    $("start-over-form").addEventListener("submit", e => {
+      e.preventDefault();
+      this.startOver();
+    });
+    $("recovery-print").addEventListener("click", () => window.print());
+    $("recovery-done").addEventListener("click", () => this.closeRecovery());
+    // Only "I've written it down" closes it.
+    $("recovery-dialog").addEventListener("cancel", e => e.preventDefault());
     $("forgot").addEventListener("click", () => {
       location.hash = "forgot";
     });
@@ -96,14 +121,15 @@ const Page = {
     if (unlocked) {
       this.revealed = null;
       this.renderList({ keepSelection: true });
-      // about:passwords#import and #export (from Settings) open the dialog.
-      if (location.hash == "#import" || location.hash == "#export") {
+      // about:passwords#import, #open-older and #export (from Settings)
+      // open the dialog.
+      if (["#import", "#open-older", "#export"].includes(location.hash)) {
         let which = location.hash;
         history.replaceState(null, "", location.pathname);
-        if (which == "#import") {
-          Transfer.openImport();
-        } else {
+        if (which == "#export") {
           Transfer.openExport();
+        } else {
+          Transfer.openImport({ older: which == "#open-older" });
         }
       }
       return;
@@ -118,7 +144,15 @@ const Page = {
     for (let name of ["locked", "setup", "forgot"]) {
       $(`card-${name}`).hidden = name != card;
     }
-    if (card == "locked") {
+    if (card == "forgot") {
+      $("recover-form").hidden = !PasswordVault.hasRecoveryKey;
+      for (let id of ["recover-error", "start-over-error"]) {
+        $(id).hidden = true;
+      }
+      $("start-over-confirm").value = "";
+      $("start-over-submit").disabled = true;
+      (PasswordVault.hasRecoveryKey ? $("recover-code") : $("start-over-confirm")).focus();
+    } else if (card == "locked") {
       $("unlock-error").hidden = true;
       // Windows Hello unlocks for filling; showing and copying still ask
       // for the master password.
@@ -169,17 +203,105 @@ const Page = {
 
   async setup() {
     let error = $("setup-error");
+    let password = $("setup-password").value;
+    let withRecovery = $("setup-recovery").checked;
     this._busy($("setup-form"), true);
     try {
-      await PasswordVault.setup($("setup-password").value, $("setup-confirm").value);
+      await PasswordVault.setup(password, $("setup-confirm").value);
       $("setup-password").value = "";
       $("setup-confirm").value = "";
+      $("setup-password").type = $("setup-confirm").type = "password";
+      $("setup-suggested").hidden = true;
+      this.suggested = null;
     } catch (e) {
       let id = { "too-short": "passwords-too-short", mismatch: "passwords-mismatch" }[e.code] ?? "passwords-error";
       document.l10n.setAttributes(error, id);
       error.hidden = false;
+      return;
     } finally {
       this._busy($("setup-form"), false);
+    }
+    // The recovery key, offered at setup (§6, §17 Q3).
+    if (withRecovery) {
+      try {
+        this.showRecovery(await PasswordVault.newRecoveryKey(password));
+      } catch (e) {
+        console.error("browser-wip: no recovery key", e.code);
+      }
+    }
+  },
+
+  /** Fills both fields with a 5-word passphrase, shown, to write down. */
+  suggest() {
+    this.suggested = PasswordVault.suggestPassphrase();
+    for (let id of ["setup-password", "setup-confirm"]) {
+      $(id).type = "text";
+      $(id).value = this.suggested;
+    }
+    $("setup-suggested").hidden = false;
+    $("setup-error").hidden = true;
+    $("setup-password").focus();
+    $("setup-password").select();
+  },
+
+  showRecovery(code) {
+    let groups = code.split("-").map(group => {
+      let span = document.createElement("span");
+      span.textContent = group;
+      return span;
+    });
+    $("recovery-code").replaceChildren(...groups);
+    $("recovery-code").setAttribute("aria-label", code.split("").join(" "));
+    $("recovery-dialog").showModal();
+    $("recovery-done").focus();
+  },
+
+  closeRecovery() {
+    $("recovery-code").replaceChildren();
+    $("recovery-code").removeAttribute("aria-label");
+    $("recovery-dialog").close();
+  },
+
+  async recover() {
+    let error = $("recover-error");
+    error.hidden = true;
+    this._busy($("recover-form"), true);
+    try {
+      await PasswordVault.recover($("recover-code").value, $("recover-password").value, $("recover-confirm").value);
+      for (let id of ["recover-code", "recover-password", "recover-confirm"]) {
+        $(id).value = "";
+      }
+      history.replaceState(null, "", location.pathname);
+      this.render();
+    } catch (e) {
+      let id =
+        {
+          "too-short": "passwords-too-short",
+          mismatch: "passwords-mismatch",
+          "wrong-recovery-key": "passwords-recover-wrong",
+          "no-recovery-key": "passwords-recover-none",
+        }[e.code] ?? "passwords-error";
+      document.l10n.setAttributes(error, id);
+      error.hidden = false;
+      $(e.code == "wrong-recovery-key" ? "recover-code" : "recover-password").focus();
+    } finally {
+      this._busy($("recover-form"), false);
+    }
+  },
+
+  async startOver() {
+    let error = $("start-over-error");
+    error.hidden = true;
+    this._busy($("start-over-form"), true);
+    try {
+      await PasswordVault.startOver($("start-over-confirm").value);
+      $("start-over-confirm").value = "";
+      history.replaceState(null, "", location.pathname);
+      this.render();
+    } catch (e) {
+      document.l10n.setAttributes(error, "passwords-error");
+      error.hidden = false;
+      this._busy($("start-over-form"), false);
     }
   },
 
@@ -782,10 +904,15 @@ const Transfer = {
     );
   },
 
-  async _pickFile(mode, title, ext) {
+  async _pickFile(mode, title, ext, dir) {
     let picker = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
     let [label] = await document.l10n.formatValues([title]);
     picker.init(window.browsingContext, label, mode);
+    if (dir) {
+      let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+      file.initWithPath(dir);
+      picker.displayDirectory = file;
+    }
     if (mode == Ci.nsIFilePicker.modeSave) {
       let date = new Date().toISOString().slice(0, 10);
       picker.defaultString = `passwords-${date}.${ext}`;
@@ -892,8 +1019,17 @@ const Transfer = {
 
   // ---- Import ----
 
-  openImport() {
+  // older: "Open an older vault…" from Settings: the picker starts in the
+  // vault's directory, where Start over kept it, and the passphrase is
+  // that vault's master password.
+  openImport({ older = false } = {}) {
+    this.older = older;
     this._clearImport();
+    document.l10n.setAttributes($("import-title"), older ? "passwords-older-title" : "passwords-import-title");
+    document.l10n.setAttributes(
+      $("import-passphrase-label"),
+      older ? "passwords-older-password" : "passwords-import-passphrase"
+    );
     $("import-dialog").showModal();
     $("import-choose").focus();
   },
@@ -924,7 +1060,12 @@ const Transfer = {
   },
 
   async _choose() {
-    let path = await this._pickFile(Ci.nsIFilePicker.modeOpen, "passwords-import-file-title");
+    let path = await this._pickFile(
+      Ci.nsIFilePicker.modeOpen,
+      "passwords-import-file-title",
+      null,
+      this.older ? PasswordVault.directory : null
+    );
     if (!path) {
       return;
     }

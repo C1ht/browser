@@ -123,7 +123,7 @@ jobs:
         if: matrix.platform == 'linux-x86_64'
         run: |
           sudo apt-get install -y -qq strace > /dev/null
-          python3 browser/tools/runtime/check.py "$WORK/mozilla-central/obj-release/dist/bin" --part 1 2 3 4 6 7
+          python3 browser/tools/runtime/check.py "$WORK/mozilla-central/obj-release/dist/bin" --part 1 2 3 4 6 7 8
 
   test-windows:
     name: Smoke test on Windows
@@ -146,11 +146,11 @@ jobs:
         run: |
           Expand-Archive -Path (Get-ChildItem dist/*.zip).FullName -DestinationPath app
           Get-ChildItem app -Recurse -Filter browser-wip.exe | Select-Object -First 1 FullName
-      - name: Run checks (app identity, prefs, blocking, first run, chrome, password manager off, network blocker)
+      - name: Run checks (app identity, prefs, blocking, first run, chrome, password manager off, network blocker, passwords)
         shell: pwsh
         run: |
           $exe = Get-ChildItem app -Recurse -Filter browser-wip.exe | Select-Object -First 1
-          python browser/tools/runtime/check.py $exe.DirectoryName --part 1 2 3 4 6 7
+          python browser/tools/runtime/check.py $exe.DirectoryName --part 1 2 3 4 6 7 8
 
   release:
     name: Publish release

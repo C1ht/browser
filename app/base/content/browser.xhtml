@@ -284,6 +284,12 @@
                    autocomplete="off" data-l10n-id="passwords-setup-password"/>
             <input id="passwords-setup-confirm" class="passwords-input" type="password"
                    autocomplete="off" data-l10n-id="passwords-setup-confirm"/>
+            <button id="passwords-setup-suggest" class="panel-link passwords-suggest" type="button" data-l10n-id="passwords-suggest-passphrase"/>
+            <p id="passwords-setup-suggested" class="passwords-note" hidden="true" data-l10n-id="passwords-suggested-note"></p>
+            <label class="passwords-check">
+              <input id="passwords-setup-recovery" type="checkbox" checked="checked"/>
+              <span data-l10n-id="passwords-setup-recovery"></span>
+            </label>
             <p id="passwords-setup-error" class="passwords-error" role="alert" hidden="true"></p>
             <p class="passwords-note" data-l10n-id="passwords-setup-where"></p>
             <div class="passwords-buttons">
@@ -292,6 +298,17 @@
               <button id="passwords-setup-create" class="panel-button primary" type="submit" data-l10n-id="passwords-setup-create"/>
             </div>
           </form>
+        </div>
+
+        <div id="passwords-recovery-view" class="passwords-view">
+          <div class="passwords-stack">
+            <p id="passwords-recovery-code" class="passwords-recovery-code"></p>
+            <p class="passwords-note" data-l10n-id="passwords-recovery-keep"></p>
+            <div class="passwords-buttons">
+              <span class="passwords-spacer"></span>
+              <button id="passwords-recovery-done" class="panel-button primary" type="button" data-l10n-id="passwords-recovery-done"/>
+            </div>
+          </div>
         </div>
 
         <div id="passwords-site-view" class="passwords-view">

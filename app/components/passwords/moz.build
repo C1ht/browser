@@ -11,6 +11,7 @@ EXTRA_JS_MODULES.browserwip += [
     "PasswordsParent.sys.mjs",
     "PasswordTransfer.sys.mjs",
     "PasswordVault.sys.mjs",
+    "PasswordWords.sys.mjs",
 ]
 
 DIRS += [

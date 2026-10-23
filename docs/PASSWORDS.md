@@ -10,8 +10,20 @@ mockups*).
 
 **Built so far (Stage 2):**
 
-- **Master password and Windows Hello.** The keyring and the recovery
-  key are not built yet (§18 part 3).
+- **Master password, recovery key and Windows Hello.** The keyring
+  (Linux) is not built yet (§18 part 3).
+- **Forgotten master password (§6):**
+  - the recovery key, offered at setup (panel and about:passwords) and
+    in Settings, shown once with Print and "I've written it down";
+    `bwt_new_recovery_key` and `bwt_reset_password` in the core
+  - Forgot password: the recovery key sets a new master password, or
+    **Start over** (typed "start over") keeps the old vault as
+    `vault-forgotten-<date>.bwv` and sets up a new one
+  - Settings › "Open an older vault…" opens a kept vault with its master
+    password through the .bwv import
+- **Passphrase suggestion (§5.5):** five words from the bundled EFF long
+  word list (`PasswordWords.sys.mjs`, CC BY 3.0 US;
+  `tests/unit/password-words.test.mjs`).
 - **Windows Hello (§5.3),** turned on in Settings › Passwords with the
   master password: a TPM-backed KeyCredentialManager key named
   `BWVAULT-<vault id>` signs the vault's HELLO-slot challenge
@@ -47,10 +59,10 @@ mockups*).
   - .bwv passwords copied inside `nsIPasswordVault`, never through JS
   - the column mapping and the import plan in `PasswordTransfer.sys.mjs`
     (`tests/unit/password-transfer.test.mjs`)
-- **Not built yet:**
-  - the passphrase suggestion at setup (it needs the EFF word list)
-  - "Start over" from Forgot password
-  - runtime checks for these parts in `tools/runtime/check.py`
+- **Runtime checks:** `tools/runtime/check.py --part 8` (§15 part 7's
+  list, plus the recovery key, Start over and the passphrase). Frames
+  from another site run in a second profile without Fission: headless
+  Gecko doesn't route a synthesized click into an out-of-process frame.
 
 ---
 
