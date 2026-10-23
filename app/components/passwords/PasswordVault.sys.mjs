@@ -17,7 +17,11 @@
  * Errors thrown to callers carry a `code`: "wrong-password",
  * "too-short", "mismatch", "locked", "no-vault", "needs-master-password",
  * "not-fillable", "needs-passphrase", "wrong-passphrase", "bad-file",
- * "no-columns", or the core's status name ("BWV_E_IO", ...).
+ * "no-columns", "cancelled", "hello-unavailable", "hello-failed", or the
+ * core's status name ("BWV_E_IO", ...).
+ *
+ * Windows Hello (§5.3) is a second way to unlock, for filling only: showing,
+ * copying and exporting still ask for the master password.
  */
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
@@ -130,7 +134,9 @@ export const PasswordVault = {
       let info = JSON.parse(await lazy.core.open(dir));
       Services.obs.addObserver(this, "sleep_notification");
       Services.obs.addObserver(this, "quit-application-granted");
+      Services.obs.addObserver(this, "browserwip:session-locked");
       Services.prefs.addObserver(LOCK_PREF, this);
+      await this._refreshHello();
       this._setState(info.exists ? "locked" : "none");
       return this.state;
     })().catch(e => {
@@ -211,6 +217,88 @@ export const PasswordVault = {
     this._failures = 0;
     this._revealUntil = Date.now() + REVEAL_GRACE_MS;
     this._setState("unlocked");
+  },
+
+  // ---------------------------------------------------------------------
+  // Windows Hello
+
+  // { available: Hello can unlock on this machine, enrolled: the vault has
+  // a Hello slot }
+  hello: { available: false, enrolled: false },
+
+  async _refreshHello() {
+    try {
+      this.hello = {
+        available: await lazy.core.helloAvailable(),
+        enrolled: JSON.parse(await lazy.core.slots()).hello,
+      };
+    } catch (e) {
+      this.hello = { available: false, enrolled: false };
+    }
+  },
+
+  /** Whether the unlock panel should offer Windows Hello. */
+  get canUnlockWithHello() {
+    return this.hello.available && this.hello.enrolled;
+  },
+
+  _helloFailure(e) {
+    let code = coreCode(e);
+    return failure(code == "BWV_E_CANCELLED" ? "cancelled" : code == "BWV_E_AUTH" ? "wrong-password" : "hello-failed", e);
+  },
+
+  /** Unlocks with Windows Hello: one prompt. Not a master password: no reveal grace. */
+  async unlockWithHello() {
+    await this.init();
+    if (this.state == "unlocked") {
+      return;
+    }
+    if (!this.canUnlockWithHello) {
+      throw failure("hello-unavailable");
+    }
+    let json;
+    try {
+      json = await lazy.core.unlockWithHello();
+    } catch (e) {
+      if (coreCode(e) == "BWV_E_NO_SLOT") {
+        await this._refreshHello();
+      }
+      // A slot that won't open (the PIN was reset, the key deleted): the
+      // master password still works.
+      throw failure(coreCode(e) == "BWV_E_CANCELLED" ? "cancelled" : "hello-failed", e);
+    }
+    this._index = parseIndex(json);
+    this._failures = 0;
+    this._setState("unlocked");
+  },
+
+  /** Adds Windows Hello; needs the master password (§5.1). Hello asks once or twice. */
+  async enableHello(master) {
+    this._requireUnlocked();
+    if (!this.hello.available) {
+      throw failure("hello-unavailable");
+    }
+    try {
+      await lazy.core.enableHello(master.normalize("NFC"));
+    } catch (e) {
+      await this._refreshHello();
+      this._changed();
+      throw this._helloFailure(e);
+    }
+    this.hello = { ...this.hello, enrolled: true };
+    this._changed();
+  },
+
+  async disableHello() {
+    this._requireUnlocked();
+    try {
+      await lazy.core.disableHello();
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    } finally {
+      await this._refreshHello();
+      this._changed();
+    }
   },
 
   async lock() {
@@ -796,6 +884,7 @@ export const PasswordVault = {
     switch (topic) {
       case "idle":
       case "sleep_notification":
+      case "browserwip:session-locked":
       case "quit-application-granted":
         this.lock();
         break;

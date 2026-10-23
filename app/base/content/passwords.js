@@ -79,6 +79,7 @@ var PasswordsUI = {
       $("passwords-unlock-error").hidden = true;
     });
     $("passwords-forgot").addEventListener("click", () => this.openManager("forgot"));
+    $("passwords-unlock-hello").addEventListener("click", () => this._unlockWithHello());
 
     // Setup
     $("passwords-setup-form").addEventListener("submit", e => {
@@ -430,7 +431,14 @@ var PasswordsUI = {
         $("passwords-unlock-error").hidden = true;
         this._setBusy($("passwords-unlock-form"), false);
         doc.l10n.setAttributes($("passwords-unlock-submit"), "passwords-unlock");
-        this._focusSoon($("passwords-unlock-password"));
+        // Windows Hello first where it's set up (it unlocks for filling;
+        // the master password is still asked to show or copy).
+        let hello = vault.canUnlockWithHello;
+        $("passwords-unlock-hello").hidden = !hello;
+        $("passwords-unlock-hello").disabled = false;
+        doc.l10n.setAttributes($("passwords-unlock-hello-label"), "passwords-use-hello");
+        $("passwords-unlock-or").hidden = !hello;
+        this._focusSoon(hello ? $("passwords-unlock-hello") : $("passwords-unlock-password"));
         break;
       }
       case "setup":
@@ -635,6 +643,36 @@ var PasswordsUI = {
     }
     field.value = "";
     this._setBusy(form, false);
+    this._afterUnlock();
+  },
+
+  async _unlockWithHello() {
+    let $ = this.$;
+    let doc = this.window.document;
+    let button = $("passwords-unlock-hello");
+    let error = $("passwords-unlock-error");
+    error.hidden = true;
+    button.disabled = true;
+    doc.l10n.setAttributes($("passwords-unlock-hello-label"), "passwords-hello-waiting");
+    try {
+      await PasswordsLazy.PasswordVault.unlockWithHello();
+    } catch (e) {
+      button.disabled = false;
+      doc.l10n.setAttributes($("passwords-unlock-hello-label"), "passwords-use-hello");
+      if (e.code != "cancelled") {
+        doc.l10n.setAttributes(error, "passwords-hello-failed");
+        error.hidden = false;
+        $("passwords-unlock-hello").hidden = !PasswordsLazy.PasswordVault.canUnlockWithHello;
+        $("passwords-unlock-or").hidden = $("passwords-unlock-hello").hidden;
+      }
+      $("passwords-unlock-password").focus();
+      return;
+    }
+    this._afterUnlock();
+  },
+
+  // Unlocked from the panel: carry on with what it was opened for.
+  _afterUnlock() {
     let purpose = this._unlockPurpose;
     let resume = this._resume;
     this._resume = null;

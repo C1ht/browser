@@ -258,6 +258,13 @@
         </div>
 
         <div id="passwords-unlock-view" class="passwords-view">
+          <button id="passwords-unlock-hello" class="panel-button primary passwords-hello" hidden="true">
+            <img class="icon" src="chrome://browser-wip/skin/icons/hello.svg" alt=""/>
+            <span id="passwords-unlock-hello-label" data-l10n-id="passwords-use-hello"></span>
+          </button>
+          <div id="passwords-unlock-or" class="passwords-divider" hidden="true">
+            <span data-l10n-id="passwords-or-master"></span>
+          </div>
           <form id="passwords-unlock-form" class="passwords-inline">
             <input id="passwords-unlock-password" class="passwords-input" type="password"
                    autocomplete="off" data-l10n-id="passwords-master-password"/>

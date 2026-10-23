@@ -24,6 +24,7 @@ browser-wip.jar:
   skin/browser-wip/icons/folder.svg             (shared/icons/folder.svg)
   skin/browser-wip/icons/forward.svg            (shared/icons/forward.svg)
   skin/browser-wip/icons/globe.svg              (shared/icons/globe.svg)
+  skin/browser-wip/icons/hello.svg              (shared/icons/hello.svg)
   skin/browser-wip/icons/key.svg                (shared/icons/key.svg)
   skin/browser-wip/icons/lock-page.svg          (shared/icons/lock-page.svg)
   skin/browser-wip/icons/menu.svg               (shared/icons/menu.svg)

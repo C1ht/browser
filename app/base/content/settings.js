@@ -134,6 +134,15 @@ window.addEventListener("DOMContentLoaded", () => {
     // exporting unlock first, on about:passwords.
     $("passwords-change-box").hidden = !unlocked;
     $("passwords-transfer-row").hidden = state != "unlocked" && state != "locked";
+    // Windows Hello: offered where it works; turning it on or off needs the
+    // vault unlocked.
+    let hello = PasswordVault.hello;
+    $("passwords-hello-row").hidden = !hello.available || state == "none";
+    $("passwords-hello").setAttribute("aria-checked", String(hello.enrolled));
+    $("passwords-hello").disabled = !unlocked;
+    if (!unlocked) {
+      $("passwords-hello-form").hidden = true;
+    }
     $("passwords-offer").setAttribute("aria-checked", String(Services.prefs.getBoolPref(OFFER_PREF, true)));
     let minutes = String(Services.prefs.getIntPref(LOCK_PREF, 15));
     for (let b of document.querySelectorAll("#passwords-lock-after [data-value]")) {
@@ -149,6 +158,49 @@ window.addEventListener("DOMContentLoaded", () => {
       window.browsingContext.topChromeWindow?.PasswordsUI?.openManager(which);
     });
   }
+  let helloResult = l10n => {
+    document.l10n.setAttributes($("passwords-hello-result"), l10n);
+    $("passwords-hello-result").hidden = false;
+  };
+  $("passwords-hello").addEventListener("click", async () => {
+    $("passwords-hello-result").hidden = true;
+    if (PasswordVault.hello.enrolled) {
+      await PasswordVault.disableHello().catch(() => helloResult("settings-passwords-hello-error"));
+      syncPasswords();
+    } else {
+      $("passwords-hello-form").hidden = false;
+      $("passwords-hello-master").focus();
+    }
+  });
+  $("passwords-hello-label").addEventListener("click", e => {
+    e.preventDefault();
+    $("passwords-hello").click();
+  });
+  $("passwords-hello-cancel").addEventListener("click", () => {
+    $("passwords-hello-master").value = "";
+    $("passwords-hello-form").hidden = true;
+  });
+  $("passwords-hello-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    let submit = $("passwords-hello-submit");
+    submit.disabled = true;
+    try {
+      await PasswordVault.enableHello($("passwords-hello-master").value);
+      $("passwords-hello-form").hidden = true;
+      helloResult("settings-passwords-hello-on");
+    } catch (err) {
+      helloResult(
+        {
+          "wrong-password": "passwords-wrong-password",
+          cancelled: "settings-passwords-hello-cancelled",
+        }[err.code] ?? "settings-passwords-hello-error"
+      );
+    } finally {
+      $("passwords-hello-master").value = "";
+      submit.disabled = false;
+      syncPasswords();
+    }
+  });
   $("passwords-offer").addEventListener("click", () => {
     Services.prefs.setBoolPref(OFFER_PREF, $("passwords-offer").getAttribute("aria-checked") != "true");
     syncPasswords();

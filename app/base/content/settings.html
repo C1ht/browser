@@ -49,6 +49,21 @@
         </div>
         <button id="passwords-offer" class="switch" type="button" role="switch" aria-labelledby="passwords-offer-label"></button>
       </div>
+      <div id="passwords-hello-row" class="toggle-row" hidden="hidden">
+        <div>
+          <label id="passwords-hello-label" for="passwords-hello" data-l10n-id="settings-passwords-hello-label"></label>
+          <span class="help" data-l10n-id="settings-passwords-hello-help"></span>
+        </div>
+        <button id="passwords-hello" class="switch" type="button" role="switch" aria-labelledby="passwords-hello-label"></button>
+      </div>
+      <form id="passwords-hello-form" class="change-form" hidden="hidden">
+        <input id="passwords-hello-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-hello-master"/>
+        <div class="button-row">
+          <button id="passwords-hello-submit" class="primary" type="submit" data-l10n-id="settings-passwords-hello-confirm"></button>
+          <button id="passwords-hello-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
+        </div>
+      </form>
+      <p id="passwords-hello-result" role="status" hidden="hidden"></p>
       <div class="inline-row">
         <span id="passwords-lock-after-label" data-l10n-id="settings-passwords-lock-after"></span>
         <div id="passwords-lock-after" class="segmented" role="radiogroup" aria-labelledby="passwords-lock-after-label">

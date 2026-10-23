@@ -16,7 +16,17 @@ XPCOM_MANIFESTS += [
 
 SOURCES += [
     "PasswordVault.cpp",
+    "WindowsUnlock.cpp",
 ]
+
+if CONFIG["OS_ARCH"] == "WINNT":
+    # Windows Hello (KeyCredentialManager through WinRT), the TPM check, and
+    # session lock notifications.
+    OS_LIBS += [
+        "runtimeobject",
+        "tbs",
+        "wtsapi32",
+    ]
 
 LOCAL_INCLUDES += [
     "../vault",

@@ -10,15 +10,21 @@ mockups*).
 
 **Built so far (Stage 2):**
 
-- **Master password only.** The keyring, Windows Hello and the recovery
+- **Master password and Windows Hello.** The keyring and the recovery
   key are not built yet (§18 part 3).
+- **Windows Hello (§5.3),** turned on in Settings › Passwords with the
+  master password: a TPM-backed KeyCredentialManager key named
+  `BWVAULT-<vault id>` signs the vault's HELLO-slot challenge
+  (`service/WindowsUnlock.cpp`). It unlocks for filling only; showing,
+  copying and exporting still ask for the master password.
 - **The bridge to the core:** `components/passwords/service/`
   (`nsIPasswordVault`). The core runs on one background task queue and
   every call returns a Promise.
 - **`PasswordVault.sys.mjs`:** lock state and the index, saving and
   editing, captured logins, reveal and copy behind the master password
   with the 5-minute grace, clearing the clipboard after 30 s, locking on
-  idle (system idle, through `nsIUserIdleService`), on sleep and on quit.
+  idle (system idle, through `nsIUserIdleService`), on sleep, on quit and
+  when Windows locks (WTS session notifications, `browserwip:session-locked`).
 - **`PasswordRules.sys.mjs`:** the §7.1 origin rules, tested in Node
   (`tests/unit/password-rules.test.mjs`).
 - **In pages:** `PasswordsChild`/`PasswordsParent` (https frames only) and
@@ -42,7 +48,6 @@ mockups*).
   - the column mapping and the import plan in `PasswordTransfer.sys.mjs`
     (`tests/unit/password-transfer.test.mjs`)
 - **Not built yet:**
-  - session-lock signals (§5.4)
   - the passphrase suggestion at setup (it needs the EFF word list)
   - "Start over" from Forgot password
   - runtime checks for these parts in `tools/runtime/check.py`

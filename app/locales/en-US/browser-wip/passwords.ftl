@@ -321,3 +321,19 @@ passwords-import-bad-file = This file can’t be read. Import a CSV file or a .b
 passwords-import-no-columns = This CSV file has no website and password columns.
 passwords-import-newer = This file was made by a newer version of { -brand-short-name }.
 passwords-import-empty = No logins found in this file.
+
+## Windows Hello
+
+passwords-use-hello = Use Windows Hello
+passwords-hello-waiting = Waiting for Windows Hello…
+passwords-or-master = or your master password
+passwords-hello-failed = Windows Hello couldn’t unlock. Use your master password.
+settings-passwords-hello-label = Unlock with Windows Hello
+settings-passwords-hello-help = Face, fingerprint or PIN, backed by this computer’s security chip. Showing, copying and exporting passwords still ask for the master password.
+settings-passwords-hello-confirm = Turn on
+settings-passwords-hello-master =
+    .placeholder = Master password, to turn it on
+    .aria-label = Master password
+settings-passwords-hello-on = Windows Hello can now unlock your passwords.
+settings-passwords-hello-cancelled = Windows Hello was cancelled. Nothing changed.
+settings-passwords-hello-error = Windows Hello couldn’t be set up.

@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "PasswordVault.h"
+#include "WindowsUnlock.h"
 
 #include <inttypes.h>
 #include <string.h>
@@ -195,6 +196,52 @@ bwv_status CopySecret(const bwv_vault* aFrom, const nsCString& aFromId,
   return st;
 }
 
+// Whether aPassword opens the password slot of vault.bwv as it is on disk.
+bwv_status CheckMaster(bws_store* aStore, const nsCString& aPassword) {
+  bwv_vault* vault = nullptr;
+  bwv_key* key = nullptr;
+  bwv_status st = LoadFile(aStore, &vault);
+  if (st == BWV_OK) {
+    st = PasswordKey(vault, aPassword, &key);
+  }
+  if (st == BWV_OK) {
+    st = bwv_unlock(vault, BWV_SLOT_PASSWORD, key);
+  }
+  bwv_key_free(key);
+  bwv_free(vault);
+  return st;
+}
+
+// The key of `aVault`'s Hello slot: its challenge signed with this vault's
+// Hello key (one prompt), through HKDF (§5.3).
+bwv_status HelloKey(const bwv_vault* aVault, const uint8_t aChallenge[BWV_CHALLENGE_BYTES],
+                    bwv_key** aOut) {
+  uint8_t id[BWV_ID_BYTES];
+  bwv_get_id(aVault, id);
+  uint8_t signature[BWT_MAX_SIGNATURE];
+  size_t len = sizeof(signature);
+  bwv_status st = windows_unlock::HelloSign(nullptr, id, aChallenge, signature, &len);
+  bwv_key* key = nullptr;
+  if (st == BWV_OK) {
+    key = bwv_key_new();
+    st = key ? bwv_derive_hello_key(id, signature, len, key) : BWV_E_NOMEM;
+  }
+  Wipe(signature, sizeof(signature));
+  if (st != BWV_OK) {
+    bwv_key_free(key);
+    return st;
+  }
+  *aOut = key;
+  return BWV_OK;
+}
+
+void NotifySessionLocked() {
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  if (obs) {
+    obs->NotifyObservers(nullptr, "browserwip:session-locked", nullptr);
+  }
+}
+
 // An exported vault is at most this big (a few hundred thousand logins).
 constexpr size_t kMaxImportBytes = 64 * 1024 * 1024;
 
@@ -332,6 +379,8 @@ nsresult PasswordVault::Init() {
   if (obs) {
     obs->AddObserver(this, "profile-before-change", false);
   }
+  // Locking the Windows session locks the vault (§5.4).
+  windows_unlock::WatchSessionLock(NotifySessionLocked);
   return NS_OK;
 }
 
@@ -351,6 +400,7 @@ void PasswordVault::Shutdown() {
     return;
   }
   mShutDown = true;
+  windows_unlock::StopWatchingSessionLock();
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
   if (obs) {
     obs->RemoveObserver(this, "profile-before-change");
@@ -522,21 +572,9 @@ PasswordVault::CheckPassword(const nsACString& aPassword, JSContext* aCx,
                              Promise** aPromise) {
   return Run(aCx, aPromise, "PasswordVault::CheckPassword",
              [pw = Own(aPassword)](Core& core) mutable {
-               bwv_status st = core.mSession ? BWV_OK : BWV_E_STATE;
-               bwv_vault* vault = nullptr;
-               bwv_key* key = nullptr;
-               if (st == BWV_OK) {
-                 st = LoadFile(core.mStore, &vault);
-               }
-               if (st == BWV_OK) {
-                 st = PasswordKey(vault, pw, &key);
-               }
+               bwv_status st =
+                   core.mSession ? CheckMaster(core.mStore, pw) : BWV_E_STATE;
                Wipe(pw);
-               if (st == BWV_OK) {
-                 st = bwv_unlock(vault, BWV_SLOT_PASSWORD, key);
-               }
-               bwv_key_free(key);
-               bwv_free(vault);
                if (st == BWV_E_AUTH) {
                  return Flag(false);
                }
@@ -909,6 +947,157 @@ PasswordVault::CloseImport(JSContext* aCx, Promise** aPromise) {
   return Run(aCx, aPromise, "PasswordVault::CloseImport", [](Core& core) {
     core.CloseImport();
     return Done(BWV_OK);
+  });
+}
+
+NS_IMETHODIMP
+PasswordVault::HelloAvailable(JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::HelloAvailable", [](Core& core) {
+    return Flag(windows_unlock::HelloAvailable());
+  });
+}
+
+NS_IMETHODIMP
+PasswordVault::Slots(JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::Slots", [](Core& core) {
+    bool hello = false;
+    bwv_vault* vault = nullptr;
+    if (core.mStore && LoadFile(core.mStore, &vault) == BWV_OK) {
+      hello = bwv_has_slot(vault, BWV_SLOT_HELLO);
+    }
+    bwv_free(vault);
+    return Text(nsCString(hello ? R"({"hello":true})" : R"({"hello":false})"), false);
+  });
+}
+
+NS_IMETHODIMP
+PasswordVault::EnableHello(const nsACString& aMasterPassword, JSContext* aCx,
+                           Promise** aPromise) {
+  return Run(
+      aCx, aPromise, "PasswordVault::EnableHello",
+      [pw = Own(aMasterPassword)](Core& core) mutable {
+        bwv_vault* vault = core.Vault();
+        if (!vault) {
+          Wipe(pw);
+          return Done(BWV_E_LOCKED);
+        }
+        // Adding an unlock method needs the master password (§5.1).
+        bwv_status st = CheckMaster(core.mStore, pw);
+        Wipe(pw);
+        if (st != BWV_OK) {
+          return Done(st);
+        }
+        if (!windows_unlock::HelloAvailable()) {
+          return Done(BWV_E_PROVIDER);
+        }
+        uint8_t id[BWV_ID_BYTES];
+        bwv_get_id(vault, id);
+        bool hadSlot = bwv_has_slot(vault, BWV_SLOT_HELLO);
+        st = windows_unlock::HelloEnroll(id);
+        if (st == BWV_OK) {
+          st = bwv_prepare_slot(vault, BWV_SLOT_HELLO, nullptr);
+        }
+        bwv_kdf_params params;
+        uint8_t challenge[kSlotInputsMax];
+        size_t challengeLen = 0;
+        if (st == BWV_OK) {
+          st = bwv_prepared_inputs(vault, BWV_SLOT_HELLO, &params, challenge,
+                                   &challengeLen);
+        }
+        if (st == BWV_OK && challengeLen != BWV_CHALLENGE_BYTES) {
+          st = BWV_E_FORMAT;
+        }
+        bwv_key* key = nullptr;
+        if (st == BWV_OK) {
+          st = HelloKey(vault, challenge, &key);
+        }
+        if (st == BWV_OK) {
+          st = bwv_set_slot(vault, BWV_SLOT_HELLO, key);
+        }
+        bwv_key_free(key);
+        if (st == BWV_OK) {
+          st = bwt_save(core.mSession);
+        }
+        if (st != BWV_OK && hadSlot) {
+          // A new key replaced the one the old slot was made with: that slot
+          // can't open any more.
+          bwv_remove_slot(vault, BWV_SLOT_HELLO);
+          bwt_save(core.mSession);
+        }
+        return Done(st);
+      });
+}
+
+NS_IMETHODIMP
+PasswordVault::DisableHello(JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::DisableHello", [](Core& core) {
+    bwv_vault* vault = core.Vault();
+    if (!vault) {
+      return Done(BWV_E_LOCKED);
+    }
+    uint8_t id[BWV_ID_BYTES];
+    bwv_get_id(vault, id);
+    bwv_status st = BWV_OK;
+    if (bwv_has_slot(vault, BWV_SLOT_HELLO)) {
+      st = bwv_remove_slot(vault, BWV_SLOT_HELLO);
+      if (st == BWV_OK) {
+        st = bwt_save(core.mSession);
+      }
+    }
+    if (st == BWV_OK) {
+      windows_unlock::HelloDelete(id);
+    }
+    return Done(st);
+  });
+}
+
+NS_IMETHODIMP
+PasswordVault::UnlockWithHello(JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::UnlockWithHello", [](Core& core) {
+    bwv_status st = core.mSession ? BWV_OK : BWV_E_STATE;
+    bwv_vault* vault = nullptr;
+    if (st == BWV_OK) {
+      st = LoadFile(core.mStore, &vault);
+    }
+    if (st == BWV_OK && !bwv_has_slot(vault, BWV_SLOT_HELLO)) {
+      st = BWV_E_NO_SLOT;
+    }
+    bwv_kdf_params params;
+    uint8_t challenge[kSlotInputsMax];
+    size_t challengeLen = 0;
+    if (st == BWV_OK) {
+      st = bwv_slot_inputs(vault, BWV_SLOT_HELLO, &params, challenge, &challengeLen);
+    }
+    if (st == BWV_OK && challengeLen != BWV_CHALLENGE_BYTES) {
+      st = BWV_E_FORMAT;
+    }
+    bwv_key* key = nullptr;
+    if (st == BWV_OK) {
+      st = HelloKey(vault, challenge, &key);
+    }
+    if (st == BWV_OK) {
+      st = bwv_unlock(vault, BWV_SLOT_HELLO, key);
+    }
+    bwv_key_free(key);
+    if (st == BWV_OK) {
+      st = bwv_open_body(vault);
+    }
+    nsCString index;
+    if (st == BWV_OK) {
+      uint8_t* data = nullptr;
+      size_t len = 0;
+      st = bwv_get_index(vault, &data, &len);
+      if (st == BWV_OK) {
+        index.Assign(reinterpret_cast<const char*>(data), len);
+        bwv_secret_free(data);
+      }
+    }
+    if (st != BWV_OK) {
+      bwv_free(vault);
+      return Done(st);
+    }
+    bwt_attach(core.mSession, vault);
+    return Text(std::move(index), true);
   });
 }
 

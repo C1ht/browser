@@ -43,6 +43,7 @@ const Page = {
       e.preventDefault();
       this.unlock();
     });
+    $("unlock-hello").addEventListener("click", () => this.unlockWithHello());
     $("setup-form").addEventListener("submit", e => {
       e.preventDefault();
       this.setup();
@@ -119,6 +120,10 @@ const Page = {
     }
     if (card == "locked") {
       $("unlock-error").hidden = true;
+      // Windows Hello unlocks for filling; showing and copying still ask
+      // for the master password.
+      $("unlock-hello").parentNode.hidden = !PasswordVault.canUnlockWithHello;
+      $("unlock-hello").hidden = !PasswordVault.canUnlockWithHello;
       $("unlock-password").focus();
     } else if (card == "setup") {
       $("setup-password").focus();
@@ -142,6 +147,23 @@ const Page = {
     } finally {
       field.value = "";
       this._busy($("unlock-form"), false);
+    }
+  },
+
+  async unlockWithHello() {
+    let button = $("unlock-hello");
+    button.disabled = true;
+    $("unlock-error").hidden = true;
+    try {
+      await PasswordVault.unlockWithHello();
+      history.replaceState(null, "", location.pathname);
+    } catch (e) {
+      if (e.code != "cancelled") {
+        document.l10n.setAttributes($("unlock-error"), "passwords-hello-failed");
+        $("unlock-error").hidden = false;
+      }
+    } finally {
+      button.disabled = false;
     }
   },
 
