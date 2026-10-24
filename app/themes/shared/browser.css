@@ -1651,3 +1651,281 @@ panel.passwords-dropdown {
 .passwords-dropdown-note {
   max-width: 300px;
 }
+
+/* ---------- The address bar's dropdown (urlbar.js) ---------- */
+
+panel.urlbar-popup {
+  --panel-background-color: var(--panel-bg);
+  --panel-text-color: var(--chrome-fg);
+  --panel-border-color: var(--field-border);
+  --panel-box-shadow: var(--popup-shadow);
+  --panel-box-shadow-margin: 10px;
+  --panel-border-radius: 12px;
+  --panel-padding: 6px;
+  font: 13px/1.3 var(--font-ui);
+}
+
+#urlbar-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  box-sizing: border-box;
+  max-width: 100vw;
+}
+
+.urlbar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: default;
+}
+
+.urlbar-row[selected] {
+  background-color: var(--hover-bg);
+}
+
+.urlbar-row-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  -moz-context-properties: fill;
+  fill: var(--chrome-muted);
+}
+
+.urlbar-row.heuristic .urlbar-row-icon {
+  fill: var(--accent);
+}
+
+.urlbar-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.urlbar-row-primary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
+
+.urlbar-row.heuristic .urlbar-row-primary {
+  font-weight: 600;
+}
+
+.urlbar-row-secondary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--chrome-muted);
+  font-size: 12px;
+  flex: 1 1 0;
+  min-width: 80px;
+}
+
+.urlbar-row-secondary:empty {
+  display: none;
+}
+
+.urlbar-row.page .urlbar-row-secondary {
+  color: var(--accent);
+}
+
+.urlbar-row-star {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  -moz-context-properties: fill;
+  fill: var(--accent);
+}
+
+/* Offering search suggestions: text over two lines, then the buttons. */
+.urlbar-row.offer {
+  margin-top: 4px;
+  padding-block: 10px;
+  border-top: 1px solid var(--field-border);
+  border-radius: 0 0 8px 8px;
+}
+
+.urlbar-row.offer .urlbar-row-text {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.urlbar-row.offer .urlbar-row-primary {
+  font-weight: 600;
+  white-space: normal;
+}
+
+.urlbar-row.offer .urlbar-row-secondary {
+  flex: none;
+  white-space: normal;
+  color: var(--chrome-muted);
+}
+
+.urlbar-row.offer .panel-button {
+  min-width: 0;
+  padding: 5px 12px;
+}
+
+/* ---------- Bookmarks: the star's panel and the bar (bookmarks.js) ---------- */
+
+#star-button[starred] .icon {
+  fill: var(--accent);
+}
+
+.bookmark-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bookmark-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--chrome-muted);
+}
+
+.panel-input {
+  appearance: none;
+  height: 32px;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  background-color: var(--field-bg);
+  color: var(--chrome-fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  outline: none;
+}
+
+select.panel-input {
+  padding-inline-end: 28px;
+  background-image: url("chrome://browser-wip/skin/icons/chevron-down.svg");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  -moz-context-properties: fill;
+  fill: var(--chrome-muted);
+}
+
+.panel-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.panel-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.panel-spacer {
+  flex: 1;
+}
+
+#bookmarks-bar {
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline: 12px;
+  font: 12px var(--font-ui);
+}
+
+#bookmarks-bar[hidden] {
+  display: none;
+}
+
+#bookmarks-bar-items {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.bookmark-item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  max-width: 180px;
+  height: 26px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--chrome-fg);
+  font: inherit;
+}
+
+.bookmark-item[hidden] {
+  display: none;
+}
+
+.bookmark-item:hover {
+  background-color: var(--hover-bg);
+}
+
+.bookmark-item:hover:active {
+  background-color: var(--active-bg);
+}
+
+.bookmark-item .icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  -moz-context-properties: fill;
+  fill: var(--chrome-muted);
+}
+
+.bookmark-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmarks-bar-separator {
+  width: 1px;
+  height: 16px;
+  margin-inline: 4px;
+  background-color: var(--divider);
+  flex: none;
+}
+
+#bookmarks-bar-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--chrome-muted);
+}
+
+#bookmarks-bar-empty[hidden] {
+  display: none;
+}
+
+#bookmarks-bar-empty .panel-link {
+  margin-top: 0;
+}
+
+#bookmarks-bar-overflow {
+  width: 28px;
+  height: 26px;
+}

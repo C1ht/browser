@@ -27,3 +27,16 @@ settings-about-heading = About
 # $version (String) - app version; $gecko (String) - engine version
 settings-about-version = { -brand-full-name } { $version }, Gecko { $gecko }
 settings-about-lists = Ad and tracker blocking uses EasyList, EasyPrivacy and Fanboy’s Social Blocking List by the EasyList authors, under CC BY-SA 3.0. The lists ship with the browser and are never downloaded.
+
+## Search suggestions and history
+
+settings-search-suggest-label = Show search suggestions
+# $engine: the search engine's name
+settings-search-suggest-help = What you type in the address bar is sent to { $engine } as you type, never addresses. Off by default.
+settings-search-suggest-none = { $engine } doesn’t offer suggestions.
+settings-history-heading = History
+settings-history-remember-label = Remember browsing history
+settings-history-remember-help = Pages you visit are kept on this computer, for the address bar and the History page. Strict Privacy and Anonymous turn this off.
+settings-history-clear-label = Clear what’s kept
+settings-history-clear = Clear history…
+settings-history-open = Show history

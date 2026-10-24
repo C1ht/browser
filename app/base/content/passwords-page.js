@@ -77,7 +77,7 @@ const Page = {
       location.hash = "forgot";
     });
     $("forgot-back").addEventListener("click", () => {
-      history.replaceState(null, "", location.pathname);
+      history.replaceState(null, "", location.href.split("#")[0]);
       this.render();
     });
     window.addEventListener("hashchange", () => this.render());
@@ -125,7 +125,7 @@ const Page = {
       // open the dialog.
       if (["#import", "#open-older", "#export"].includes(location.hash)) {
         let which = location.hash;
-        history.replaceState(null, "", location.pathname);
+        history.replaceState(null, "", location.href.split("#")[0]);
         if (which == "#export") {
           Transfer.openExport();
         } else {
@@ -173,7 +173,7 @@ const Page = {
     this._busy($("unlock-form"), true);
     try {
       await PasswordVault.unlock(field.value);
-      history.replaceState(null, "", location.pathname);
+      history.replaceState(null, "", location.href.split("#")[0]);
     } catch (e) {
       document.l10n.setAttributes(error, { "wrong-password": "passwords-wrong-password", "device-failed": "passwords-device-failed" }[e.code] ?? "passwords-error");
       error.hidden = false;
@@ -190,7 +190,7 @@ const Page = {
     $("unlock-error").hidden = true;
     try {
       await PasswordVault.unlockWithHello();
-      history.replaceState(null, "", location.pathname);
+      history.replaceState(null, "", location.href.split("#")[0]);
     } catch (e) {
       if (e.code != "cancelled") {
         document.l10n.setAttributes($("unlock-error"), "passwords-hello-failed");
@@ -271,7 +271,7 @@ const Page = {
       for (let id of ["recover-code", "recover-password", "recover-confirm"]) {
         $(id).value = "";
       }
-      history.replaceState(null, "", location.pathname);
+      history.replaceState(null, "", location.href.split("#")[0]);
       this.render();
     } catch (e) {
       let id =
@@ -296,7 +296,7 @@ const Page = {
     try {
       await PasswordVault.startOver($("start-over-confirm").value);
       $("start-over-confirm").value = "";
-      history.replaceState(null, "", location.pathname);
+      history.replaceState(null, "", location.href.split("#")[0]);
       this.render();
     } catch (e) {
       document.l10n.setAttributes(error, "passwords-error");

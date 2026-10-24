@@ -9,6 +9,7 @@ DIRS += [
     "contextmenu",
     "favicons",
     "fullscreen",
+    "library",
     "links",
     "passwords",
     "permissions",

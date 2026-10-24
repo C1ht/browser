@@ -10,6 +10,7 @@ ChromeUtils.defineESModuleGetters(this, {
   AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
   ContentBlockingAllowList: "resource://gre/modules/ContentBlockingAllowList.sys.mjs",
   ContentBlockingLists: "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
   SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
 });
@@ -34,6 +35,7 @@ var BrowserWip = {
     TabOverview.init(window);
     FullScreen.init(window);
     PasswordsUI.init(window);
+    BookmarksUI.init(window);
     // Gecko asks this object where to open links and window.open() calls.
     window.browserDOMWindow = gBrowser.browserDOMWindow;
 
@@ -197,6 +199,10 @@ var BrowserWip = {
     cmd_find: () => BrowserWip.find(),
     cmd_findAgain: () => BrowserWip.find({ again: true }),
     cmd_findPrevious: () => BrowserWip.find({ again: true, previous: true }),
+    cmd_bookmarkPage: () => BookmarksUI.bookmarkPage(),
+    cmd_toggleBookmarksBar: () => BookmarksUI.toggleBar(),
+    cmd_bookmarks: () => BookmarksUI.openManager("bookmarks"),
+    cmd_history: () => BookmarksUI.openManager("history"),
   },
 
   // Find in page: one toolkit findbar per window, bound to the selected tab.

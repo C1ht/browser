@@ -29,6 +29,7 @@
   <script src="chrome://browser-wip/content/fullscreen.js"/>
   <script src="chrome://browser-wip/content/passwords.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
+  <script src="chrome://browser-wip/content/bookmarks.js"/>
   <script src="chrome://browser-wip/content/browser.js"/>
 </head>
 <body>
@@ -55,6 +56,10 @@
     <xul:command id="cmd_find"/>
     <xul:command id="cmd_findAgain"/>
     <xul:command id="cmd_findPrevious"/>
+    <xul:command id="cmd_bookmarkPage"/>
+    <xul:command id="cmd_toggleBookmarksBar"/>
+    <xul:command id="cmd_bookmarks"/>
+    <xul:command id="cmd_history"/>
   </xul:commandset>
 
   <!-- reserved="true": handled by the browser even when a page has focus. -->
@@ -84,6 +89,10 @@
     <xul:key id="key_findPrevious" key="g" modifiers="accel,shift" command="cmd_findPrevious"/>
     <xul:key id="key_findAgain2" keycode="VK_F3" command="cmd_findAgain"/>
     <xul:key id="key_findPrevious2" keycode="VK_F3" modifiers="shift" command="cmd_findPrevious"/>
+    <xul:key id="key_bookmarkPage" key="d" modifiers="accel" command="cmd_bookmarkPage"/>
+    <xul:key id="key_toggleBookmarksBar" key="b" modifiers="accel,shift" command="cmd_toggleBookmarksBar"/>
+    <xul:key id="key_bookmarks" key="o" modifiers="accel,shift" command="cmd_bookmarks"/>
+    <xul:key id="key_history" key="h" modifiers="accel" command="cmd_history"/>
   </xul:keyset>
 
   <xul:popupset id="main-popupset">
@@ -92,7 +101,11 @@
       <xul:menuitem data-l10n-id="app-menu-new-window" key="key_newWindow" command="cmd_newWindow"/>
       <xul:menuitem id="app-menu-restore-session" data-l10n-id="app-menu-restore-session" command="cmd_restoreSession"/>
       <xul:menuseparator/>
+      <xul:menuitem data-l10n-id="app-menu-bookmarks" key="key_bookmarks" command="cmd_bookmarks"/>
+      <xul:menuitem data-l10n-id="app-menu-history" key="key_history" command="cmd_history"/>
       <xul:menuitem data-l10n-id="app-menu-downloads" key="key_downloads" command="cmd_downloads"/>
+      <xul:menuitem data-l10n-id="app-menu-bookmarks-bar" type="checkbox" key="key_toggleBookmarksBar"
+                    command="cmd_toggleBookmarksBar"/>
       <xul:menuitem data-l10n-id="app-menu-settings" command="cmd_settings"/>
       <xul:menuseparator/>
       <xul:menuitem data-l10n-id="app-menu-quit" command="cmd_quit"/>
@@ -144,6 +157,45 @@
       <xul:menuitem id="tab-ctx-close" data-l10n-id="tab-context-close"/>
       <xul:menuitem id="tab-ctx-close-others" data-l10n-id="tab-context-close-others"/>
       <xul:menuitem id="tab-ctx-reopen" data-l10n-id="tab-context-reopen" key="key_reopenTab"/>
+    </xul:menupopup>
+
+    <!-- Under the address field while typing (urlbar.js). Focus stays in the
+         field, which moves the selection. -->
+    <xul:panel id="urlbar-popup" class="urlbar-popup" noautofocus="true" consumeoutsideclicks="never"
+               level="parent" role="presentation">
+      <div id="urlbar-results" role="listbox" data-l10n-id="urlbar-results"></div>
+    </xul:panel>
+
+    <!-- The star's panel: name and folder (bookmarks.js). -->
+    <xul:panel id="bookmark-panel" class="wip-panel" type="arrow" role="dialog"
+               aria-labelledby="bookmark-panel-title">
+      <form id="bookmark-panel-form" class="panel-body bookmark-panel-body">
+        <h2 id="bookmark-panel-title" class="panel-title"></h2>
+        <label class="bookmark-field">
+          <span data-l10n-id="bookmark-panel-name"></span>
+          <input id="bookmark-panel-name" class="panel-input" type="text"/>
+        </label>
+        <label class="bookmark-field">
+          <span data-l10n-id="bookmark-panel-folder"></span>
+          <select id="bookmark-panel-folder" class="panel-input"></select>
+        </label>
+        <div class="panel-buttons">
+          <button id="bookmark-panel-remove" class="panel-button" type="button" data-l10n-id="bookmark-panel-remove"/>
+          <span class="panel-spacer"></span>
+          <button id="bookmark-panel-done" class="panel-button primary" type="submit" data-l10n-id="bookmark-panel-done"/>
+        </div>
+      </form>
+    </xul:panel>
+
+    <xul:menupopup id="bookmarks-folder-menu" class="wip-menu"/>
+    <xul:menupopup id="bookmarks-context-menu" class="wip-menu">
+      <xul:menuitem id="bookmarks-context-open" data-l10n-id="bookmarks-context-open"/>
+      <xul:menuitem id="bookmarks-context-open-tab" data-l10n-id="bookmarks-context-open-tab"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="bookmarks-context-edit" data-l10n-id="bookmarks-context-edit"/>
+      <xul:menuitem id="bookmarks-context-delete" data-l10n-id="bookmarks-context-delete"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="bookmarks-context-manage" data-l10n-id="bookmarks-context-manage"/>
     </xul:menupopup>
 
     <xul:panel id="protections-panel" class="wip-panel" type="arrow" role="dialog"
@@ -377,6 +429,9 @@
         <img id="protections-icon" class="icon" src="chrome://browser-wip/skin/icons/shield.svg" alt=""/>
         <span id="protections-count"></span>
       </button>
+      <button id="star-button" class="urlbar-button" hidden="true" data-l10n-id="star-button">
+        <img class="icon" src="chrome://browser-wip/skin/icons/star.svg" alt=""/>
+      </button>
       <div id="urlbar-progress"></div>
     </div>
 
@@ -398,6 +453,19 @@
       <button id="window-close" class="caption-button" data-l10n-id="window-close"/>
     </div>
   </header>
+
+  <!-- The bookmarks bar (bookmarks.js), between the toolbar and the tabs;
+       hidden unless turned on (Ctrl+Shift+B). -->
+  <div id="bookmarks-bar" role="toolbar" data-l10n-id="bookmarks-bar" hidden="true">
+    <div id="bookmarks-bar-items"></div>
+    <span id="bookmarks-bar-empty" hidden="true">
+      <span data-l10n-id="bookmarks-bar-empty"></span>
+      <button id="bookmarks-bar-manage" class="panel-link" data-l10n-id="bookmarks-bar-manage"/>
+    </span>
+    <button id="bookmarks-bar-overflow" class="toolbar-button" hidden="true" data-l10n-id="bookmarks-bar-overflow">
+      <img class="icon" src="chrome://browser-wip/skin/icons/chevron-down.svg" alt=""/>
+    </button>
+  </div>
 
   <div id="tab-strip">
     <div id="tabs" role="tablist" data-l10n-id="tab-strip"></div>

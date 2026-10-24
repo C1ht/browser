@@ -13,7 +13,7 @@ Design mockups: `design/mockups/chrome-directions.html` (also published as an ar
 | Q3 Mozilla downloads | **None**, so no CRLite. Safe Browsing excluded. | OCSP is also off: it reports every site you visit to the certificate authority. Revocation relies on the OneCRL list bundled with each release. A bundled enterprise policy disables Remote Settings entirely. |
 | Q4 Extensions | **v2** | Not supported in v1; AMO and update calls are off. |
 | Q5 Gecko | **Firefox Release** | Pinned in `GECKO_REVISION` (currently 157.0.2), updated with `tools/fetch-gecko.sh --update`. Considered and rejected on 2026-10-12: Firefox ESR to match Mullvad/Tor Browser, since ordinary Firefox users are the far larger crowd. |
-| Q6 Search | **Brave Search**, with DuckDuckGo, Startpage and Mojeek selectable | Suggestions off (not implemented yet). |
+| Q6 Search | **Brave Search**, with DuckDuckGo, Startpage and Mojeek selectable | Suggestions are opt-in: off by default, offered once in the address bar's dropdown and switchable in Settings. Never sent for text that looks like an address, and sent without cookies (`components/library/`). Mojeek has none. |
 | Q7 Decorations | **Desktop-drawn on Linux, app-drawn on Windows** | Linux: no custom titlebar. The compositor must offer server-side decorations to GTK3 apps (KDE's `org_kde_kwin_server_decoration` protocol); otherwise GTK draws its own. Windows is not built yet. |
 | Q7 Font | (no preference given) **Bundle Instrument Sans** | Consistent across Linux and Windows. Switching to the desktop font is a one-token change in `browser.css`. |
 | Q7 Accent | (no preference given) **Fixed teal** | Contrast is verified for this accent; following the desktop accent can come later. |

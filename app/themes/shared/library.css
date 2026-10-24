@@ -1,0 +1,228 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* about:history and about:bookmarks, on top of pages.css and the header,
+ * search, menu and dialog styles of passwords.css. */
+
+#library {
+  padding: 0 48px 48px;
+  max-width: 1080px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.library-banner {
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+/* ---------- Rows: history entries and bookmarks ---------- */
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 4px 8px 4px 12px;
+  border-radius: 10px;
+}
+
+.entry:hover,
+.entry:focus-within {
+  background-color: var(--hover-bg);
+}
+
+.entry-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  -moz-context-properties: fill;
+  fill: var(--muted);
+}
+
+.entry-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+a.entry-title:hover {
+  text-decoration: underline;
+}
+
+button.entry-title {
+  color: var(--fg);
+  font-size: 14px;
+}
+
+.entry-host {
+  flex: 1 1 0;
+  min-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.entry-time {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.entry-more {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  opacity: 0;
+}
+
+.entry:hover .entry-more,
+.entry:focus-within .entry-more,
+.entry-more[aria-expanded="true"],
+.entry .menu-wrap:has(.menu) .entry-more {
+  opacity: 1;
+}
+
+.entry-more:hover {
+  background-color: var(--hover-bg);
+}
+
+.entry .menu {
+  min-width: 220px;
+}
+
+/* ---------- History: days ---------- */
+
+.day + .day {
+  margin-top: 20px;
+}
+
+.day-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 0 4px;
+  padding: 8px 12px;
+  background-color: var(--page-bg);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--muted);
+}
+
+#history-empty,
+#items-empty {
+  padding: 8px 12px;
+}
+
+#history-more {
+  margin: 16px 12px 0;
+}
+
+/* ---------- Bookmarks: folders and the selected folder ---------- */
+
+.two-pane {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+#folders {
+  width: 240px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 16px;
+}
+
+.folder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  padding-inline-start: calc(10px + var(--depth, 0) * 16px);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+}
+
+.folder:hover {
+  background-color: var(--hover-bg);
+}
+
+.folder[selected] {
+  background-color: var(--accent-soft);
+  font-weight: 600;
+}
+
+.folder:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.folder span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#items-pane {
+  flex: 1;
+  min-width: 0;
+}
+
+#items-heading {
+  padding: 8px 12px;
+  margin: 0;
+}
+
+#status {
+  padding: 0 12px 8px;
+}
+
+.entry.editing {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0;
+  padding: 14px;
+}
+
+.entry.editing:hover {
+  background: none;
+}
+
+@media (max-width: 760px) {
+  #library {
+    padding-inline: 20px;
+  }
+
+  .two-pane {
+    flex-direction: column;
+  }
+
+  #folders {
+    width: 100%;
+    position: static;
+  }
+
+  .entry-time,
+  .entry-host {
+    display: none;
+  }
+}

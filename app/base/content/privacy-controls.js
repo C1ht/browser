@@ -27,6 +27,7 @@ const TOGGLE_UI = {
   httpsOnly: { l10n: "privacy-toggle-https-only", on: strict => strict },
   noStorageHeuristics: { l10n: "privacy-toggle-storage-heuristics", on: strict => !strict },
   blockSocial: { l10n: "privacy-toggle-social", on: strict => strict },
+  noHistory: { l10n: "privacy-toggle-history", on: strict => !strict },
   webrtcOff: { l10n: "privacy-toggle-webrtc-off", on: strict => !strict },
   resistFingerprinting: { l10n: "privacy-toggle-rfp", on: strict => strict },
   spoofEnglish: { l10n: "privacy-toggle-english", on: strict => strict },
@@ -56,6 +57,14 @@ class PrivacyControls {
 
   get mode() {
     return PrivacyModes.modeFor(this.state);
+  }
+
+  /** Settings: re-read the prefs, changed elsewhere (Settings › History). */
+  refresh() {
+    if (this.live) {
+      this.state = PrivacyModes.state;
+      this._sync();
+    }
   }
 
   /** First run: write the previewed choices. */

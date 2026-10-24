@@ -4,7 +4,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Runtime checks against a built browser-wip.
 
-    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4 5 6 7 8] [--shots DIR]
+    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4 5 6 7 8 9] [--shots DIR]
 
 Starts the browser (headless, fresh profile, Marionette on a local port),
 runs privileged JavaScript in its window and reports pass/fail per check.
@@ -1924,10 +1924,234 @@ return data.value.QueryInterface(Ci.nsISupportsString).data;"""
         shutil.rmtree(work, ignore_errors=True)
 
 
+# ---------------------------------------------------------------------------
+# Part 9: bookmarks, history and the address bar's dropdown
+#
+# Pages come from a local server: /page/<name> has the title <name>. A fake
+# search engine answers suggestions at /suggest and remembers every query,
+# so the checks can tell exactly what was sent.
+
+
+class LibraryHandler(http.server.BaseHTTPRequestHandler):
+    queries = []
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        path, _, query = self.path.partition("?")
+        if path == "/suggest":
+            q = urllib.parse.parse_qs(query).get("q", [""])[0]
+            LibraryHandler.queries.append(q)
+            body = json.dumps([q, [q + " recipe", q + " history", q]]).encode()
+            kind = "application/json"
+        elif path.startswith("/page/"):
+            name = urllib.parse.unquote(path[len("/page/"):])
+            body = f"<!doctype html><meta charset=utf-8><title>{name}</title><p>{name}".encode()
+            kind = "text/html; charset=utf-8"
+        else:
+            body, kind = b"not found", "text/plain"
+        self.send_response(200 if kind != "text/plain" else 404)
+        self.send_header("Content-Type", kind)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+URLBAR_ROWS = """return [...document.querySelectorAll("#urlbar-results .urlbar-row")].map(r => ({
+  kind: r.className.replace("urlbar-row ", ""), text: r.querySelector(".urlbar-row-primary").textContent,
+  selected: r.hasAttribute("selected") }));"""
+
+
+def part9(bindir, base):
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), LibraryHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    site = f"http://127.0.0.1:{server.server_address[1]}"
+    LibraryHandler.queries = []
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True,
+                               "browserwip.search.suggest.testURL": site + "/suggest?q="})
+    LIB = 'const { Library } = ChromeUtils.importESModule("resource://gre/modules/browserwip/Library.sys.mjs");'
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        title = lambda: b.js("return gBrowser.selectedBrowser.contentTitle;")
+
+        def visit(name):
+            b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0], "
+                 "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", f"{site}/page/{name}")
+            return b.wait("return gBrowser.selectedBrowser.contentTitle == arguments[0];", name, timeout=15)
+
+        def type_in_urlbar(text):
+            b.js("gURLBar.focusAndSelect();")
+            b.js(PW_TYPE, text, None)
+
+        def in_history(name):
+            return b.js(LIB + "return Library.history().then(h => h.some(e => e.title == arguments[0]));", name)
+
+        # -- History: kept in Standard, shown on about:history.
+        r = b.js(LIB + "return Library.historyEnabled;")
+        record(9, "Standard remembers history", r is True, r)
+        visit("Pelican facts")
+        record(9, "a visited page is in history", b.wait(LIB + "return Library.history().then(h => h.some(e => e.title == 'Pelican facts'));", timeout=10))
+        b.js("gBrowser.selectTab(gBrowser.addTab('about:history', { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));")
+        r = b.wait("let d = gBrowser.selectedBrowser.contentDocument; let h = d?.querySelector('.day-heading');"
+                   "return h?.textContent && [h.textContent, [...d.querySelectorAll('.entry-title')].map(e => e.textContent)];", timeout=15)
+        record(9, "about:history lists it under Today", r and r[0] == "Today" and "Pelican facts" in r[1], r)
+        b.js("gBrowser.removeTab(gBrowser.selectedTab);")
+
+        # -- The dropdown: search first, then the visited page; Enter goes there.
+        type_in_urlbar("pelican")
+        r = b.wait("return document.getElementById('urlbar-popup').state == 'open' && document.querySelectorAll('#urlbar-results .urlbar-row.page').length > 0 && "
+                   "!!document.querySelector('#urlbar-results .urlbar-row-primary').textContent;", timeout=10)
+        rows = b.js(URLBAR_ROWS)
+        record(9, "typing opens the dropdown: search first (selected), then the page",
+               r and rows[0]["kind"] == "heuristic" and rows[0]["selected"] and "pelican" in rows[0]["text"]
+               and any(x["kind"] == "page" and x["text"] == "Pelican facts" for x in rows), rows)
+        record(9, "with suggestions off, nothing is sent to the search engine", LibraryHandler.queries == [], LibraryHandler.queries)
+        record(9, "and it offers them once", any(x["kind"] == "offer" for x in rows), rows)
+        visit("Somewhere else")
+        type_in_urlbar("pelican")
+        b.wait("return document.querySelectorAll('#urlbar-results .urlbar-row.page').length > 0;", timeout=10)
+        b.js(PW_TYPE, "", "ArrowDown")
+        b.js(PW_TYPE, "", "Enter")
+        record(9, "ArrowDown, Enter opens the page", b.wait("return gBrowser.selectedBrowser.contentTitle == 'Pelican facts';", timeout=10), title())
+
+        # Shift+Delete forgets the selected page.
+        type_in_urlbar("pelican")
+        b.wait("return document.querySelectorAll('#urlbar-results .urlbar-row.page').length > 0;", timeout=10)
+        b.js(PW_TYPE, "", "ArrowDown")
+        b.js("""let tip = Cc["@mozilla.org/text-input-processor;1"].createInstance(Ci.nsITextInputProcessor);
+          tip.beginInputTransactionForTests(window);
+          tip.keydown(new KeyboardEvent("", { key: "Shift", code: "ShiftLeft" }));
+          let del = new KeyboardEvent("", { key: "Delete", code: "Delete", keyCode: KeyboardEvent.DOM_VK_DELETE });
+          tip.keydown(del); tip.keyup(del);
+          tip.keyup(new KeyboardEvent("", { key: "Shift", code: "ShiftLeft" }));""")
+        r = b.wait(LIB + "return Library.history().then(h => !h.some(e => e.title == 'Pelican facts'));", timeout=10)
+        record(9, "Shift+Delete in the dropdown forgets the page", r)
+        b.js("gURLBar.closePopup(); gBrowser.selectedBrowser.focus();")
+
+        # -- Suggestions: on, only for searches, never for addresses.
+        b.js("Services.prefs.setBoolPref('browserwip.search.suggest.enabled', true);")
+        type_in_urlbar("bread")
+        r = b.wait("return [...document.querySelectorAll('#urlbar-results .urlbar-row.suggestion')].map(r => r.textContent);", timeout=10)
+        record(9, "turned on, suggestions come from the engine", r == ["bread recipe", "bread history"], r)
+        record(9, "for what was typed", LibraryHandler.queries and LibraryHandler.queries[-1] == "bread", LibraryHandler.queries)
+        sent = len(LibraryHandler.queries)
+        type_in_urlbar("secret.example.com/path")
+        time.sleep(1.2)
+        rows = b.js(URLBAR_ROWS)
+        record(9, "an address is never sent for suggestions", len(LibraryHandler.queries) == sent and rows and rows[0]["kind"] == "heuristic"
+               and rows[0]["text"].startswith("Go to"), [LibraryHandler.queries[sent:], rows[:1]])
+        b.js("gURLBar.closePopup(); gBrowser.selectedBrowser.focus();")
+        b.js("Services.prefs.setBoolPref('browserwip.search.suggest.enabled', false);")
+
+        # -- Bookmarks: the star, its panel, the bar.
+        visit("Heron notes")
+        b.wait("return !document.getElementById('star-button').hidden;", timeout=5)
+        b.js("document.getElementById('star-button').click();")
+        r = b.wait("let p = document.getElementById('bookmark-panel'); return p.state == 'open' && document.getElementById('bookmark-panel-name').value;", timeout=10)
+        record(9, "the star bookmarks the page and opens its panel", r == "Heron notes", r)
+        b.js("document.getElementById('bookmark-panel-name').value = 'Herons'; document.getElementById('bookmark-panel-done').click();")
+        r = b.wait(LIB + "return Library.bookmarkFor(arguments[0]).then(bm => bm && [bm.title, bm.parentGuid == Library.BAR]);", f"{site}/page/Heron notes", timeout=10)
+        record(9, "renamed, in the bookmarks bar folder", r == ["Herons", True], r)
+        r = b.wait("return document.getElementById('star-button').hasAttribute('starred');", timeout=5)
+        record(9, "the star shows the page is bookmarked", r)
+        b.js("Services.prefs.setBoolPref('browserwip.bookmarks.bar', true);")
+        r = b.wait("let bar = document.getElementById('bookmarks-bar'); return !bar.hidden && [...bar.querySelectorAll('.bookmark-label')].map(l => l.textContent);", timeout=10)
+        record(9, "the bookmarks bar shows it", r == ["Herons"], r)
+        visit("Somewhere else")
+        b.js("document.querySelector('#bookmarks-bar .bookmark-item').click();")
+        record(9, "and clicking it opens the page", b.wait("return gBrowser.selectedBrowser.contentTitle == 'Heron notes';", timeout=10), title())
+
+        # -- Strict Privacy: no history; the dropdown has bookmarks only.
+        b.js(PM + "PrivacyModes.setMode('strict');")
+        r = b.js("return Services.prefs.getBoolPref('places.history.enabled');")
+        record(9, "Strict Privacy turns history off", r is False, r)
+        visit("Secret visit")
+        time.sleep(1.5)
+        record(9, "a page visited then isn't kept", not in_history("Secret visit"))
+        type_in_urlbar("o")
+        b.wait("return document.querySelectorAll('#urlbar-results .urlbar-row.page').length > 0;", timeout=10)
+        rows = b.js(URLBAR_ROWS)
+        pages = [x["text"] for x in rows if x["kind"] == "page"]
+        record(9, "the dropdown then suggests bookmarks, not history", pages == ["Herons"], rows)
+        b.js("gURLBar.closePopup(); gBrowser.selectedBrowser.focus();")
+        b.js("gBrowser.selectTab(gBrowser.addTab('about:history', { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));")
+        r = b.wait("let d = gBrowser.selectedBrowser.contentDocument; return d?.readyState == 'complete' && !d.getElementById('history-off').hidden;", timeout=15)
+        record(9, "about:history says history is off", r)
+        b.js("gBrowser.removeTab(gBrowser.selectedTab);")
+        b.js(PM + "PrivacyModes.setMode('anonymous');")
+        record(9, "so does Anonymous", b.js("return Services.prefs.getBoolPref('places.history.enabled');") is False)
+
+        # Settings: the History switch turns it back on (a custom mix then).
+        b.js("gBrowser.selectTab(gBrowser.addTab('about:settings', { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));")
+        S = "let d = gBrowser.selectedBrowser.contentDocument; "
+        r = b.wait(S + "return d?.readyState == 'complete' && d.getElementById('history-remember')?.getAttribute('aria-checked');", timeout=15)
+        record(9, "Settings shows history off", r == "false", r)
+        b.js(S + "d.getElementById('history-remember').click();")
+        r = b.wait(PM + S + "return Services.prefs.getBoolPref('places.history.enabled') && "
+                   "[d.getElementById('history-remember').getAttribute('aria-checked'), PrivacyModes.mode];", timeout=5)
+        record(9, "turning it on there remembers history again (a custom mix)", r and r[0] == "true" and r[1] == "custom", r)
+        b.js(PM + "PrivacyModes.setMode('standard');")
+        b.js("gBrowser.removeTab(gBrowser.selectedTab);")
+
+        # -- Clearing: everything goes; bookmarks stay.
+        visit("Kept for a moment")
+        b.wait(LIB + "return Library.history().then(h => h.some(e => e.title == 'Kept for a moment'));", timeout=10)
+        b.js("gBrowser.selectTab(gBrowser.addTab('about:history#clear', { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));")
+        r = b.wait(S + "return d?.readyState == 'complete' && d.getElementById('clear-dialog').open;", timeout=15)
+        record(9, "Settings' Clear history opens the dialog on about:history", r)
+        b.js(S + "d.querySelector('#clear-range [data-range=all]').click(); d.getElementById('clear-submit').click();")
+        r = b.wait(LIB + "return Library.history().then(h => h.length == 0);", timeout=10)
+        record(9, "clearing everything empties history", r)
+        r = b.js(LIB + "return Library.bookmarkFor(arguments[0]).then(bm => !!bm);", f"{site}/page/Heron notes")
+        record(9, "and keeps bookmarks", r is True)
+        r = b.wait(S + "let e = d.getElementById('history-empty'); return !e.hidden && e.textContent;", timeout=10)
+        record(9, "about:history then says it's empty", r == "Pages you visit will show here.", r)
+        b.js("gBrowser.removeTab(gBrowser.selectedTab);")
+
+        # -- about:bookmarks: folders, editing in place, export and import.
+        b.js("gBrowser.selectTab(gBrowser.addTab('about:bookmarks', { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));")
+        r = b.wait(S + "return d?.readyState == 'complete' && d.querySelectorAll('#items .entry').length && "
+                   "[d.getElementById('items-heading').textContent, [...d.querySelectorAll('#items .entry-title')].map(e => e.textContent)];", timeout=15)
+        record(9, "about:bookmarks opens on the bookmarks bar", r == ["Bookmarks bar", ["Herons"]], r)
+        b.js(S + "d.querySelector('#items .entry-more').click();")
+        b.js(S + "d.querySelector('#items .menu [data-action=edit]').click();")
+        r = b.wait(S + "return !!d.querySelector('#items form.editing');", timeout=5)
+        record(9, "Edit turns the row into a form", r)
+        b.js(S + "let f = d.querySelector('#items form.editing'); f.querySelector('input').value = 'Grey herons'; "
+                 "f.querySelector('[type=url]').value = 'notaurl'; f.querySelector('[type=submit]').click();")
+        r = b.wait(S + "let e = d.querySelector('#items form.editing .error'); return e && !e.hidden && e.textContent;", timeout=5)
+        record(9, "a bad address is refused", r == "That isn’t a web address.", r)
+        b.js(S + "let f = d.querySelector('#items form.editing'); f.querySelector('[type=url]').value = arguments[0]; f.querySelector('[type=submit]').click();",
+             f"{site}/page/Grey herons")
+        r = b.wait(S + "return !d.querySelector('#items form.editing') && [...d.querySelectorAll('#items .entry-title')].map(e => e.textContent);", timeout=10)
+        record(9, "a good one is saved", r == ["Grey herons"], r)
+        r = b.wait("return [...document.querySelectorAll('#bookmarks-bar .bookmark-label')].map(l => l.textContent);", timeout=5)
+        record(9, "and the bar follows", r == ["Grey herons"], r)
+        export = Path(tempfile.mkdtemp(prefix="wip-bm-")) / "bookmarks.html"
+        count = b.js(LIB + "return Library.exportHTML(arguments[0]);", str(export))
+        text = export.read_text(encoding="utf-8", errors="replace") if export.exists() else ""
+        record(9, "export writes the bookmarks as an HTML file", "Grey herons" in text and "/page/Grey%20herons" in text, count)
+        b.js(LIB + "return (async () => { let bm = await Library.bookmarkFor(arguments[0]); await Library.removeBookmark(bm.guid); })();",
+             f"{site}/page/Grey herons")
+        r = b.wait("return document.querySelectorAll('#bookmarks-bar .bookmark-item').length == 0;", timeout=5)
+        record(9, "deleting it empties the bar", r)
+        b.js(LIB + "return Library.importHTML(arguments[0]);", str(export))
+        r = b.wait(LIB + "return Library.searchBookmarks('Grey herons').then(r => r.length);", timeout=10)
+        record(9, "importing the file brings it back", r == 1, r)
+
+        log = (b.profile / "browser.log").read_text(errors="replace")
+        errors = [l for l in log.splitlines() if re.search(r"Library|bookmarks|urlbar|history", l) and re.search(r"Error|Exception", l)]
+        record(9, "no errors from bookmarks, history or the address bar", not errors, errors[:3])
+    finally:
+        b.quit()
+        server.shutdown()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("bindir")
-    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5, 6, 7, 8])
+    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5, 6, 7, 8, 9])
     parser.add_argument("--shots", help="directory for screenshots")
     args = parser.parse_args()
     if args.shots:
@@ -1936,7 +2160,8 @@ def main():
     parts = {1: lambda: part1(args.bindir, base), 2: lambda: part2(args.bindir, base),
              3: lambda: part3(args.bindir, base, args.shots), 4: lambda: part4(args.bindir, base, args.shots),
              5: lambda: part5(args.bindir, base), 6: lambda: part6(args.bindir, base),
-             7: lambda: part7(args.bindir, base), 8: lambda: part8(args.bindir, base, args.shots)}
+             7: lambda: part7(args.bindir, base), 8: lambda: part8(args.bindir, base, args.shots),
+             9: lambda: part9(args.bindir, base)}
     for p in args.part:
         try:
             parts[p]()

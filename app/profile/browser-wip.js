@@ -57,6 +57,16 @@ pref("browser.tabs.closeWindowWithLastTab", true);
 // Suggestions send each keystroke to the engine, so they are opt-in.
 pref("browserwip.search.engine", "brave");
 pref("browserwip.search.suggest.enabled", false);
+// The address bar offers to turn them on once.
+pref("browserwip.search.suggest.offered", false);
+
+// The bookmarks bar, between the toolbar and the tabs (Ctrl+Shift+B).
+pref("browserwip.bookmarks.bar", false);
+
+// Browsing history is kept (Firefox sets this in its own prefs file, so
+// toolkit has no default). Strict Privacy and Anonymous turn it off
+// (PrivacyModes.sys.mjs, "noHistory").
+pref("places.history.enabled", true);
 
 // Privacy mode as last chosen by the user. Informational: the effective mode
 // is always derived from the actual prefs (PrivacyModes.sys.mjs).

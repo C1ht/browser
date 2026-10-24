@@ -10,25 +10,27 @@
  * The address field. It always describes the selected tab: its URL, whether
  * the connection is secure, how many trackers were blocked, and loading
  * progress. Typing a URL loads it; anything else searches.
+ *
+ * While typing, a dropdown under it offers: going there or searching (what
+ * Enter does), search suggestions (only when turned on), and matching
+ * bookmarks and history (Library.sys.mjs).
  */
 
-// Search engines that need no account or API key. The default is a pref
-// (browserwip.search.engine) so Settings can change it.
-const SEARCH_ENGINES = {
-  brave: { name: "Brave Search", url: "https://search.brave.com/search?q=" },
-  duckduckgo: { name: "DuckDuckGo", url: "https://duckduckgo.com/?q=" },
-  startpage: { name: "Startpage", url: "https://www.startpage.com/do/search?query=" },
-  mojeek: { name: "Mojeek", url: "https://www.mojeek.com/search?q=" },
-};
+const UrlbarLibrary = ChromeUtils.importESModule("resource://gre/modules/browserwip/Library.sys.mjs");
+
+// Search engines that need no account or API key (SearchEngines.sys.mjs).
+// The default is a pref (browserwip.search.engine) so Settings can change it.
+const SEARCH_ENGINES = UrlbarLibrary.SEARCH_ENGINES;
 
 // Pages whose address is not worth showing: the field stays empty so the
 // placeholder invites a search.
 const BLANK_PAGES = new Set(["about:blank", "about:newtab", "about:home", "about:welcome"]);
 
+// Typing waits this long before asking for suggestions.
+const URLBAR_SUGGEST_DELAY_MS = 120;
+
 function searchURL(terms) {
-  let id = Services.prefs.getStringPref("browserwip.search.engine", "brave");
-  let engine = SEARCH_ENGINES[id] ?? SEARCH_ENGINES.brave;
-  return engine.url + encodeURIComponent(terms);
+  return UrlbarLibrary.searchURL(terms);
 }
 
 /**
@@ -83,10 +85,21 @@ class URLBar {
     this.protectionsCount = this.document.getElementById("protections-count");
     this.progress = this.document.getElementById("urlbar-progress");
 
+    this.popup = this.document.getElementById("urlbar-popup");
+    this.results = this.document.getElementById("urlbar-results");
+    this.rows = [];
+    this.selectedIndex = -1;
+    this._query = 0;
+
     this.input.addEventListener("focus", this);
     this.input.addEventListener("blur", this);
     this.input.addEventListener("keydown", this);
     this.input.addEventListener("input", this);
+    // A click on a row mustn't take focus from the field.
+    this.results.addEventListener("mousedown", e => e.preventDefault());
+    this.results.addEventListener("click", e => this._onRowClick(e));
+    this.results.addEventListener("auxclick", e => this._onRowClick(e));
+    this.popup.addEventListener("popuphidden", () => this._clearRows());
 
     let tabs = this.gBrowser.tabContainer;
     for (let type of ["TabSelect", "TabLocationChange", "TabSecurityChange", "TabAttrModified"]) {
@@ -117,6 +130,7 @@ class URLBar {
         break;
       case "blur":
         this.box.removeAttribute("focused");
+        this.closePopup();
         if (!this.browser?.userTypedValue) {
           this.update();
         }
@@ -125,12 +139,16 @@ class URLBar {
         if (this.browser) {
           this.browser.userTypedValue = this.input.value;
         }
+        this._startQuery();
         break;
       case "keydown":
         this._onKeydown(event);
         break;
       case "TabSelect":
       case "TabLocationChange":
+        if (event.type == "TabSelect") {
+          this.closePopup();
+        }
         if (event.target == this.gBrowser.selectedTab) {
           if (event.type == "TabLocationChange" && !event.detail.sameDocument) {
             this.browser.userTypedValue = null;
@@ -148,16 +166,37 @@ class URLBar {
   }
 
   _onKeydown(event) {
+    let open = this.popup.state == "open" || this.popup.state == "showing";
     if (event.key == "Enter") {
-      this.go({ newTab: event.altKey });
+      let row = open ? this.rows[this.selectedIndex] : null;
+      if (row && row.kind != "heuristic") {
+        this._openRow(row, { newTab: event.altKey });
+      } else {
+        this.go({ newTab: event.altKey });
+      }
       event.preventDefault();
     } else if (event.key == "Escape") {
-      if (this.browser) {
-        this.browser.userTypedValue = null;
+      if (open) {
+        // First the dropdown, then what was typed.
+        this.closePopup();
+      } else {
+        if (this.browser) {
+          this.browser.userTypedValue = null;
+        }
+        this.input.value = this._fullURL();
+        this.input.select();
       }
-      this.input.value = this._fullURL();
-      this.input.select();
       event.preventDefault();
+    } else if ((event.key == "ArrowDown" || event.key == "ArrowUp") && !event.altKey && open) {
+      this._moveSelection(event.key == "ArrowDown" ? 1 : -1);
+      event.preventDefault();
+    } else if (event.key == "Delete" && event.shiftKey && open) {
+      // Shift+Delete forgets the selected page from history.
+      let row = this.rows[this.selectedIndex];
+      if (row?.kind == "page" && !row.bookmarked) {
+        event.preventDefault();
+        UrlbarLibrary.Library.removePage(row.url).then(() => this._startQuery({ now: true }));
+      }
     }
   }
 
@@ -166,7 +205,11 @@ class URLBar {
     if (!target) {
       return;
     }
-    let url = target.url ?? searchURL(target.search);
+    this._load(target.url ?? searchURL(target.search), { newTab });
+  }
+
+  _load(url, { newTab = false } = {}) {
+    this.closePopup();
     if (newTab) {
       this.gBrowser.addTab(url);
     } else {
@@ -176,6 +219,244 @@ class URLBar {
       this.gBrowser.loadURL(this.browser, url, { userGesture: true });
     }
     this.gBrowser.selectedBrowser.focus();
+  }
+
+  // -----------------------------------------------------------------------
+  // The dropdown
+
+  closePopup() {
+    this._query++;
+    this._abort?.abort();
+    clearTimeout(this._suggestTimer);
+    if (this.popup.state != "closed") {
+      this.popup.hidePopup();
+    }
+  }
+
+  _clearRows() {
+    this.rows = [];
+    this.selectedIndex = -1;
+    this.results.replaceChildren();
+    this.input.removeAttribute("aria-activedescendant");
+    this.input.setAttribute("aria-expanded", "false");
+  }
+
+  /** Recomputes the rows for what is typed now. */
+  _startQuery({ now = false } = {}) {
+    let text = this.input.value;
+    let query = ++this._query;
+    this._abort?.abort();
+    clearTimeout(this._suggestTimer);
+    let target = interpretInput(text);
+    if (!target) {
+      this.closePopup();
+      return;
+    }
+    let state = { text, target, suggestions: [], matches: [] };
+    this._render(state);
+    UrlbarLibrary.Library.matches(text)
+      .then(matches => {
+        if (query == this._query) {
+          state.matches = matches;
+          this._render(state);
+        }
+      })
+      .catch(console.error);
+    // Suggestions only for searches: an address is never sent anywhere.
+    if (target.search && this._suggestionsOn()) {
+      let abort = (this._abort = new AbortController());
+      this._suggestTimer = setTimeout(
+        () =>
+          UrlbarLibrary.Library.suggestions(text, abort.signal).then(suggestions => {
+            if (query == this._query) {
+              state.suggestions = suggestions;
+              this._render(state);
+            }
+          }),
+        now ? 0 : URLBAR_SUGGEST_DELAY_MS
+      );
+    }
+  }
+
+  _suggestionsOn() {
+    return Services.prefs.getBoolPref(UrlbarLibrary.SUGGEST_PREF, false) && !!UrlbarLibrary.currentEngine().suggest;
+  }
+
+  /** Whether to offer turning suggestions on: once, for a search, where the engine has them. */
+  _offerSuggestions(target) {
+    return (
+      target.search &&
+      !Services.prefs.getBoolPref(UrlbarLibrary.SUGGEST_PREF, false) &&
+      !Services.prefs.getBoolPref(UrlbarLibrary.SUGGEST_OFFERED_PREF, false) &&
+      !!UrlbarLibrary.currentEngine().suggest
+    );
+  }
+
+  _render({ text, target, suggestions, matches }) {
+    // Keep the selection on the same row (by key) as rows arrive.
+    let selectedKey = this.rows[this.selectedIndex]?.key;
+    let engine = UrlbarLibrary.currentEngine();
+    let rows = [];
+    if (target.url) {
+      rows.push({ kind: "heuristic", key: "go", url: target.url, l10n: ["urlbar-go", { url: target.url }] });
+    } else {
+      rows.push({
+        kind: "heuristic",
+        key: "search",
+        search: target.search,
+        l10n: ["urlbar-search", { terms: target.search, engine: engine.name }],
+      });
+    }
+    for (let s of suggestions) {
+      rows.push({ kind: "suggestion", key: "s:" + s, search: s });
+    }
+    let typed = target.url?.toLowerCase();
+    for (let m of matches) {
+      if (typed && m.url.toLowerCase().replace(/\/$/, "").endsWith(typed.replace(/\/$/, ""))) {
+        // The page the first row goes to anyway.
+        continue;
+      }
+      rows.push({ kind: "page", key: "p:" + m.url, ...m });
+    }
+    if (this._offerSuggestions(target)) {
+      rows.push({ kind: "offer", key: "offer", engine: engine.name });
+    }
+    this.rows = rows;
+    let index = rows.findIndex(r => r.key == selectedKey);
+    this.selectedIndex = index >= 0 ? index : 0;
+    // Rows that didn't change keep their element, so their (asynchronously
+    // translated) text doesn't blink as suggestions and matches arrive.
+    let previous = new Map([...this.results.children].map(el => [el.dataset.signature, el]));
+    this.results.replaceChildren(
+      ...rows.map((row, i) => {
+        let signature = JSON.stringify([row.kind, row.key, row.l10n ?? null, row.title ?? null, row.bookmarked ?? null]);
+        let el = previous.get(signature) ?? this._rowElement(row, i);
+        previous.delete(signature);
+        el.dataset.signature = signature;
+        el.dataset.index = i;
+        el.id = `urlbar-row-${i}`;
+        return el;
+      })
+    );
+    this._markSelected();
+    if (this.popup.state == "closed" || this.popup.state == "hiding") {
+      let rect = this.box.getBoundingClientRect();
+      this.results.style.width = rect.width + "px";
+      this.popup.openPopup(this.box, "after_start", 0, 4);
+      this.input.setAttribute("aria-expanded", "true");
+    }
+  }
+
+  _rowElement(row, index) {
+    let doc = this.document;
+    let el = doc.createElement("div");
+    el.className = `urlbar-row ${row.kind}`;
+    el.id = `urlbar-row-${index}`;
+    el.dataset.index = index;
+    el.setAttribute("role", row.kind == "offer" ? "presentation" : "option");
+    let icon = doc.createElement("img");
+    icon.className = "urlbar-row-icon";
+    icon.alt = "";
+    let text = doc.createElement("span");
+    text.className = "urlbar-row-text";
+    let primary = doc.createElement("span");
+    primary.className = "urlbar-row-primary";
+    let secondary = doc.createElement("span");
+    secondary.className = "urlbar-row-secondary";
+    text.append(primary, secondary);
+    el.append(icon, text);
+    switch (row.kind) {
+      case "heuristic":
+        icon.src = row.url
+          ? "chrome://browser-wip/skin/icons/globe.svg"
+          : "chrome://browser-wip/skin/icons/search.svg";
+        doc.l10n.setAttributes(primary, ...row.l10n);
+        break;
+      case "suggestion":
+        icon.src = "chrome://browser-wip/skin/icons/search.svg";
+        primary.textContent = row.search;
+        break;
+      case "page": {
+        icon.src = UrlbarLibrary.Library.iconURL(row.url);
+        icon.addEventListener("error", () => (icon.src = "chrome://browser-wip/skin/icons/globe.svg"), { once: true });
+        primary.textContent = row.title || row.url;
+        secondary.textContent = UrlbarLibrary.Library.displayURL(row.url);
+        if (row.bookmarked) {
+          let star = doc.createElement("img");
+          star.className = "urlbar-row-star";
+          star.src = "chrome://browser-wip/skin/icons/star-filled.svg";
+          star.alt = "";
+          doc.l10n.setAttributes(star, "urlbar-bookmarked");
+          el.append(star);
+        }
+        break;
+      }
+      case "offer": {
+        icon.src = "chrome://browser-wip/skin/icons/search.svg";
+        doc.l10n.setAttributes(primary, "urlbar-suggest-offer", { engine: row.engine });
+        doc.l10n.setAttributes(secondary, "urlbar-suggest-offer-note", { engine: row.engine });
+        let on = doc.createElement("button");
+        on.className = "panel-button primary urlbar-offer-on";
+        doc.l10n.setAttributes(on, "urlbar-suggest-turn-on");
+        let no = doc.createElement("button");
+        no.className = "panel-button urlbar-offer-no";
+        doc.l10n.setAttributes(no, "urlbar-suggest-no-thanks");
+        el.append(on, no);
+        break;
+      }
+    }
+    return el;
+  }
+
+  _markSelected() {
+    for (let el of this.results.children) {
+      let selected = +el.dataset.index == this.selectedIndex;
+      el.toggleAttribute("selected", selected);
+      el.setAttribute("aria-selected", String(selected));
+    }
+    if (this.selectedIndex >= 0) {
+      this.input.setAttribute("aria-activedescendant", `urlbar-row-${this.selectedIndex}`);
+    }
+  }
+
+  _moveSelection(delta) {
+    let selectable = this.rows.map((r, i) => (r.kind == "offer" ? -1 : i)).filter(i => i >= 0);
+    let at = selectable.indexOf(this.selectedIndex);
+    let next = selectable[(at + delta + selectable.length) % selectable.length];
+    this.selectedIndex = next ?? 0;
+    this._markSelected();
+  }
+
+  _onRowClick(event) {
+    if (event.button > 1) {
+      return;
+    }
+    let el = event.target.closest(".urlbar-row");
+    let row = el && this.rows[+el.dataset.index];
+    if (!row) {
+      return;
+    }
+    if (row.kind == "offer") {
+      if (event.target.closest(".urlbar-offer-on")) {
+        Services.prefs.setBoolPref(UrlbarLibrary.SUGGEST_PREF, true);
+      }
+      if (event.target.closest("button")) {
+        Services.prefs.setBoolPref(UrlbarLibrary.SUGGEST_OFFERED_PREF, true);
+        this._startQuery({ now: true });
+      }
+      return;
+    }
+    this._openRow(row, { newTab: event.button == 1 || event.ctrlKey });
+  }
+
+  _openRow(row, { newTab = false } = {}) {
+    if (row.kind == "heuristic") {
+      this.go({ newTab });
+    } else if (row.kind == "suggestion") {
+      this._load(searchURL(row.search), { newTab });
+    } else if (row.kind == "page") {
+      this._load(row.url, { newTab });
+    }
   }
 
   // -----------------------------------------------------------------------

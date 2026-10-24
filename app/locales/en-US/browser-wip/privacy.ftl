@@ -10,9 +10,9 @@ privacy-mode-recommended = Recommended
 privacy-mode-standard-name = Standard
 privacy-mode-standard-description = Strong protection that stays out of your way. Sites learn little about your device, and video calls, streaming and sign-ins work as you expect.
 privacy-mode-strict-name = Strict Privacy
-privacy-mode-strict-description = Also turns off features sites can misuse. Some sites will be slower, and a few may not work.
+privacy-mode-strict-description = Also turns off features sites can misuse, and doesn’t keep your browsing history. Some sites will be slower, and a few may not work.
 privacy-mode-anonymous-name = Anonymous
-privacy-mode-anonymous-description = Makes { -brand-short-name } look the same as other privacy browsers, so sites can’t tell you apart. Sites show times in UTC and pages in English, pages get margins around them, and calls are off.
+privacy-mode-anonymous-description = Makes { -brand-short-name } look the same as other privacy browsers, so sites can’t tell you apart. Sites show times in UTC and pages in English, pages get margins around them, calls are off, and no history is kept.
 privacy-mode-custom = You’re using a custom mix of the settings below.
 
 ## Switches. Each has a -label and a -help string.
@@ -29,6 +29,8 @@ privacy-toggle-storage-heuristics-label = Let sign-in pages share data automatic
 privacy-toggle-storage-heuristics-help = When off, some sign-in pages ask before they can use data from another site.
 privacy-toggle-social-label = Block social media widgets
 privacy-toggle-social-help = Blocks like buttons and embedded posts from social networks on other sites.
+privacy-toggle-history-label = Remember browsing history
+privacy-toggle-history-help = When off, pages you visit aren’t kept, and the address bar suggests only bookmarks. History kept before stays until you clear it.
 privacy-toggle-webrtc-off-label = Allow video and voice calls
 privacy-toggle-webrtc-off-help = When off, websites can’t make calls at all.
 privacy-toggle-rfp-label = Look like everyone else

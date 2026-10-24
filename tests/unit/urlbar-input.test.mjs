@@ -5,6 +5,8 @@ import vm from "node:vm";
 const KNOWN_SCHEMES = new Set(["http", "https", "about", "file", "data", "view-source", "chrome", "resource", "moz-extension", "blob", "javascript", "mailto"]);
 const context = vm.createContext({
   Services: { io: { getProtocolHandler: s => ({ scheme: KNOWN_SCHEMES.has(s) ? s : "default" }) } },
+  // urlbar.js imports Library.sys.mjs at the top; only interpretInput is tested here.
+  ChromeUtils: { importESModule: () => ({ SEARCH_ENGINES: {} }) },
 });
 vm.runInContext(fs.readFileSync("app/base/content/urlbar.js", "utf8") + "\nthis.interpretInput = interpretInput;", context);
 const { interpretInput } = context;

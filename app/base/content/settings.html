@@ -181,6 +181,32 @@
           <option value="mojeek">Mojeek</option>
         </select>
       </div>
+      <div class="toggle-row">
+        <div>
+          <label id="search-suggest-label" for="search-suggest" data-l10n-id="settings-search-suggest-label"></label>
+          <span id="search-suggest-help" class="help"></span>
+        </div>
+        <button id="search-suggest" class="switch" type="button" role="switch" aria-labelledby="search-suggest-label"
+                aria-describedby="search-suggest-help"></button>
+      </div>
+    </section>
+
+    <section id="history" aria-labelledby="history-heading">
+      <h2 id="history-heading" data-l10n-id="settings-history-heading"></h2>
+      <div class="toggle-row">
+        <div>
+          <label id="history-remember-label" for="history-remember" data-l10n-id="settings-history-remember-label"></label>
+          <span class="help" data-l10n-id="settings-history-remember-help"></span>
+        </div>
+        <button id="history-remember" class="switch" type="button" role="switch" aria-labelledby="history-remember-label"></button>
+      </div>
+      <div class="inline-row">
+        <span data-l10n-id="settings-history-clear-label"></span>
+        <div class="button-row">
+          <button id="history-clear" class="secondary" type="button" data-l10n-id="settings-history-clear"></button>
+          <button id="history-open" class="secondary" type="button" data-l10n-id="settings-history-open"></button>
+        </div>
+      </div>
     </section>
 
     <section id="downloads" aria-labelledby="downloads-heading">

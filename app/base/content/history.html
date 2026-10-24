@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!-- about:history: pages visited, by day, with search, and clearing it.
+     When history is off (Strict Privacy and Anonymous), it says so. -->
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width"/>
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src chrome:; img-src chrome: page-icon:; style-src chrome:; object-src 'none'"/>
+  <title data-l10n-id="history-page-title"></title>
+  <link rel="stylesheet" href="chrome://browser-wip/skin/pages.css"/>
+  <link rel="stylesheet" href="chrome://browser-wip/skin/passwords.css"/>
+  <link rel="stylesheet" href="chrome://browser-wip/skin/library.css"/>
+  <link rel="localization" href="branding/brand.ftl"/>
+  <link rel="localization" href="browser-wip/library.ftl"/>
+  <script src="chrome://browser-wip/content/history-page.js"></script>
+</head>
+<body>
+  <header id="header">
+    <h1 data-l10n-id="history-heading"></h1>
+    <span class="spacer"></span>
+    <label class="search">
+      <img class="search-icon" src="chrome://browser-wip/skin/icons/search.svg" alt=""/>
+      <input id="search" type="search" autocomplete="off" data-l10n-id="history-search"/>
+    </label>
+    <button id="clear" class="secondary" type="button" data-l10n-id="history-clear"></button>
+  </header>
+
+  <main id="library">
+    <div id="history-off" class="warning library-banner" role="status" hidden="hidden">
+      <img class="warning-icon" src="chrome://browser-wip/skin/icons/history.svg" alt=""/>
+      <span id="history-off-text" data-l10n-id="history-off"></span>
+      <span class="spacer"></span>
+      <button id="history-turn-on" class="secondary small" type="button" data-l10n-id="history-turn-on"></button>
+    </div>
+    <div id="history-list" aria-live="polite"></div>
+    <p id="history-empty" class="muted" hidden="hidden"></p>
+    <div><button id="history-more" class="secondary small" type="button" hidden="hidden" data-l10n-id="history-more"></button></div>
+  </main>
+
+  <dialog id="clear-dialog" class="dialog" aria-labelledby="clear-title">
+    <form id="clear-form" class="dialog-body">
+      <h2 id="clear-title" class="dialog-title" data-l10n-id="history-clear-title"></h2>
+      <div id="clear-range" class="segmented" role="radiogroup" data-l10n-id="history-clear-range">
+        <button type="button" role="radio" data-range="hour" aria-checked="true" data-l10n-id="history-clear-hour"></button>
+        <button type="button" role="radio" data-range="today" aria-checked="false" data-l10n-id="history-clear-today"></button>
+        <button type="button" role="radio" data-range="all" aria-checked="false" data-l10n-id="history-clear-all"></button>
+      </div>
+      <p class="muted small" data-l10n-id="history-clear-text"></p>
+      <div class="dialog-buttons">
+        <button id="clear-cancel" class="secondary" type="button" data-l10n-id="library-cancel"></button>
+        <button id="clear-submit" class="danger" type="submit" data-l10n-id="history-clear-submit"></button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

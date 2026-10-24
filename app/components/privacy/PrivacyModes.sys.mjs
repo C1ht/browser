@@ -74,6 +74,13 @@ export const TOGGLES = {
       "privacy.restrict3rdpartystorage.heuristic.window_open": false,
     },
   },
+  // No browsing history: Places records no visits, and the address bar
+  // suggests only bookmarks. History already kept stays until cleared
+  // (Settings › History, about:history).
+  noHistory: {
+    modes: ["strict", "anonymous"],
+    strict: { "places.history.enabled": false },
+  },
   // Social-network widgets (like buttons, embedded feeds) from other sites.
   blockSocial: {
     modes: ["strict", "anonymous"],

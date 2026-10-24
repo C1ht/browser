@@ -36,4 +36,27 @@ export const BrowserWindowTracker = {
   get windowCount() {
     return this.orderedWindows.length;
   },
+
+  // nsIBrowserWindowTracker. Places asks getBrowserById for every visit it
+  // stores (History::VisitURI) and drops the visit if the call fails.
+
+  /** The tab's <browser> with this browserId, or null. */
+  getBrowserById(browserId) {
+    for (let win of this.orderedWindows) {
+      for (let tab of win.gBrowser?.tabs ?? []) {
+        if (tab.linkedBrowser?.browserId == browserId) {
+          return tab.linkedBrowser;
+        }
+      }
+    }
+    return null;
+  },
+
+  /** Each window's selected tab, as nsIVisibleTab. */
+  getAllVisibleTabs() {
+    return this.orderedWindows
+      .map(win => win.gBrowser?.selectedBrowser)
+      .filter(Boolean)
+      .map(browser => ({ contentTitle: browser.contentTitle, browserId: browser.browserId }));
+  },
 };

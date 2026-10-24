@@ -12,12 +12,13 @@ const { ContentBlockingLists } = ChromeUtils.importESModule(
 
 window.addEventListener("DOMContentLoaded", () => {
   let restartRow = document.getElementById("restart-row");
-  new PrivacyControls({
+  let privacyControls = new PrivacyControls({
     cards: document.getElementById("modes"),
     toggles: document.getElementById("toggles"),
     toggleIds: [
       "httpsOnly",
       "blockSocial",
+      "noHistory",
       "jit",
       "webrtc",
       "noStorageHeuristics",
@@ -42,7 +43,68 @@ window.addEventListener("DOMContentLoaded", () => {
   engine.value = Services.prefs.getStringPref("browserwip.search.engine", "brave");
   engine.addEventListener("change", () => {
     Services.prefs.setStringPref("browserwip.search.engine", engine.value);
+    syncSuggest();
   });
+
+  // Search suggestions: opt-in, and only where the engine has them.
+  let { Library, SUGGEST_PREF, currentEngine } = ChromeUtils.importESModule(
+    "resource://gre/modules/browserwip/Library.sys.mjs"
+  );
+  let suggest = document.getElementById("search-suggest");
+  let syncSuggest = () => {
+    let current = currentEngine();
+    suggest.disabled = !current.suggest;
+    suggest.setAttribute("aria-checked", String(!!current.suggest && Services.prefs.getBoolPref(SUGGEST_PREF, false)));
+    document.l10n.setAttributes(
+      document.getElementById("search-suggest-help"),
+      current.suggest ? "settings-search-suggest-help" : "settings-search-suggest-none",
+      { engine: current.name }
+    );
+  };
+  suggest.addEventListener("click", () => {
+    Services.prefs.setBoolPref(SUGGEST_PREF, suggest.getAttribute("aria-checked") != "true");
+    syncSuggest();
+  });
+  document.getElementById("search-suggest-label").addEventListener("click", e => {
+    e.preventDefault();
+    suggest.click();
+  });
+  syncSuggest();
+
+  // History: remembered unless the privacy mode (or this switch) says not.
+  let remember = document.getElementById("history-remember");
+  let syncHistory = () => {
+    remember.setAttribute("aria-checked", String(Library.historyEnabled));
+    privacyControls.refresh();
+  };
+  remember.addEventListener("click", () => {
+    Library.setHistoryEnabled(!Library.historyEnabled);
+    syncHistory();
+  });
+  document.getElementById("history-remember-label").addEventListener("click", e => {
+    e.preventDefault();
+    remember.click();
+  });
+  let openHistory = hash => {
+    let win = window.browsingContext.topChromeWindow;
+    let url = "about:history" + hash;
+    let existing = win?.gBrowser.tabs.find(t => t.linkedBrowser.currentURI?.spec.startsWith("about:history"));
+    if (existing) {
+      win.gBrowser.selectTab(existing);
+      if (hash) {
+        existing.linkedBrowser.loadURI(Services.io.newURI(url), {
+          triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+        });
+      }
+    } else {
+      win?.gBrowser.addTab(url);
+    }
+  };
+  document.getElementById("history-clear").addEventListener("click", () => openHistory("#clear"));
+  document.getElementById("history-open").addEventListener("click", () => openHistory(""));
+  Services.prefs.addObserver("places.history.enabled", syncHistory);
+  window.addEventListener("unload", () => Services.prefs.removeObserver("places.history.enabled", syncHistory));
+  syncHistory();
 
   // Downloads: the folder files are saved to, or ask each time.
   let { Downloads } = ChromeUtils.importESModule("resource://gre/modules/Downloads.sys.mjs");

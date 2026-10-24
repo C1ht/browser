@@ -10,6 +10,11 @@
  * size is accepted, and only for the document that is still showing.
  */
 
+const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+  Library: "resource://gre/modules/browserwip/Library.sys.mjs",
+});
+
 // Base64 of FaviconChild's 256 KB limit, plus the data: prefix.
 const MAX_DATA_URL_LENGTH = 360 * 1024;
 
@@ -32,5 +37,11 @@ export class FaviconParent extends JSWindowActorParent {
       return;
     }
     browser.ownerDocument.defaultView.gBrowser?.setIcon(browser, dataURL);
+    // Kept for the bookmarks bar and the address bar's dropdown: for
+    // bookmarked pages, and visited ones while history is remembered.
+    let url = browser.currentURI?.spec;
+    if (url) {
+      lazy.Library.storeIcon(url, dataURL).catch(() => {});
+    }
   }
 }

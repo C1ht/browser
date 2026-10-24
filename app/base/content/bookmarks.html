@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!-- about:bookmarks: folders on the left, the selected folder's bookmarks
+     on the right (or search results from all of them). Editing happens in
+     place; import and export use the HTML file other browsers make. -->
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width"/>
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src chrome:; img-src chrome: page-icon:; style-src chrome:; object-src 'none'"/>
+  <title data-l10n-id="bookmarks-page-title"></title>
+  <link rel="stylesheet" href="chrome://browser-wip/skin/pages.css"/>
+  <link rel="stylesheet" href="chrome://browser-wip/skin/passwords.css"/>
+  <link rel="stylesheet" href="chrome://browser-wip/skin/library.css"/>
+  <link rel="localization" href="branding/brand.ftl"/>
+  <link rel="localization" href="browser-wip/library.ftl"/>
+  <script src="chrome://browser-wip/content/bookmarks-page.js"></script>
+</head>
+<body>
+  <header id="header">
+    <h1 data-l10n-id="bookmarks-heading"></h1>
+    <span class="spacer"></span>
+    <label class="search">
+      <img class="search-icon" src="chrome://browser-wip/skin/icons/search.svg" alt=""/>
+      <input id="search" type="search" autocomplete="off" data-l10n-id="bookmarks-search"/>
+    </label>
+    <button id="new-folder" class="secondary" type="button" data-l10n-id="bookmarks-new-folder"></button>
+    <div id="more-wrap" class="menu-wrap">
+      <button id="more" class="secondary icon-button" type="button" aria-haspopup="menu" aria-expanded="false"
+              aria-controls="more-menu" data-l10n-id="bookmarks-more-actions">
+        <img class="button-icon" src="chrome://browser-wip/skin/icons/more.svg" alt=""/>
+      </button>
+      <div id="more-menu" class="menu" role="menu" hidden="hidden">
+        <button id="menu-import" type="button" role="menuitem" data-l10n-id="bookmarks-import"></button>
+        <button id="menu-export" type="button" role="menuitem" data-l10n-id="bookmarks-export"></button>
+        <button id="menu-bar" type="button" role="menuitemcheckbox" data-l10n-id="bookmarks-show-bar"></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="library" class="two-pane">
+    <nav id="folders" role="tree" data-l10n-id="bookmarks-folders"></nav>
+    <section id="items-pane">
+      <h2 id="items-heading"></h2>
+      <p id="status" class="done small" role="status" hidden="hidden"></p>
+      <div id="items" role="list"></div>
+      <p id="items-empty" class="muted" hidden="hidden"></p>
+    </section>
+  </main>
+</body>
+</html>

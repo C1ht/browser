@@ -300,3 +300,64 @@ identity-summary-insecure = Your connection to this site is not encrypted. Don�
 fullscreen-warning-host = { $host } is now full screen
 fullscreen-warning-page = This page is now full screen
 fullscreen-exit-button = Exit full screen (Esc)
+
+## Address bar dropdown
+
+urlbar-results =
+    .aria-label = Suggestions
+# $url: what was typed, as an address
+urlbar-go = Go to { $url }
+# $terms: what was typed; $engine: the search engine's name
+urlbar-search = { $terms } — search with { $engine }
+urlbar-bookmarked =
+    .title = Bookmarked
+# $engine: the search engine's name
+urlbar-suggest-offer = See search suggestions from { $engine }?
+urlbar-suggest-offer-note = What you type here is then sent to { $engine } as you type, never addresses. You can change this in Settings.
+urlbar-suggest-turn-on = Turn on
+urlbar-suggest-no-thanks = No thanks
+
+## Bookmarks
+
+star-button =
+    .title = Bookmark this page (Ctrl+D)
+    .aria-label = Bookmark this page
+star-button-edit =
+    .title = Edit this bookmark (Ctrl+D)
+    .aria-label = Edit this bookmark
+bookmark-panel-added = Bookmark added
+bookmark-panel-edit = Edit bookmark
+bookmark-panel-name = Name
+bookmark-panel-folder = Folder
+bookmark-panel-remove = Remove
+bookmark-panel-done = Done
+bookmarks-folder-bar = Bookmarks bar
+bookmarks-folder-other = Other bookmarks
+bookmarks-folder-empty =
+    .label = (Empty)
+bookmarks-bar =
+    .aria-label = Bookmarks bar
+bookmarks-bar-empty = Bookmark a page with the star to keep it here.
+bookmarks-bar-manage = Manage bookmarks
+bookmarks-bar-overflow =
+    .title = More bookmarks
+    .aria-label = More bookmarks
+bookmarks-context-open =
+    .label = Open
+bookmarks-context-open-tab =
+    .label = Open in new tab
+bookmarks-context-edit =
+    .label = Edit…
+bookmarks-context-delete =
+    .label = Delete
+bookmarks-context-manage =
+    .label = Manage bookmarks
+bookmarks-delete-folder-title = Delete folder?
+# $name: the folder's name
+bookmarks-delete-folder-text = “{ $name }” and everything in it will be deleted.
+app-menu-bookmarks =
+    .label = Bookmarks
+app-menu-history =
+    .label = History
+app-menu-bookmarks-bar =
+    .label = Show bookmarks bar

@@ -22,7 +22,8 @@ for (const [k, v] of Object.entries({
   "privacy.restrict3rdpartystorage.heuristic.recently_visited": true, "privacy.restrict3rdpartystorage.heuristic.window_open": true,
   "privacy.trackingprotection.socialtracking.enabled": false, "browserwip.privacy.mode": "standard",
   "privacy.resistFingerprinting": false, "privacy.resistFingerprinting.pbmode": false, "privacy.spoof_english": 0,
-  "privacy.resistFingerprinting.letterboxing": false, "network.http.referer.XOriginPolicy": 0 })) defaults.set(k, v);
+  "privacy.resistFingerprinting.letterboxing": false, "network.http.referer.XOriginPolicy": 0,
+  "places.history.enabled": true })) defaults.set(k, v);
 
 const { PrivacyModes } = await import("../../app/components/privacy/PrivacyModes.sys.mjs");
 const assert = (c, m) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else console.log("ok  ", m); };
@@ -34,6 +35,7 @@ assert(get("javascript.options.ion") === false && get("dom.security.https_only_m
 assert(!user.has("privacy.fingerprintingProtection.overrides"), "strict leaves time zone alone");
 assert(get("media.peerconnection.enabled") === true, "strict keeps WebRTC available");
 assert(get("privacy.resistFingerprinting") === false, "strict leaves resistFingerprinting off");
+assert(get("places.history.enabled") === false, "strict keeps no history");
 PrivacyModes.setStrict("utcTimezone", true);
 assert(PrivacyModes.mode == "custom", "strict + UTC -> custom");
 assert(get("privacy.fingerprintingProtection.overrides").includes("+JSDateTimeUTC") &&
@@ -87,3 +89,12 @@ PrivacyModes.applyState({ ...strictState, utcTimezone: true });
 assert(PrivacyModes.mode == "custom" && PrivacyModes.isStrict("utcTimezone") && PrivacyModes.isStrict("jit"), "applyState writes a previewed custom state");
 PrivacyModes.applyState(PrivacyModes.stateForMode("standard"));
 assert(user.size == 0, "applyState(standard) leaves no protection prefs: " + [...user.keys()]);
+
+// History: off in Strict and Anonymous, on in Standard; turning it back on clears the user pref.
+PrivacyModes.setMode("anonymous");
+assert(get("places.history.enabled") === false, "anonymous keeps no history");
+PrivacyModes.setMode("standard");
+assert(get("places.history.enabled") === true && !user.has("places.history.enabled"), "standard remembers history again");
+PrivacyModes.setStrict("noHistory", true);
+assert(PrivacyModes.mode == "custom", "standard without history -> custom");
+PrivacyModes.setStrict("noHistory", false);
