@@ -1,0 +1,16 @@
+# Development build on any Linux distribution: like mozconfigs/dev, but with
+# Mozilla's own toolchains (clang, lld, nasm, node, cbindgen, WASI sysroot)
+# fetched into ~/.mozbuild by --enable-bootstrap instead of Ubuntu packages.
+# Needs no root, only the GTK/X11/Wayland/PulseAudio development libraries.
+# Usage: MOZCONFIG=/path/to/browser/mozconfigs/dev-bootstrap ./mach build
+ac_add_options --enable-project=browser-wip
+# Lets the app adjust shared build definitions without editing mozilla-central.
+export MOZ_BUILD_HOOK="$topsrcdir/browser-wip/build/hook.mozbuild"
+ac_add_options --enable-bootstrap
+ac_add_options --enable-optimize
+ac_add_options --disable-debug
+ac_add_options --disable-tests
+ac_add_options --disable-debug-symbols
+# Parallelism defaults to the number of cores.
+
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-browser-wip

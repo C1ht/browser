@@ -34,6 +34,10 @@ MOZCONFIG=$PWD/../browser/mozconfigs/dev ./mach build
 ./obj-browser-wip/dist/bin/browser-wip
 ```
 
+On other distributions, or without root, use `mozconfigs/dev-bootstrap`
+instead: it fetches Mozilla's toolchains into `~/.mozbuild` and needs only
+the GTK/X11/Wayland development libraries, plus `unzip` and `zip`.
+
 `mozconfigs/dev` targets a 4-core machine with about 13 GB of usable memory:
 no debug symbols, 3 parallel jobs. After the first build, front-end changes
 need only `./mach build faster`.
