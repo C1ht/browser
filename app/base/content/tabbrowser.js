@@ -139,6 +139,7 @@ class TabBrowser {
       () => this.tabs.forEach(t => this._unregisterAudible(t)),
       { once: true }
     );
+    this._initScrolling();
   }
 
   get selectedBrowser() {
@@ -411,7 +412,7 @@ class TabBrowser {
       delete tab.pendingLoad;
       this.loadURL(browser, url);
     }
-    tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+    this.scrollTabIntoView(tab);
     this._notify(tab, "TabSelect", { previous });
   }
 
@@ -419,6 +420,108 @@ class TabBrowser {
     let index = this.tabs.indexOf(this.selectedTab);
     let next = (index + direction + this.tabs.length) % this.tabs.length;
     this.selectTab(this.tabs[next]);
+  }
+
+  // ---------------------------------------------------------------------
+  // Scrolling: once the tabs are at their narrowest, the strip scrolls. The
+  // wheel scrolls it sideways, pinned tabs stay at the start, and each edge
+  // fades while there are more tabs beyond it.
+
+  _initScrolling() {
+    let strip = this.tabContainer;
+    strip.addEventListener("wheel", e => this._onWheel(e), { passive: false });
+    strip.addEventListener("scroll", () => this._updateOverflow());
+    new this.window.ResizeObserver(() => this._updateOverflow()).observe(strip);
+    // Tabs added, closed, moved or (un)pinned change what the strip holds.
+    let changed = () => {
+      if (!this._layoutPending) {
+        this._layoutPending = true;
+        this.window.requestAnimationFrame(() => {
+          this._layoutPending = false;
+          this._updatePinned();
+          this._updateOverflow();
+        });
+      }
+    };
+    for (let type of ["TabOpen", "TabClose", "TabMove", "TabAttrModified"]) {
+      strip.addEventListener(type, changed);
+    }
+  }
+
+  get _reducedMotion() {
+    return this.window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  scrollTabIntoView(tab) {
+    tab.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+      behavior: this._reducedMotion ? "instant" : "smooth",
+    });
+  }
+
+  _onWheel(event) {
+    let strip = this.tabContainer;
+    // Sideways wheels and touchpads already scroll the strip; Ctrl+wheel
+    // stays the page's.
+    if (
+      event.ctrlKey ||
+      event.metaKey ||
+      Math.abs(event.deltaX) >= Math.abs(event.deltaY) ||
+      strip.scrollWidth <= strip.clientWidth
+    ) {
+      return;
+    }
+    let delta = event.deltaY;
+    if (event.deltaMode == event.DOM_DELTA_LINE) {
+      delta *= 26;
+    } else if (event.deltaMode == event.DOM_DELTA_PAGE) {
+      delta *= strip.clientWidth;
+    }
+    let rtl = this.window.getComputedStyle(strip).direction == "rtl";
+    // A touchpad's pixel deltas already arrive smoothly.
+    let smooth = event.deltaMode != event.DOM_DELTA_PIXEL && !this._reducedMotion;
+    // Notches in quick succession add up, even while the last one is still
+    // scrolling there.
+    let now = this.window.performance.now();
+    let from = smooth && this._wheelTarget != null && now - this._wheelTime < 400 ? this._wheelTarget : strip.scrollLeft;
+    let max = strip.scrollWidth - strip.clientWidth;
+    let target = from + (rtl ? -delta : delta);
+    target = rtl ? Math.min(0, Math.max(-max, target)) : Math.max(0, Math.min(max, target));
+    this._wheelTarget = target;
+    this._wheelTime = now;
+    event.preventDefault();
+    strip.scrollTo({ left: target, behavior: smooth ? "smooth" : "instant" });
+  }
+
+  _updateOverflow() {
+    let strip = this.tabContainer;
+    let max = strip.scrollWidth - strip.clientWidth;
+    // Negative in right-to-left.
+    let position = Math.abs(strip.scrollLeft);
+    strip.toggleAttribute("overflowing", max > 1);
+    strip.toggleAttribute("more-before", max > 1 && position > 1);
+    strip.toggleAttribute("more-after", max > 1 && position < max - 1);
+  }
+
+  // Pinned tabs stick at the start of the strip, one after another, and the
+  // selected tab scrolls clear of them.
+  _updatePinned() {
+    // Sticky offsets count from inside the strip's padding.
+    let offset = 0;
+    let last = null;
+    for (let tab of this.tabs) {
+      tab.removeAttribute("last-pinned");
+      if (tab.hasAttribute("pinned")) {
+        tab.style.setProperty("--pinned-start", `${offset}px`);
+        offset += tab.offsetWidth;
+        last = tab;
+      } else {
+        tab.style.removeProperty("--pinned-start");
+      }
+    }
+    last?.setAttribute("last-pinned", "true");
+    this.tabContainer.style.setProperty("--pinned-width", `${offset}px`);
   }
 
   // ---------------------------------------------------------------------
@@ -661,30 +764,19 @@ class TabBrowser {
     if (!tab || event.button != 0 || event.target.closest(".tab-close")) {
       return;
     }
+    let strip = this.tabContainer;
     let startX = event.clientX;
-    let startY = event.clientY;
     let dragging = false;
     let rects;
     let originIndex;
+    // Positions are measured when the drag starts; if the strip scrolls
+    // meanwhile, every tab has moved by as much.
+    let scrollStart = strip.scrollLeft;
+    let pointerX = startX;
+    let autoScroll = 0;
 
-    let onMove = e => {
-      let dx = e.clientX - startX;
-      if (!dragging) {
-        if (Math.abs(dx) < 6) {
-          return;
-        }
-        dragging = true;
-        this.selectTab(tab);
-        try {
-          // Keeps the drag when the pointer leaves the strip. Not essential:
-          // the move/up listeners are on the window.
-          tab.setPointerCapture(event.pointerId);
-        } catch (e) {}
-        tab.setAttribute("dragging", "true");
-        this.tabContainer.setAttribute("reordering", "true");
-        rects = this.tabs.map(t => t.getBoundingClientRect());
-        originIndex = this.tabs.indexOf(tab);
-      }
+    let update = () => {
+      let dx = pointerX - startX + (strip.scrollLeft - scrollStart);
       // Keep pinned and unpinned tabs within their own groups.
       let pinned = tab.hasAttribute("pinned");
       let group = this.tabs.map((t, i) => [t, i]).filter(([t]) => t.hasAttribute("pinned") == pinned);
@@ -714,6 +806,56 @@ class TabBrowser {
       tab.groupIndices = group;
     };
 
+    // Near an edge of a strip that scrolls, it scrolls along, faster the
+    // closer the pointer is. Pinned tabs never scroll out of view.
+    let EDGE = 40;
+    let scrollStep = () => {
+      autoScroll = 0;
+      let box = strip.getBoundingClientRect();
+      let start = box.left + (parseFloat(strip.style.getPropertyValue("--pinned-width")) || 0);
+      let speed = 0;
+      if (pointerX < start + EDGE) {
+        speed = -Math.min(1, (start + EDGE - pointerX) / EDGE);
+      } else if (pointerX > box.right - EDGE) {
+        speed = Math.min(1, (pointerX - (box.right - EDGE)) / EDGE);
+      }
+      if (!speed || tab.hasAttribute("pinned") || strip.scrollWidth <= strip.clientWidth) {
+        return;
+      }
+      let before = strip.scrollLeft;
+      strip.scrollLeft += speed * 14;
+      if (strip.scrollLeft != before) {
+        update();
+        autoScroll = this.window.requestAnimationFrame(scrollStep);
+      }
+    };
+
+    let onMove = e => {
+      pointerX = e.clientX;
+      if (!dragging) {
+        if (Math.abs(pointerX - startX) < 6) {
+          return;
+        }
+        dragging = true;
+        this.selectTab(tab);
+        try {
+          // Keeps the drag when the pointer leaves the strip. Not essential:
+          // the move/up listeners are on the window.
+          tab.setPointerCapture(event.pointerId);
+        } catch (e) {}
+        tab.setAttribute("dragging", "true");
+        strip.setAttribute("reordering", "true");
+        rects = this.tabs.map(t => t.getBoundingClientRect());
+        originIndex = this.tabs.indexOf(tab);
+        scrollStart = strip.scrollLeft;
+        strip.addEventListener("scroll", update);
+      }
+      update();
+      if (!autoScroll) {
+        scrollStep();
+      }
+    };
+
     let onUp = () => {
       this.window.removeEventListener("pointermove", onMove);
       this.window.removeEventListener("pointerup", onUp);
@@ -721,6 +863,8 @@ class TabBrowser {
       if (!dragging) {
         return;
       }
+      this.window.cancelAnimationFrame(autoScroll);
+      strip.removeEventListener("scroll", update);
       let center = tab.dropCenter;
       let target = originIndex;
       for (let [t, i] of tab.groupIndices) {
@@ -735,8 +879,9 @@ class TabBrowser {
         t.style.transform = "";
       }
       tab.removeAttribute("dragging");
-      this.tabContainer.removeAttribute("reordering");
+      strip.removeAttribute("reordering");
       this.moveTab(tab, target);
+      this.scrollTabIntoView(tab);
     };
 
     this.window.addEventListener("pointermove", onMove);

@@ -481,11 +481,18 @@
   <xul:findbar id="findbar" hidden="true"/>
 
   <!-- Tab overview (taboverview.js), over the page area. -->
-  <div id="tab-overview" role="dialog" aria-labelledby="tab-overview-count" hidden="true">
+  <div id="tab-overview" role="dialog" aria-modal="true" aria-labelledby="tab-overview-count" hidden="true">
     <div class="overview-header">
-      <input id="tab-overview-search" type="search" data-l10n-id="tab-overview-search"/>
+      <div class="overview-search">
+        <img class="icon" src="chrome://browser-wip/skin/icons/search.svg" alt=""/>
+        <input id="tab-overview-search" type="search" data-l10n-id="tab-overview-search"/>
+      </div>
       <span id="tab-overview-count"></span>
+      <button id="tab-overview-dismiss" class="toolbar-button" data-l10n-id="tab-overview-dismiss">
+        <img class="icon" src="chrome://browser-wip/skin/icons/close.svg" alt=""/>
+      </button>
     </div>
+    <p id="tab-overview-empty" hidden="true"></p>
     <div id="tab-overview-grid"></div>
   </div>
 

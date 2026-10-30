@@ -235,9 +235,21 @@ tab-overview-count =
     }
 tab-overview-new =
     .aria-label = New tab
+tab-overview-new-label = New tab
 tab-overview-close =
     .title = Close tab
     .aria-label = Close tab
+tab-overview-dismiss =
+    .title = Back to the page (Esc)
+    .aria-label = Close all tabs
+# $query (String) - what was typed in the search field
+tab-overview-no-match = No tabs match “{ $query }”
+tab-overview-badge-audio =
+    .title = Playing sound
+tab-overview-badge-muted =
+    .title = Muted
+tab-overview-badge-sharing =
+    .title = Using your camera, microphone or screen
 
 ## Downloads panel
 

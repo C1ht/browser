@@ -650,6 +650,60 @@ def part4(bindir, base, shots):
         record(4, "adding a tab from the overview keeps it open, with a card for the new tab",
                added["added"] == 1 and added["open"] and added["cards"] == added["tabs"], added)
 
+        b.js("""TabOverview.open(); let s = document.getElementById("tab-overview-search");
+          s.value = "no such tab anywhere"; s.dispatchEvent(new Event("input"));""")
+        r = b.wait("""let e = document.getElementById("tab-overview-empty");
+          return !e.hidden && e.textContent && { text: e.textContent, newHidden: document.querySelector("#tab-overview-grid .overview-new").hidden };""",
+                   timeout=5)
+        record(4, "an overview search that matches nothing says so", bool(r) and "no such tab anywhere" in r["text"] and r["newHidden"], r)
+        r = b.js("""let s = document.getElementById("tab-overview-search"); s.value = ""; s.dispatchEvent(new Event("input"));
+          let before = gBrowser.tabs.length;
+          let card = [...document.querySelectorAll("#tab-overview-grid .overview-card")].find(c => c.tab && !c.hasAttribute("selected"));
+          let rect = card.getBoundingClientRect();
+          for (let type of ["mousedown", "mouseup"]) {
+            window.synthesizeMouseEvent(type, rect.left + 40, rect.top + 40, { button: 1, clickCount: 1 });
+          }
+          return new Promise(done => setTimeout(() => done({ before, after: gBrowser.tabs.length, gone: !card.isConnected,
+            cards: document.querySelectorAll("#tab-overview-grid .overview-card").length - 1 }), 600));""")
+        record(4, "middle-click on a card closes its tab; the card leaves",
+               r["after"] == r["before"] - 1 and r["gone"] and r["cards"] == r["after"], r)
+        b.js("TabOverview.close();")
+
+        # More tabs than fit: the strip scrolls.
+        b.js("""window.__extraTabs = [];
+          for (let i = 0; i < 24; i++) {
+            __extraTabs.push(gBrowser.addTab("about:blank", { select: false,
+              triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));
+          }""")
+        r = b.wait("let s = gBrowser.tabContainer; return s.hasAttribute('overflowing') && s.hasAttribute('more-after') && "
+                   "!s.hasAttribute('more-before') && s.scrollLeft == 0;", timeout=5)
+        record(4, "with more tabs than fit, the tab strip scrolls, and its end fades", bool(r), r)
+        r = b.js("""let s = gBrowser.tabContainer, rect = s.getBoundingClientRect();
+          window.windowUtils.sendWheelEvent(rect.left + rect.width / 2, rect.top + rect.height / 2, 0, 3, 0,
+            WheelEvent.DOM_DELTA_LINE, 0, 0, 3, 0);
+          return new Promise(done => setTimeout(() => done({ left: s.scrollLeft, before: s.hasAttribute("more-before") }), 800));""")
+        record(4, "the mouse wheel scrolls it sideways; then the start fades too", r["left"] > 0 and r["before"], r)
+        r = b.js("""gBrowser.selectTab(gBrowser.tabs.at(-1));
+          return new Promise(done => setTimeout(() => {
+            let s = gBrowser.tabContainer.getBoundingClientRect(), t = gBrowser.selectedTab.getBoundingClientRect();
+            done({ inside: t.left >= s.left && t.right <= s.right, after: gBrowser.tabContainer.hasAttribute("more-after") });
+          }, 800));""")
+        record(4, "selecting a tab out of view scrolls to it", r["inside"] and not r["after"], r)
+        r = b.js("""let first = gBrowser.tabs[0]; gBrowser.setPinned(first, true);
+          gBrowser.tabContainer.scrollLeft = 0;
+          return new Promise(done => setTimeout(() => {
+            gBrowser.tabContainer.scrollLeft = gBrowser.tabContainer.scrollWidth;
+            setTimeout(() => {
+              let s = gBrowser.tabContainer.getBoundingClientRect(), t = first.getBoundingClientRect();
+              let result = { offset: Math.round(t.left - s.left), visible: t.right <= s.right };
+              gBrowser.setPinned(first, false);
+              done(result);
+            }, 300);
+          }, 300));""")
+        record(4, "a pinned tab stays at the start while the others scroll", r["visible"] and 0 <= r["offset"] <= 16, r)
+        b.js("for (let t of __extraTabs) gBrowser.removeTab(t, { skipPermitUnload: true });")
+        b.wait("return !gBrowser.tabContainer.hasAttribute('overflowing');", timeout=5)
+
         # Fullscreen: a page's own button (a video's), and a player embedded
         # from another site, which asks from its own process.
         for name, page, (x, y) in [("a page", "fullscreen.html", (40, 40)),
