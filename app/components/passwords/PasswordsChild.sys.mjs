@@ -37,6 +37,9 @@ export class PasswordsChild extends JSWindowActorChild {
   // The field the dropdown was asked for, and whether it is open.
   #dropdownField = null;
   #dropdownOpen = false;
+  // The field's value when the dropdown was asked for: typing before the
+  // parent says it is open would otherwise not narrow or close it.
+  #requestedValue = "";
   // Whether a row is selected: only then does Enter pick it instead of
   // reaching the page (and submitting the form).
   #dropdownSelected = false;
@@ -89,10 +92,15 @@ export class PasswordsChild extends JSWindowActorChild {
         return this.#fill(message.data);
       case "Passwords:FillGenerated":
         return this.#fillGenerated(message.data.password);
-      case "Passwords:DropdownState":
+      case "Passwords:DropdownState": {
         this.#dropdownOpen = !!message.data.open;
         this.#dropdownSelected = this.#dropdownOpen && !!message.data.selected;
+        let field = this.#dropdownField?.deref();
+        if (this.#dropdownOpen && field && field.value != this.#requestedValue) {
+          this.#input({ currentTarget: field });
+        }
         break;
+      }
     }
     return undefined;
   }
@@ -193,6 +201,7 @@ export class PasswordsChild extends JSWindowActorChild {
     }
     let kind = this.#kind(field);
     this.#dropdownField = new WeakRef(field);
+    this.#requestedValue = field.value;
     let rect = this.contentWindow.windowUtils.getElementBoundingScreenRect(field);
     this.sendAsyncMessage("Passwords:OpenDropdown", {
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },

@@ -1667,6 +1667,8 @@ def part8(bindir, base, shots):
             b.wait("return !document.getElementById('passwords-button').hidden;", timeout=10)
             b.m.click(60, 55)
             typ(f"{mode}@example.com")
+            # No saved login starts with what was typed: the list closes.
+            b.wait("return document.getElementById('passwords-dropdown').state == 'closed';", timeout=5)
             open_dropdown(60, 115)
             b.js("document.querySelector('#passwords-dropdown .passwords-option.generator').click();")
             b.wait("return gBrowser.selectedBrowser.contentTitle.endsWith('p=20 same=true');", timeout=5)
@@ -1818,7 +1820,7 @@ return data.value.QueryInterface(Ci.nsISupportsString).data;"""
         record(8, "with Windows Hello, Show offers it first", r)
         b.js("gBrowser.selectedBrowser.contentDocument.querySelector('#inline-slot .confirm-hello').click();")
         r = b.wait("let d = gBrowser.selectedBrowser.contentDocument; let e = d.querySelector('#inline-slot .error');"
-                   "return e && !e.hidden && [e.textContent, d.querySelector('#inline-slot .confirm-hello').hidden];", timeout=15)
+                   "return e && !e.hidden && e.textContent && [e.textContent, d.querySelector('#inline-slot .confirm-hello').hidden];", timeout=15)
         record(8, "a Hello that can't open the vault falls back to the master password", r and "Windows Hello" in r[0] and r[1], r)
         b.js("let d = gBrowser.selectedBrowser.contentDocument; d.querySelector('#inline-slot').replaceChildren();")
         b.js(PV + "return PasswordVault._refreshHello();")
@@ -1863,7 +1865,7 @@ return data.value.QueryInterface(Ci.nsISupportsString).data;"""
         secrets.append(code_renewed)
         b.js(S + "d.getElementById('passwords-replace-stored').click();")
         r = b.wait(S + "let r = d.getElementById('passwords-change-result'), done = d.getElementById('passwords-replace-done');"
-                   "return !r.hidden && !done.hidden && [r.textContent, d.getElementById('passwords-replace-done-text').textContent];",
+                   "return !r.hidden && !done.hidden && r.textContent && d.getElementById('passwords-replace-done-text').textContent && [r.textContent, d.getElementById('passwords-replace-done-text').textContent];",
                    timeout=60)
         record(8, "“I have stored it” finishes it", r and r[0] == "Master password changed." and "old recovery key no longer works" in r[1], r)
         phrase = renewed
