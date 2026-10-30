@@ -4,7 +4,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 """Runtime checks against a built browser-wip.
 
-    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4 5 6 7 8 9] [--shots DIR]
+    python3 -I tools/runtime/check.py <dist/bin> [--part 1 2 3 4 5 6 7 8 9 10] [--shots DIR]
 
 Starts the browser (headless, fresh profile, Marionette on a local port),
 runs privileged JavaScript in its window and reports pass/fail per check.
@@ -2150,10 +2150,233 @@ def part9(bindir, base):
         server.shutdown()
 
 
+# ---------------------------------------------------------------------------
+# Part 10: YouTube ads (opt-in; contentblocking/youtube/)
+
+# Rules written the way uBlock Origin's YouTube rules are.
+YT_LIST = r"""! Title: YouTube test rules
+www.youtube.com##+js(set, ytInitialPlayerResponse.adPlacements, undefined)
+www.youtube.com##+js(set, ytInitialPlayerResponse.playerAds, undefined)
+www.youtube.com##+js(json-prune-fetch-response, adPlacements playerAds, , propsToMatch, /\/player(\?|$)/)
+!#if !cap_html_filtering
+www.youtube.com##+js(trusted-replace-xhr-response, '"adPlacements"', '"no_ads"', /\/player(?:\?.+)?$/)
+!#else
+www.youtube.com##+js(set, wrongBranch, 1)
+!#endif
+youtube.com##+js(json-prune, playerResponse.adPlacements)
+www.youtube.com##+js(rpnt, script, /(\(function serverContract\(\))/, window.__rpnt=1;$1, sedCount, 1, condition, /serverContract|js_ld/)
+www.youtube.com##+js(rmnt, script, window\,"fetch")
+youtube.com###masthead-ad
+youtube-nocookie.com##+js(set, ytInitialPlayerResponse.adPlacements, undefined)
+example.com##+js(set, ytInitialPlayerResponse.adPlacements, undefined)
+"""
+
+# A watch page shaped like YouTube's, under its Trusted Types policy. The
+# title reports what the page saw.
+YT_WATCH = r"""<!doctype html><meta charset="utf-8"><title>loading</title>
+<script>var ytInitialPlayerResponse = {"adPlacements":[{"a":1}],"playerAds":[1],"videoDetails":{"videoId":"test"}};</script>
+<script>(function serverContract() { window.__contract = 1; })(); /* js_ld */</script>
+<script>window.__rmntTarget = 1; // window,"fetch"</script>
+<div id="masthead-ad">ad</div>
+<script>
+(async () => {
+  let p = ytInitialPlayerResponse;
+  let r = { href: location.href, initial: { ads: p.adPlacements !== undefined || p.playerAds !== undefined, id: p.videoDetails?.videoId } };
+  r.contract = window.__contract === 1;
+  r.rpnt = window.__rpnt === 1;
+  r.rmnt = window.__rmntTarget === undefined;
+  r.wrongBranch = window.wrongBranch === 1;
+  let player = await (await fetch("/youtubei/v1/player?key=x")).json();
+  r.fetchAds = "adPlacements" in player || "playerAds" in player;
+  r.fetchKept = player.videoDetails?.videoId == "test";
+  let x = new XMLHttpRequest();
+  x.open("GET", "/youtubei/v1/player");
+  await new Promise(done => { x.onload = done; x.send(); });
+  r.xhrAds = x.responseText.includes("adPlacements");
+  r.parseAds = "adPlacements" in JSON.parse('{"playerResponse":{"adPlacements":[1]}}').playerResponse;
+  r.hidden = getComputedStyle(document.getElementById("masthead-ad")).display == "none";
+  r.native = Function.prototype.toString.call(fetch).includes("[native code]");
+  document.title = "done " + JSON.stringify(r);
+})();
+</script>"""
+
+YT_EMBED = r"""<!doctype html><meta charset="utf-8"><title>loading</title>
+<script>var ytInitialPlayerResponse = {"adPlacements":[1]};</script>
+<script>document.title = "embed " + (ytInitialPlayerResponse.adPlacements !== undefined);</script>"""
+
+
+class YouTubeHandler(http.server.BaseHTTPRequestHandler):
+    """A proxy answering for YouTube and every other host, and the list
+    server, reached directly on 127.0.0.1."""
+
+    requests = []
+    list_status = 200
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        url = urllib.parse.urlsplit(self.path)
+        YouTubeHandler.requests.append({"path": url.path, "cookie": self.headers.get("Cookie"),
+                                        "referer": self.headers.get("Referer")})
+        status, headers, body = 200, {"Content-Type": "text/html; charset=utf-8"}, ""
+        if url.path.startswith("/__lists/"):
+            status = YouTubeHandler.list_status
+            headers["Content-Type"] = "text/plain; charset=utf-8"
+            body = YT_LIST if status == 200 else "unavailable"
+        elif url.path == "/__setcookie":
+            headers["Set-Cookie"] = "session=secret; Path=/"
+            body = "<!doctype html><title>cookie</title>"
+        elif url.path == "/watch":
+            headers["Content-Security-Policy"] = "require-trusted-types-for 'script'"
+            body = YT_WATCH
+        elif url.path.startswith("/youtubei/v1/player"):
+            headers["Content-Type"] = "application/json"
+            body = json.dumps({"adPlacements": [{"x": 1}], "playerAds": [1], "videoDetails": {"videoId": "test"}})
+        elif url.path.startswith("/embed/"):
+            body = YT_EMBED
+        elif url.path == "/embedder":
+            body = '<!doctype html><title>embedder</title><iframe src="http://www.youtube-nocookie.com/embed/x"></iframe>'
+        data = body.encode()
+        self.send_response(status)
+        for k, v in {**headers, "Cache-Control": "no-store", "Content-Length": str(len(data))}.items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(data)
+
+
+def part10(bindir, base):
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), YouTubeHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    port = server.server_address[1]
+    YouTubeHandler.requests = []
+    YouTubeHandler.list_status = 200
+    prefs = {"browserwip.firstrun.completed": True,
+             "browserwip.youtubeblocking.lists": f"http://127.0.0.1:{port}/__lists/a.txt http://127.0.0.1:{port}/__lists/b.txt",
+             **proxy_prefs(port)}
+    YT = 'const { YouTubeBlocking } = ChromeUtils.importESModule("resource://gre/modules/browserwip/YouTubeBlocking.sys.mjs");'
+    S = "let d = gBrowser.selectedBrowser.contentDocument;"
+    cache = lambda: Path(b.profile, "youtube-blocking.json")
+    lists_fetched = lambda: [r for r in YouTubeHandler.requests if r["path"].startswith("/__lists/")]
+    loads = [0]
+    b = Browser(bindir, prefs=prefs)
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+
+        def load(url):
+            b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0], "
+                 "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", url)
+
+        def watch(host="www.youtube.com"):
+            loads[0] += 1
+            url = f"http://{host}/watch?v=test&n={loads[0]}"
+            load(url)
+            r = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith('done ') && t.includes(arguments[0]) && t;",
+                       f"n={loads[0]}", timeout=20)
+            return json.loads(r[5:]) if r else None
+
+        def settings():
+            load("about:settings#youtube")
+            b.wait(S + "return d?.readyState == 'complete' && d.getElementById('youtube-ads');", timeout=15)
+
+        # -- Off by default.
+        r = watch()
+        record(10, "off by default: YouTube pages are left alone",
+               bool(r) and r["initial"]["ads"] and r["fetchAds"] and r["xhrAds"] and r["parseAds"] and not r["hidden"] and not r["rpnt"], r)
+        record(10, "and nothing is downloaded", not lists_fetched(), lists_fetched())
+
+        # -- Settings asks before anything is downloaded.
+        load(f"http://127.0.0.1:{port}/__setcookie")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'cookie';", timeout=10)
+        settings()
+        b.js(S + "d.getElementById('youtube-ads').click();")
+        r = b.wait(S + "return !d.getElementById('youtube-ads-confirm').hidden && d.getElementById('youtube-ads-disclaimer').textContent;", timeout=5)
+        record(10, "turning it on first says what gets downloaded, from where and how often",
+               bool(r) and "ublockorigin.github.io" in r and "8 hours" in r, r)
+        time.sleep(1)
+        r = b.js(S + "return [Services.prefs.getBoolPref('browserwip.youtubeblocking.enabled'), d.getElementById('youtube-ads').getAttribute('aria-checked')];")
+        record(10, "nothing is downloaded or turned on before agreeing", r == [False, "false"] and not lists_fetched(), r)
+        b.js(S + "d.getElementById('youtube-ads-cancel').click();")
+        r = b.js(S + "return [d.getElementById('youtube-ads-confirm').hidden, Services.prefs.getBoolPref('browserwip.youtubeblocking.enabled')];")
+        record(10, "Cancel leaves it off", r == [True, False] and not lists_fetched(), r)
+        b.js(S + "d.getElementById('youtube-ads').click(); d.getElementById('youtube-ads-accept').click();")
+        r = b.wait(S + "let s = d.getElementById('youtube-ads-status');"
+                   "return !d.getElementById('youtube-ads-status-row').hidden && s.textContent.startsWith('Rules downloaded') && s.textContent;",
+                   timeout=20)
+        record(10, "agreeing downloads the rules, and Settings says when", bool(r), r)
+        got = lists_fetched()
+        record(10, "both lists, without cookies or a referrer", len(got) == 2 and not any(g["cookie"] or g["referer"] for g in got), got)
+        record(10, "the rules are cached in the profile", cache().exists())
+
+        # -- A YouTube page with the rules.
+        r = watch()
+        ok = bool(r)
+        record(10, "set-constant: ytInitialPlayerResponse loses its ads and keeps the rest",
+               ok and not r["initial"]["ads"] and r["initial"]["id"] == "test", r)
+        record(10, "json-prune-fetch-response: the player API answer loses its ads", ok and not r["fetchAds"] and r["fetchKept"], r)
+        record(10, "trusted-replace-xhr-response, from the !#if branch without HTML filtering",
+               ok and not r["xhrAds"] and not r["wrongBranch"], r)
+        record(10, "json-prune: JSON.parse", ok and not r["parseAds"], r)
+        record(10, "replace-node-text changes an inline script, which still runs under Trusted Types",
+               ok and r["rpnt"] and r["contract"], r)
+        record(10, "remove-node-text empties one", ok and r["rmnt"], r)
+        record(10, "element hiding", ok and r["hidden"], r)
+        record(10, "wrapped functions still look native", ok and r["native"], r)
+
+        r = watch("example.com")
+        record(10, "other sites are left alone, even when a rule names them", bool(r) and r["initial"]["ads"] and r["fetchAds"], r)
+        load("http://example.com/embedder")
+        r = b.wait("let t = gBrowser.selectedBrowser.browsingContext.children[0]?.currentWindowGlobal?.documentTitle;"
+                   "return t?.startsWith('embed') && t;", timeout=20)
+        record(10, "an embedded player (youtube-nocookie.com, its own frame and process) gets its rules", r == "embed false", r)
+
+        watch()
+        b.js(IMPORTS + "ContentBlockingAllowList.add(gBrowser.selectedBrowser);")
+        r = watch()
+        record(10, "turning protections off for YouTube turns this off there too", bool(r) and r["initial"]["ads"] and r["fetchAds"], r)
+        b.js(IMPORTS + "ContentBlockingAllowList.remove(gBrowser.selectedBrowser);")
+
+        # -- A failed update keeps the rules in use.
+        YouTubeHandler.list_status = 500
+        b.js(YT + "return YouTubeBlocking.update();")
+        r = b.js(YT + "return YouTubeBlocking.status;")
+        record(10, "a failed update keeps the rules in use", r["state"] == "error" and r["updated"] > 0, r)
+        r = watch()
+        record(10, "and pages still get them", bool(r) and not r["initial"]["ads"], r)
+        settings()
+        r = b.wait(S + "let s = d.getElementById('youtube-ads-status'); return s.hasAttribute('error') && s.textContent;", timeout=5)
+        record(10, "Settings says the update failed and which rules are used", bool(r) and "couldn’t be updated" in r, r)
+        YouTubeHandler.list_status = 200
+
+        # -- After a restart: the cached rules at once, no download.
+        fetched = len(lists_fetched())
+        b.quit()
+        b = Browser(bindir, prefs=prefs, profile=b.profile)
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        r = watch()
+        record(10, "after a restart the cached rules apply at once, without downloading",
+               bool(r) and not r["initial"]["ads"] and len(lists_fetched()) == fetched, r)
+
+        # -- Turning it off.
+        settings()
+        b.js(S + "d.getElementById('youtube-ads').click();")
+        r = b.js(S + "return [Services.prefs.getBoolPref('browserwip.youtubeblocking.enabled'), d.getElementById('youtube-ads-status-row').hidden];")
+        record(10, "turning it off needs no confirmation", r == [False, True], r)
+        r = watch()
+        record(10, "and pages are left alone again", bool(r) and r["initial"]["ads"] and r["fetchAds"], r)
+        deadline = time.time() + 5
+        while cache().exists() and time.time() < deadline:
+            time.sleep(0.2)
+        record(10, "and the cached rules are deleted", not cache().exists())
+    finally:
+        b.quit()
+        server.shutdown()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("bindir")
-    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5, 6, 7, 8, 9])
+    parser.add_argument("--part", type=int, nargs="*", default=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     parser.add_argument("--shots", help="directory for screenshots")
     args = parser.parse_args()
     if args.shots:
@@ -2163,7 +2386,7 @@ def main():
              3: lambda: part3(args.bindir, base, args.shots), 4: lambda: part4(args.bindir, base, args.shots),
              5: lambda: part5(args.bindir, base), 6: lambda: part6(args.bindir, base),
              7: lambda: part7(args.bindir, base), 8: lambda: part8(args.bindir, base, args.shots),
-             9: lambda: part9(args.bindir, base)}
+             9: lambda: part9(args.bindir, base), 10: lambda: part10(args.bindir, base)}
     for p in args.part:
         try:
             parts[p]()

@@ -18,6 +18,7 @@ with no changes to mozilla-central. `browser-wip` is a codename;
 | `app/base/content/` | Browser window, tab strip, address bar, about: pages |
 | `app/components/` | Startup, privacy modes, content blocking, about: page module |
 | `app/components/contentblocking/lists/` | Vendored filter lists (`tools/update-blocklists.py` refreshes them) |
+| `app/components/contentblocking/youtube/` | Opt-in YouTube ad blocker: uBlock Origin's YouTube rules, downloaded only while it is on |
 | `app/policies/` | Bundled enterprise policy that disables Remote Settings |
 | `app/themes/shared/` | Folio styles, icons, Instrument Sans |
 | `GECKO_REVISION` | The Firefox release this tracks |

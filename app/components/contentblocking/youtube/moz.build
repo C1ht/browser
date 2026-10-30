@@ -1,0 +1,16 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# The opt-in YouTube ad blocker (docs/CONTENT-BLOCKING.md, "YouTube ads").
+EXTRA_JS_MODULES.browserwip += [
+    "YouTubeBlocking.sys.mjs",
+    "YouTubeBlockingChild.sys.mjs",
+    "YouTubeRules.sys.mjs",
+]
+
+# resource://gre/modules/browserwip/youtube/scriptlets.js, run in YouTube
+# pages by YouTubeBlockingChild.
+EXTRA_JS_MODULES.browserwip.youtube += [
+    "scriptlets.js",
+]

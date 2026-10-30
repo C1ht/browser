@@ -140,6 +140,11 @@ pref("urlclassifier.features.antifraud.annotate.allowlistTables", "");
 pref("urlclassifier.features.harmfuladdon.blocklistTables", "");
 // Element hiding for leftover ad slots (ContentBlockingChild.sys.mjs).
 pref("browserwip.contentblocking.cosmetic.enabled", true);
+// YouTube ads (contentblocking/youtube/): off unless turned on in Settings,
+// which says first that it downloads uBlock Origin's lists from these
+// addresses, every 8 hours while on.
+pref("browserwip.youtubeblocking.enabled", false);
+pref("browserwip.youtubeblocking.lists", "https://ublockorigin.github.io/uAssets/filters/filters.txt https://ublockorigin.github.io/uAssets/filters/quick-fixes.txt");
 
 // Fingerprinting Protection: Gecko's default target set (canvas
 // randomization, language-pack-only fonts, tiered hardware concurrency,

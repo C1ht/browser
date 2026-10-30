@@ -59,7 +59,7 @@ Frames (`subdocument`) and everything else a page loads are blocked as usual.
 | Options adblock-rust 0.12.1 doesn't know (`$header`, `$permissions`, `$replace`, `$urltransform`, `$denyallow`, `$to`, `$method`, `$strict1p`, `$strict3p`, ...) | The whole rule is dropped by the engine's parser. | |
 | `!#if` and `!#include` | Not processed. | |
 | Requests that aren't HTTP (`data:`, `blob:`, `file:`), and responses a service worker serves from its own cache | Not seen. A service worker's own network requests are seen. | |
-| Cosmetic and scriptlet rules (`+js`, procedural `#?#` rules, `:has-text` and the like) | Element hiding keeps working as before (`compile_lists.py`, `ContentBlockingChild.sys.mjs`). | Phase 2 |
+| Cosmetic and scriptlet rules (`+js`, procedural `#?#` rules, `:has-text` and the like) | Element hiding keeps working as before (`compile_lists.py`, `ContentBlockingChild.sys.mjs`). Scriptlets run only for the opt-in YouTube blocker, below. | Phase 2 |
 
 ### Behaviour changes from the URL-classifier tables
 
@@ -85,3 +85,28 @@ Frames (`subdocument`) and everything else a page loads are blocked as usual.
   - odd URLs
   - the "not working" shield
   - DNS lookups for blocked hosts
+
+## YouTube ads (opt-in)
+
+`app/components/contentblocking/youtube/`. Off by default. Settings › YouTube › "Block YouTube ads" turns it on, after a notice that says what is downloaded, from where and how often.
+
+YouTube serves ads from the same servers as the videos and tells its player about them in the player's own JSON, so network blocking can't remove them, and the rules that do change every few days. The bundled lists can't keep up, so this feature downloads **uBlock Origin's** lists, uses only their YouTube rules, and applies those with the browser's own code.
+
+- **Download (`YouTubeBlocking.sys.mjs`, parent).** `filters.txt` and `quick-fixes.txt` from `ublockorigin.github.io/uAssets` (the `browserwip.youtubeblocking.lists` pref), when turned on and then whenever the rules are more than 8 hours old. No cookies, no referrer, HTTPS only. A failed download keeps the rules in use and is retried an hour later; Settings says so and has "Update now". Turning it off stops the downloads and deletes the cache. Nothing is downloaded while it is off, so the network-silence test is unaffected.
+- **Rules (`YouTubeRules.sys.mjs`, no Gecko APIs).** Applies the lists' `!#if` blocks as uBlock Origin does on Firefox, except without "HTML filtering" (rewriting responses in the parent): `cap_html_filtering` is false, so the lists pick their scriptlet-based rules, the ones uBlock Origin uses on Chromium. Keeps only scriptlet (`##+js(...)`) and element-hiding rules whose domains include `youtube.com`, `youtubekids.com` or `youtube-nocookie.com`, with their exceptions. Network rules, procedural element hiding and scriptlets we don't implement are dropped and counted. The compiled rules (JSON) are cached in the profile as `youtube-blocking.json` and shared with content processes through shared memory.
+- **In the page (`YouTubeBlockingChild.sys.mjs`).** A window actor that only matches YouTube's sites, in every frame (embedded players included). On `DOMDocElementInserted`, which fires before any of the page's scripts:
+  - element-hiding rules become one agent stylesheet;
+  - `replace-node-text` / `remove-node-text` (`rpnt`, `rmnt`) change inline scripts from a MutationObserver of the browser's own. Gecko runs microtasks just before each parser-inserted script, so the change lands before the script runs, and Trusted Types (which YouTube enforces) exempts changes the browser makes;
+  - every other scriptlet runs in the page's own realm from `youtube/scriptlets.js`, through `PrecompiledScript.executeInGlobal`, so the page's CSP doesn't apply. Until that script is compiled in a process, `Document.blockParsing` holds the page.
+- **Scriptlets (`scriptlets.js`).** Our own implementations (MPL) of what uBlock Origin's YouTube rules name: `set-constant`, `json-prune`, `json-prune-fetch-response`, `json-prune-xhr-response`, `json-edit` (and its fetch and XHR forms), `trusted-replace-fetch-response`, `trusted-replace-xhr-response`, `trusted-edit-inbound-object` / `-outbound-object`, `trusted-prevent-dom-bypass`, `nano-setTimeout-booster`, `nano-setInterval-booster`, `no-setTimeout-if`. Functions they replace are Proxies of the originals, so they still read as native code. Nothing is left on the page's global.
+- **Switches.** The shield's per-site switch (the content-blocking allow list) turns this off on YouTube as well. Pages pick up new rules when they are opened or reloaded.
+
+What this trusts: the lists choose which of our scriptlets run with which arguments, and `rpnt` puts JavaScript from the list into YouTube pages (that is how uBlock Origin's current YouTube rules work). All of it is limited to YouTube's sites and to the page's own privileges; nothing from the lists runs with the browser's. uBlock Origin's lists are GPLv3 and are not shipped with the browser; Settings › About credits them.
+
+If uBlock Origin moves YouTube to a scriptlet this browser doesn't have, those rules are skipped until a browser update adds it. `compiled.stats.unsupported` in `youtube-blocking.json` counts them.
+
+### Tests
+
+- `tests/unit/youtube-rules.test.mjs`: `!#if` blocks, argument splitting, domain matching, exceptions, which rules are kept.
+- `tests/unit/youtube-scriptlets.test.mjs`: each scriptlet in a fresh realm, including the JSON queries uBlock Origin uses on YouTube.
+- `tools/runtime/check.py` part 10: a local proxy plays YouTube (a watch page under YouTube's Trusted Types policy, its player API) and the list server. It covers the Settings notice and Cancel, the download (no cookies, no referrer), every kind of rule in the page, other sites left alone, an embedded `youtube-nocookie.com` player in another site's page, the per-site switch, a failed update, the cache after a restart, and turning it off.

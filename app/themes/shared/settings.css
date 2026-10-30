@@ -42,6 +42,31 @@
   color: var(--warn-fg);
 }
 
+/* YouTube */
+
+#youtube-ads-confirm:not([hidden]) {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background-color: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+#youtube-ads-confirm p,
+#youtube-ads-status {
+  margin: 0;
+  font-size: 14px;
+}
+
+#youtube-ads-status {
+  color: var(--muted);
+}
+
+#youtube-ads-status[error] {
+  color: var(--warn-fg);
+}
+
 /* Passwords */
 
 .button-row {

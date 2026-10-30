@@ -71,6 +71,67 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   syncSuggest();
 
+  // YouTube ads: opt-in, and only after saying what gets downloaded.
+  let { YouTubeBlocking, ENABLED_PREF: YOUTUBE_PREF, YOUTUBE_BLOCKING_TOPIC } = ChromeUtils.importESModule(
+    "resource://gre/modules/browserwip/YouTubeBlocking.sys.mjs"
+  );
+  let youtube = document.getElementById("youtube-ads");
+  let youtubeConfirm = document.getElementById("youtube-ads-confirm");
+  let syncYouTube = () => {
+    let on = Services.prefs.getBoolPref(YOUTUBE_PREF, false);
+    youtube.setAttribute("aria-checked", String(on));
+    document.getElementById("youtube-ads-status-row").hidden = !on;
+    if (!on) {
+      return;
+    }
+    let { state, updated } = YouTubeBlocking.status;
+    let status = document.getElementById("youtube-ads-status");
+    if (state == "ready") {
+      document.l10n.setAttributes(status, "settings-youtube-ads-ready", { updated });
+    } else if (state == "error") {
+      document.l10n.setAttributes(
+        status,
+        updated ? "settings-youtube-ads-error-old" : "settings-youtube-ads-error",
+        updated ? { updated } : {}
+      );
+    } else {
+      // Updating, or just turned on.
+      document.l10n.setAttributes(status, "settings-youtube-ads-updating");
+    }
+    status.toggleAttribute("error", state == "error");
+    document.getElementById("youtube-ads-update").disabled = state != "ready" && state != "error";
+  };
+  youtube.addEventListener("click", () => {
+    if (Services.prefs.getBoolPref(YOUTUBE_PREF, false)) {
+      Services.prefs.setBoolPref(YOUTUBE_PREF, false);
+    } else {
+      youtubeConfirm.hidden = false;
+      document.getElementById("youtube-ads-accept").focus();
+    }
+  });
+  document.getElementById("youtube-ads-label").addEventListener("click", e => {
+    e.preventDefault();
+    youtube.click();
+  });
+  document.getElementById("youtube-ads-accept").addEventListener("click", () => {
+    youtubeConfirm.hidden = true;
+    Services.prefs.setBoolPref(YOUTUBE_PREF, true);
+    youtube.focus();
+  });
+  document.getElementById("youtube-ads-cancel").addEventListener("click", () => {
+    youtubeConfirm.hidden = true;
+    youtube.focus();
+  });
+  document.getElementById("youtube-ads-update").addEventListener("click", () => YouTubeBlocking.update());
+  let onYouTube = () => syncYouTube();
+  Services.obs.addObserver(onYouTube, YOUTUBE_BLOCKING_TOPIC);
+  Services.prefs.addObserver(YOUTUBE_PREF, onYouTube);
+  window.addEventListener("unload", () => {
+    Services.obs.removeObserver(onYouTube, YOUTUBE_BLOCKING_TOPIC);
+    Services.prefs.removeObserver(YOUTUBE_PREF, onYouTube);
+  });
+  syncYouTube();
+
   // History: remembered unless the privacy mode (or this switch) says not.
   let remember = document.getElementById("history-remember");
   let syncHistory = () => {

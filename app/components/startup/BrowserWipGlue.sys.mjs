@@ -15,6 +15,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ContentPermissionPrompt: "resource://gre/modules/browserwip/ContentPermissionPrompt.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
   SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
+  YouTubeBlocking: "resource://gre/modules/browserwip/YouTubeBlocking.sys.mjs",
 });
 
 const JSWINDOWACTORS = {
@@ -30,6 +31,21 @@ const JSWINDOWACTORS = {
     allFrames: true,
     // Runs in ordinary web processes. Safe there: the child only adds
     // stylesheets and never messages the parent.
+    safeForUntrustedWebProcess: true,
+  },
+  // The opt-in YouTube ad blocker (YouTubeBlocking.sys.mjs). Only on
+  // YouTube; it reads its rules from shared memory and never messages the
+  // parent.
+  YouTubeBlocking: {
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/YouTubeBlockingChild.sys.mjs",
+      events: {
+        // Fired when the root element is inserted, before the page's scripts.
+        DOMDocElementInserted: { capture: true },
+      },
+    },
+    matches: ["*://*.youtube.com/*", "*://*.youtubekids.com/*", "*://*.youtube-nocookie.com/*"],
+    allFrames: true,
     safeForUntrustedWebProcess: true,
   },
   // The right-click menu on pages (contextmenu.js). As Firefox's: safe in
@@ -262,6 +278,7 @@ BrowserWipGlue.prototype = {
     // Before session restore, so its pages' requests are held until the
     // blocker is ready instead of loading unchecked.
     lazy.ContentBlockingLists.start();
+    lazy.YouTubeBlocking.init();
     lazy.SessionStore.init();
   },
 };

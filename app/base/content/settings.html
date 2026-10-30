@@ -33,6 +33,28 @@
       </div>
     </section>
 
+    <section id="youtube" aria-labelledby="youtube-heading">
+      <h2 id="youtube-heading" data-l10n-id="settings-youtube-heading"></h2>
+      <div class="toggle-row">
+        <div>
+          <label id="youtube-ads-label" for="youtube-ads" data-l10n-id="settings-youtube-ads-label"></label>
+          <span class="help" data-l10n-id="settings-youtube-ads-help"></span>
+        </div>
+        <button id="youtube-ads" class="switch" type="button" role="switch" aria-labelledby="youtube-ads-label"></button>
+      </div>
+      <div id="youtube-ads-confirm" role="group" aria-labelledby="youtube-ads-disclaimer" hidden="hidden">
+        <p id="youtube-ads-disclaimer" data-l10n-id="settings-youtube-ads-disclaimer"></p>
+        <div class="button-row">
+          <button id="youtube-ads-accept" class="primary" type="button" data-l10n-id="settings-youtube-ads-accept"></button>
+          <button id="youtube-ads-cancel" class="secondary" type="button" data-l10n-id="settings-youtube-ads-cancel"></button>
+        </div>
+      </div>
+      <div id="youtube-ads-status-row" class="inline-row" hidden="hidden">
+        <p id="youtube-ads-status" role="status"></p>
+        <button id="youtube-ads-update" class="secondary" type="button" data-l10n-id="settings-youtube-ads-update"></button>
+      </div>
+    </section>
+
     <section id="passwords" aria-labelledby="passwords-heading">
       <h2 id="passwords-heading" data-l10n-id="settings-passwords-heading"></h2>
       <div class="inline-row">
@@ -240,6 +262,7 @@
       <h2 id="about-heading" data-l10n-id="settings-about-heading"></h2>
       <p id="version"></p>
       <p class="muted" data-l10n-id="settings-about-lists"></p>
+      <p class="muted" data-l10n-id="settings-about-youtube"></p>
       <p class="muted" id="lists-snapshot"></p>
     </section>
   </main>
