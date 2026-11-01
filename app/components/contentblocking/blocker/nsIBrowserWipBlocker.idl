@@ -26,4 +26,12 @@ interface nsIBrowserWipBlocker : nsISupports
    * EasyPrivacy, aSocialList that of Fanboy Social. Later calls do nothing.
    */
   void start(in ACString aMainLists, in ACString aSocialList);
+
+  /**
+   * "Continue anyway" on the blocked-page screen: pages on aHost (exactly
+   * that host) aren't blocked again until the browser quits, in private
+   * windows if aPrivate, else in normal ones. Requests the pages make are
+   * still checked as usual.
+   */
+  void allowPage(in ACString aHost, in boolean aPrivate);
 };

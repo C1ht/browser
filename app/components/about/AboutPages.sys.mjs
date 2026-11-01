@@ -29,6 +29,9 @@ const PAGES = {
   // Gecko shows about:certerror for certificate problems. Firefox registers
   // it in browser/; it is toolkit's shared network-error page.
   certerror: { url: "chrome://global/content/aboutNetError.html", flags: ERROR_PAGE },
+  // A page opened in a tab that the lists block as a whole (NetworkBlocker:
+  // CheckPage). Gecko loads it in place of the page, as for Safe Browsing.
+  blocked: { url: "chrome://browser-wip/content/blocked.html", flags: ERROR_PAGE },
 };
 
 function pageFor(uri) {

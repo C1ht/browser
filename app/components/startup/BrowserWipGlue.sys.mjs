@@ -33,6 +33,22 @@ const JSWINDOWACTORS = {
     // stylesheets and never messages the parent.
     safeForUntrustedWebProcess: true,
   },
+  // The blocked-page screen's buttons (about:blocked, blocked.html). Error
+  // pages load in the blocked site's own process, so the parent trusts
+  // nothing from it: it reads the address from the document's own URI.
+  BlockedPage: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/BlockedPageParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/BlockedPageChild.sys.mjs",
+      events: {
+        "BrowserWip:BlockedPage": { wantUntrusted: true },
+      },
+    },
+    matches: ["about:blocked*"],
+    safeForUntrustedWebProcess: true,
+  },
   // The opt-in YouTube ad blocker (YouTubeBlocking.sys.mjs). Only on
   // YouTube; it reads its rules from shared memory and never messages the
   // parent.

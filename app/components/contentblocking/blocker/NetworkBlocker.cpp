@@ -127,6 +127,21 @@ static bool IsRedirectRule(const nsACString& aLine) {
   return false;
 }
 
+// Rules whose options include document (or doc): for whole pages.
+static bool IsDocumentRule(const nsACString& aLine) {
+  int32_t dollar = aLine.RFindChar('$');
+  if (dollar == kNotFound) {
+    return false;
+  }
+  const nsDependentCSubstring options = Substring(aLine, dollar + 1);
+  for (const auto& option : options.Split(',')) {
+    if (option.EqualsLiteral("document") || option.EqualsLiteral("doc")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /* static */
 NetworkBlocker::Rules NetworkBlocker::SplitRules(const nsACString& aText) {
   // tools/adblock/src/lib.rs (split_rules) does exactly the same for the
@@ -145,6 +160,9 @@ NetworkBlocker::Rules NetworkBlocker::SplitRules(const nsACString& aText) {
     if (IsRedirectRule(line)) {
       rules.mDroppedRedirect++;
       continue;
+    }
+    if (IsDocumentRule(line)) {
+      rules.mDocumentRules.AppendElement(line);
     }
     rules.mRules.AppendElement(std::move(line));
   }
@@ -171,6 +189,11 @@ NetworkBlocker::BuildResult NetworkBlocker::Build(const nsACString& aMain,
   }
   result.mMain = BuildAdblockRustEngine(main.mRules);
   result.mSocial = BuildAdblockRustEngine(social.mRules);
+  // Without one, pages simply aren't blocked.
+  if (!main.mDocumentRules.IsEmpty()) {
+    result.mPages = BuildAdblockRustEngine(main.mDocumentRules);
+  }
+  BLOCKER_LOG(Info, ("%zu rules for whole pages", main.mDocumentRules.Length()));
   if (!result.mMain || !result.mSocial) {
     result.mError = "the filter engine could not be built"_ns;
     return result;
@@ -280,6 +303,7 @@ void NetworkBlocker::OnBuilt(BuildResult&& aResult) {
                      mState == State::Timeout ? ", after the timeout" : ""));
   mMain = std::move(aResult.mMain);
   mSocial = std::move(aResult.mSocial);
+  mPages = std::move(aResult.mPages);
   SetState(State::Ready);
   ProcessHeld();
 }
@@ -324,21 +348,27 @@ void NetworkBlocker::PrefChanged(const char* aPref, void* aClosure) {
 void NetworkBlocker::OnModifyRequest(nsIChannel* aChannel) {
   TimeStamp start = TimeStamp::Now();
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->LoadInfo();
-  // Top-level pages are never blocked in this phase: the lists' $document
-  // rules would need a "blocked page" with a way to continue
-  // (docs/CONTENT-BLOCKING.md).
-  if (loadInfo->GetExternalContentPolicyType() ==
-      ExtContentPolicy::TYPE_DOCUMENT) {
-    return;
-  }
-  // The browser's own requests.
-  nsIPrincipal* source = loadInfo->GetLoadingPrincipal();
-  if (!source) {
-    source = loadInfo->TriggeringPrincipal();
-  }
-  if (!source || source->IsSystemPrincipal() ||
-      source->GetIsAddonOrExpandedAddonPrincipal()) {
-    return;
+  // Top-level pages: only the lists' $document rules (scam and pop-under
+  // landing pages), and with a screen that offers to continue anyway
+  // (docs/CONTENT-BLOCKING.md). Addresses typed or bookmarked are checked
+  // too: the browser loads them, but it's still the user visiting the site.
+  bool page = loadInfo->GetExternalContentPolicyType() ==
+              ExtContentPolicy::TYPE_DOCUMENT;
+  if (page) {
+    if (!Preferences::GetBool("browserwip.contentblocking.blockpages.enabled",
+                              true)) {
+      return;
+    }
+  } else {
+    // The browser's own requests.
+    nsIPrincipal* source = loadInfo->GetLoadingPrincipal();
+    if (!source) {
+      source = loadInfo->TriggeringPrincipal();
+    }
+    if (!source || source->IsSystemPrincipal() ||
+        source->GetIsAddonOrExpandedAddonPrincipal()) {
+      return;
+    }
   }
   if (!ProtectionEnabled(aChannel)) {
     return;
@@ -361,7 +391,11 @@ void NetworkBlocker::OnModifyRequest(nsIChannel* aChannel) {
       }
       return;
     case State::Ready:
-      Check(aChannel, start);
+      if (page) {
+        CheckPage(aChannel);
+      } else {
+        Check(aChannel, start);
+      }
       return;
     default:
       return;
@@ -441,6 +475,43 @@ void NetworkBlocker::Check(nsIChannel* aChannel, const TimeStamp& aStart) {
                request.mThirdParty ? " (third party)" : ""));
 }
 
+// A top-level page, matched as the document it is: its own host is the
+// source, and only rules for documents ($document) apply.
+void NetworkBlocker::CheckPage(nsIChannel* aChannel) {
+  FilterRequest request;
+  nsCOMPtr<nsIURI> uri;
+  aChannel->GetURI(getter_AddRefs(uri));
+  if (!uri || NS_FAILED(uri->GetAsciiSpec(request.mUrl)) ||
+      NS_FAILED(uri->GetAsciiHost(request.mHost)) || request.mHost.IsEmpty()) {
+    return;
+  }
+  nsAutoCString key(NS_UsePrivateBrowsing(aChannel) ? "p:" : "");
+  key.Append(request.mHost);
+  if (!mPages || mAllowedPages.Contains(key)) {
+    return;
+  }
+  request.mType = "document"_ns;
+  request.mSourceHost = request.mHost;
+  request.mThirdParty = false;
+  if (!mPages->Check(request).mBlock) {
+    return;
+  }
+  BLOCKER_LOG(Info, ("blocked a page"));
+  BLOCKER_LOG(Verbose, ("  %s", request.mUrl.get()));
+  // Docshell shows the blocked-page screen for this error: about:blocked
+  // (urlclassifier.alternate_error_page), with the address as `u`.
+  (void)aChannel->Cancel(NS_ERROR_HARMFUL_URI);
+}
+
+NS_IMETHODIMP
+NetworkBlocker::AllowPage(const nsACString& aHost, bool aPrivate) {
+  MOZ_ASSERT(NS_IsMainThread());
+  nsAutoCString key(aPrivate ? "p:" : "");
+  key.Append(aHost);
+  mAllowedPages.Insert(key);
+  return NS_OK;
+}
+
 void NetworkBlocker::ProcessHeld() {
   nsTArray<nsCOMPtr<nsIChannel>> held = std::move(mHeld);
   if (!held.IsEmpty()) {
@@ -515,6 +586,7 @@ void NetworkBlocker::Shutdown() {
   }
   mMain = nullptr;
   mSocial = nullptr;
+  mPages = nullptr;
 }
 
 }  // namespace mozilla::browserwip

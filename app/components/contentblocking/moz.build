@@ -5,6 +5,8 @@
 DIRS += ["blocker", "youtube"]
 
 EXTRA_JS_MODULES.browserwip += [
+    "BlockedPageChild.sys.mjs",
+    "BlockedPageParent.sys.mjs",
     "ContentBlockingChild.sys.mjs",
     "ContentBlockingLists.sys.mjs",
 ]

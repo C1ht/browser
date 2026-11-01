@@ -13,6 +13,7 @@
 #include "nsIObserver.h"
 #include "nsITimer.h"
 #include "nsTArray.h"
+#include "nsTHashSet.h"
 
 class nsIChannel;
 
@@ -41,6 +42,8 @@ class NetworkBlocker final : public nsIBrowserWipBlocker,
   // matching does not use. Any thread.
   struct Rules {
     nsTArray<nsCString> mRules;
+    // The rules for whole pages ($document), also in mRules.
+    nsTArray<nsCString> mDocumentRules;
     uint32_t mDroppedRedirect = 0;
     uint32_t mDroppedCosmetic = 0;
   };
@@ -52,6 +55,7 @@ class NetworkBlocker final : public nsIBrowserWipBlocker,
   struct BuildResult {
     UniquePtr<NetworkFilterEngine> mMain;
     UniquePtr<NetworkFilterEngine> mSocial;
+    UniquePtr<NetworkFilterEngine> mPages;
     nsCString mError;
   };
 
@@ -64,6 +68,7 @@ class NetworkBlocker final : public nsIBrowserWipBlocker,
   void OnBuilt(BuildResult&& aResult);
   void OnModifyRequest(nsIChannel* aChannel);
   void Check(nsIChannel* aChannel, const TimeStamp& aStart);
+  void CheckPage(nsIChannel* aChannel);
   void ProcessHeld();
   void ReleaseHeld(const char* aReason);
   void ReleaseUnprotected();
@@ -73,10 +78,17 @@ class NetworkBlocker final : public nsIBrowserWipBlocker,
   State mState = State::Idle;
   UniquePtr<NetworkFilterEngine> mMain;
   UniquePtr<NetworkFilterEngine> mSocial;
+  // Only the $document rules, for pages opened in a tab: adblock-rust
+  // matches a document request against every rule without a type option
+  // too, which would block whole sites for one of their ad paths.
+  UniquePtr<NetworkFilterEngine> mPages;
   // Requests suspended until the engine is built.
   nsTArray<nsCOMPtr<nsIChannel>> mHeld;
   nsCOMPtr<nsITimer> mTimer;
   TimeStamp mStarted;
+  // Hosts whose pages the user chose to open anyway ("p:" prefix: in
+  // private windows), until quitting.
+  nsTHashSet<nsCString> mAllowedPages;
 };
 
 }  // namespace mozilla::browserwip

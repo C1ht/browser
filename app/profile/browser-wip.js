@@ -140,6 +140,10 @@ pref("urlclassifier.features.antifraud.annotate.allowlistTables", "");
 pref("urlclassifier.features.harmfuladdon.blocklistTables", "");
 // Element hiding for leftover ad slots (ContentBlockingChild.sys.mjs).
 pref("browserwip.contentblocking.cosmetic.enabled", true);
+// Pages opened in a tab that the lists block as a whole ($document rules:
+// scam and pop-under pages) show about:blocked, which can open them anyway.
+pref("browserwip.contentblocking.blockpages.enabled", true);
+pref("urlclassifier.alternate_error_page", "blocked");
 // YouTube ads (contentblocking/youtube/): off unless turned on in Settings,
 // which says first that it downloads uBlock Origin's lists from these
 // addresses, every 8 hours while on.
