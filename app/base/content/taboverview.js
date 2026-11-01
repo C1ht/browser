@@ -14,7 +14,8 @@
  * Click a card (or Enter) to switch to its tab; × (Delete, or a middle
  * click) to close it; the last card to add a tab (the overview stays open).
  * Typing filters by title and address, from anywhere in the overview.
- * Escape, the close button or a click on empty space closes the overview.
+ * Escape, the close button, a click on empty space or on a tab in the tab
+ * strip closes the overview.
  *
  * Snapshots are taken fresh each time it opens, at the cards' size and in
  * the page's own proportions; tabs that have not loaded yet (restored ones)
@@ -67,7 +68,15 @@ var TabOverview = {
     tabs.addEventListener("TabClose", e => this.isOpen && this._onTabClose(e.target));
     tabs.addEventListener("TabMove", () => this.isOpen && this._animateLayout(() => this._reorder()));
     tabs.addEventListener("TabAttrModified", e => this.isOpen && this._refresh(e.target));
-    // A tab chosen in the strip moves the ring; the cards stay as they are.
+    // Clicking a tab in the strip goes to it: the strip has already selected
+    // it, so the overview just gets out of the way.
+    tabs.addEventListener("click", e => {
+      if (this.isOpen && e.button == 0 && e.target.closest(".tab") && !e.target.closest(".tab-close")) {
+        this.close();
+      }
+    });
+    // A tab selected otherwise (closing the current one, from the keyboard)
+    // moves the ring; the cards stay as they are.
     tabs.addEventListener("TabSelect", () => {
       for (let card of this.grid.querySelectorAll(".overview-card")) {
         card.toggleAttribute("selected", !!card.tab && card.tab == gBrowser.selectedTab);
