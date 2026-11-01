@@ -46,18 +46,18 @@ export class FaviconParent extends JSWindowActorParent {
     browser.ownerDocument.defaultView.gBrowser?.setIcon(browser, dataURL);
     // Kept for the bookmarks bar and the address bar's dropdown: for
     // bookmarked pages, and visited ones while history is remembered.
+    // Nothing is kept from a private window.
     let url = browser.currentURI?.spec;
-    if (url) {
+    if (url && !lazy.PrivateBrowsingUtils.isBrowserPrivate(browser)) {
       lazy.Library.storeIcon(url, dataURL).catch(() => {});
       this._favoriteIcon(browser, url, dataURL).catch(() => {});
     }
   }
 
   // A favorite's site: its largest icon (or this one) for the new tab
-  // page's tile. Never kept from a private window; outside Standard, never
-  // from another site.
+  // page's tile. Outside Standard, never from another site.
   async _favoriteIcon(browser, url, dataURL) {
-    if (lazy.PrivateBrowsingUtils.isBrowserPrivate(browser) || !(await lazy.SiteIcons.isFavorite(url))) {
+    if (!(await lazy.SiteIcons.isFavorite(url))) {
       return;
     }
     let sameSiteOnly = lazy.PrivacyModes.mode != "standard";
