@@ -44,6 +44,7 @@ const Page = {
       this.unlock();
     });
     $("unlock-hello").addEventListener("click", () => this.unlockWithHello());
+    $("unlock-keyring").addEventListener("click", () => this.unlockWithKeyring());
     $("setup-form").addEventListener("submit", e => {
       e.preventDefault();
       this.setup();
@@ -158,7 +159,16 @@ const Page = {
       // (Hello or the master password).
       $("unlock-hello").parentNode.hidden = !PasswordVault.canUnlockWithHello;
       $("unlock-hello").hidden = !PasswordVault.canUnlockWithHello;
+      // The system keyring too, and tried straight away: it usually needs
+      // no prompt.
+      let keyring = !PasswordVault.canUnlockWithHello && PasswordVault.canUnlockWithKeyring;
+      $("unlock-keyring").parentNode.hidden = !keyring;
+      $("unlock-keyring").hidden = !keyring;
       $("unlock-password").focus();
+      if (keyring && !this._keyringTried) {
+        this._keyringTried = true;
+        this.unlockWithKeyring();
+      }
     } else if (card == "setup") {
       $("setup-password").focus();
     }
@@ -194,6 +204,23 @@ const Page = {
     } catch (e) {
       if (e.code != "cancelled") {
         document.l10n.setAttributes($("unlock-error"), "passwords-hello-failed");
+        $("unlock-error").hidden = false;
+      }
+    } finally {
+      button.disabled = false;
+    }
+  },
+
+  async unlockWithKeyring() {
+    let button = $("unlock-keyring");
+    button.disabled = true;
+    $("unlock-error").hidden = true;
+    try {
+      await PasswordVault.unlockWithKeyring();
+      history.replaceState(null, "", location.href.split("#")[0]);
+    } catch (e) {
+      if (e.code != "cancelled") {
+        document.l10n.setAttributes($("unlock-error"), "passwords-keyring-failed");
         $("unlock-error").hidden = false;
       }
     } finally {

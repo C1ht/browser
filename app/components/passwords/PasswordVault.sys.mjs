@@ -18,12 +18,15 @@
  * "too-short", "mismatch", "locked", "no-vault", "needs-master-password",
  * "not-fillable", "needs-passphrase", "wrong-passphrase", "bad-file",
  * "no-columns", "cancelled", "hello-unavailable", "hello-failed",
- * "wrong-recovery-key", "no-recovery-key", "not-confirmed", or the core's
- * status name ("BWV_E_IO", ...).
+ * "keyring-unavailable", "keyring-failed", "wrong-recovery-key",
+ * "no-recovery-key", "not-confirmed", or the core's status name
+ * ("BWV_E_IO", ...).
  *
- * Windows Hello (§5.3) is a second way to unlock, for filling. Showing and
- * copying ask again, with Hello or the master password; exporting, a new
- * recovery key and password changes take the master password only.
+ * Windows Hello (§5.3) and, on Linux, the system keyring (§5.2) are second
+ * ways to unlock, for filling. Showing and copying ask again, with Hello or
+ * the master password (the keyring can't tell who is at the keyboard);
+ * exporting, a new recovery key and password changes take the master
+ * password only.
  */
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
@@ -240,13 +243,15 @@ export const PasswordVault = {
   // { available: Hello can unlock on this machine, enrolled: the vault has
   // a Hello slot }
   hello: { available: false, enrolled: false },
+  // The same for the system keyring (Linux).
+  keyring: { available: false, enrolled: false },
   // Whether the vault has a recovery key (§6).
   hasRecoveryKey: false,
   // This computer only: { available: a TPM 2.0, bound: this vault is }.
   device: { available: false, bound: false },
 
   async _refreshHello() {
-    let slots = { hello: false, recovery: false, device: false };
+    let slots = { hello: false, keyring: false, recovery: false, device: false };
     try {
       slots = JSON.parse(await lazy.core.slots());
     } catch (e) {}
@@ -263,6 +268,14 @@ export const PasswordVault = {
       };
     } catch (e) {
       this.hello = { available: false, enrolled: false };
+    }
+    try {
+      this.keyring = {
+        available: await lazy.core.keyringAvailable(),
+        enrolled: !!slots.keyring,
+      };
+    } catch (e) {
+      this.keyring = { available: false, enrolled: false };
     }
   },
 
@@ -324,6 +337,75 @@ export const PasswordVault = {
     this._requireUnlocked();
     try {
       await lazy.core.disableHello();
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    } finally {
+      await this._refreshHello();
+      this._changed();
+    }
+  },
+
+  // ---------------------------------------------------------------------
+  // The system keyring (Linux, §5.2)
+
+  /** Whether the keyring can unlock (it is set up, and there is one now). */
+  get canUnlockWithKeyring() {
+    return this.keyring.available && this.keyring.enrolled;
+  },
+
+  /**
+   * Unlocks with the key kept in the system keyring. No prompt unless the
+   * desktop's keyring is itself locked. Not a master password: no reveal
+   * grace.
+   */
+  async unlockWithKeyring() {
+    await this.init();
+    if (this.state == "unlocked") {
+      return;
+    }
+    if (!this.canUnlockWithKeyring) {
+      throw failure("keyring-unavailable");
+    }
+    let json;
+    try {
+      json = await lazy.core.unlockWithKeyring();
+    } catch (e) {
+      if (["BWV_E_NO_SLOT", "BWV_E_PROVIDER"].includes(coreCode(e))) {
+        await this._refreshHello();
+      }
+      // No keyring running, the item gone, or a slot that won't open: the
+      // master password still works.
+      throw failure(coreCode(e) == "BWV_E_CANCELLED" ? "cancelled" : "keyring-failed", e);
+    }
+    this._index = parseIndex(json);
+    this._failures = 0;
+    this._setState("unlocked");
+  },
+
+  /** Adds the keyring; needs the master password (§5.1). */
+  async enableKeyring(master) {
+    await this._waitForReplacement();
+    this._requireUnlocked();
+    if (!this.keyring.available) {
+      throw failure("keyring-unavailable");
+    }
+    try {
+      await lazy.core.enableKeyring(master.normalize("NFC"));
+    } catch (e) {
+      await this._refreshHello();
+      this._changed();
+      let code = coreCode(e);
+      throw failure(code == "BWV_E_CANCELLED" ? "cancelled" : code == "BWV_E_AUTH" ? "wrong-password" : "keyring-failed", e);
+    }
+    this.keyring = { ...this.keyring, enrolled: true };
+    this._changed();
+  },
+
+  async disableKeyring() {
+    await this._waitForReplacement();
+    this._requireUnlocked();
+    try {
+      await lazy.core.disableKeyring();
     } catch (e) {
       throw failure(coreCode(e), e);
     } finally {

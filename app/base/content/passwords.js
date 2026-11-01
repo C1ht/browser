@@ -79,7 +79,9 @@ var PasswordsUI = {
       $("passwords-unlock-error").hidden = true;
     });
     $("passwords-forgot").addEventListener("click", () => this.openManager("forgot"));
-    $("passwords-unlock-hello").addEventListener("click", () => this._unlockWithHello());
+    $("passwords-unlock-hello").addEventListener("click", () =>
+      $("passwords-unlock-hello").dataset.method == "keyring" ? this._unlockWithKeyring() : this._unlockWithHello()
+    );
 
     // Setup
     $("passwords-setup-form").addEventListener("submit", e => {
@@ -401,7 +403,7 @@ var PasswordsUI = {
   },
 
   /** Switches the panel's content; `purpose` says why it unlocks. */
-  _showView(view, { purpose } = {}) {
+  _showView(view, { purpose, keyringFailed = false } = {}) {
     let $ = this.$;
     let doc = this.window.document;
     let vault = PasswordsLazy.PasswordVault;
@@ -450,14 +452,29 @@ var PasswordsUI = {
         $("passwords-unlock-error").hidden = true;
         this._setBusy($("passwords-unlock-form"), false);
         doc.l10n.setAttributes($("passwords-unlock-submit"), "passwords-unlock");
-        // Windows Hello first where it's set up (it unlocks for filling;
-        // showing or copying asks again).
+        // Windows Hello or the system keyring first where it's set up (they
+        // unlock for filling; showing or copying asks again).
         let hello = vault.canUnlockWithHello;
-        $("passwords-unlock-hello").hidden = !hello;
-        $("passwords-unlock-hello").disabled = false;
-        doc.l10n.setAttributes($("passwords-unlock-hello-label"), "passwords-use-hello");
-        $("passwords-unlock-or").hidden = !hello;
-        this._focusSoon(hello ? $("passwords-unlock-hello") : $("passwords-unlock-password"));
+        let keyring = !hello && vault.canUnlockWithKeyring;
+        let button = $("passwords-unlock-hello");
+        button.hidden = !hello && !keyring;
+        button.disabled = false;
+        button.dataset.method = keyring ? "keyring" : "hello";
+        button.querySelector("img").src = keyring
+          ? "chrome://browser-wip/skin/icons/key.svg"
+          : "chrome://browser-wip/skin/icons/hello.svg";
+        doc.l10n.setAttributes($("passwords-unlock-hello-label"), keyring ? "passwords-use-keyring" : "passwords-use-hello");
+        $("passwords-unlock-or").hidden = button.hidden;
+        if (keyring && (keyringFailed || this._keyringFailedRecently)) {
+          doc.l10n.setAttributes($("passwords-unlock-error"), "passwords-keyring-failed");
+          $("passwords-unlock-error").hidden = false;
+          this._focusSoon($("passwords-unlock-password"));
+        } else if (keyring) {
+          // Usually needs no prompt at all: try it straight away.
+          this._unlockWithKeyring();
+        } else {
+          this._focusSoon(hello ? button : $("passwords-unlock-password"));
+        }
         break;
       }
       case "recovery":
@@ -697,6 +714,39 @@ var PasswordsUI = {
     this._afterUnlock();
   },
 
+  // After the keyring failed, it isn't tried by itself for a minute, so a
+  // missing keyring doesn't hold up every click in a login field.
+  get _keyringFailedRecently() {
+    return Date.now() - (this._keyringFailedAt ?? 0) < 60 * 1000;
+  },
+
+  async _unlockWithKeyring() {
+    let $ = this.$;
+    let doc = this.window.document;
+    let button = $("passwords-unlock-hello");
+    let error = $("passwords-unlock-error");
+    error.hidden = true;
+    button.disabled = true;
+    doc.l10n.setAttributes($("passwords-unlock-hello-label"), "passwords-keyring-waiting");
+    try {
+      await PasswordsLazy.PasswordVault.unlockWithKeyring();
+    } catch (e) {
+      this._keyringFailedAt = Date.now();
+      button.disabled = false;
+      doc.l10n.setAttributes($("passwords-unlock-hello-label"), "passwords-use-keyring");
+      if (e.code != "cancelled") {
+        doc.l10n.setAttributes(error, "passwords-keyring-failed");
+        error.hidden = false;
+        button.hidden = !PasswordsLazy.PasswordVault.canUnlockWithKeyring;
+        $("passwords-unlock-or").hidden = button.hidden;
+      }
+      $("passwords-unlock-password").focus();
+      return;
+    }
+    this._keyringFailedAt = 0;
+    this._afterUnlock();
+  },
+
   // Unlocked from the panel: carry on with what it was opened for.
   _afterUnlock() {
     let purpose = this._unlockPurpose;
@@ -831,6 +881,23 @@ var PasswordsUI = {
     }
     let vault = PasswordsLazy.PasswordVault;
     await vault.init().catch(() => {});
+    // With the system keyring set up, a click in a login field unlocks
+    // straight away (no prompt unless the desktop's keyring is locked).
+    if (
+      vault.state == "locked" &&
+      vault.canUnlockWithKeyring &&
+      request.kind != "new-password" &&
+      !this._keyringFailedRecently
+    ) {
+      this._keyringUnlock ??= vault
+        .unlockWithKeyring()
+        .catch(() => (this._keyringFailedAt = Date.now()))
+        .finally(() => (this._keyringUnlock = null));
+      await this._keyringUnlock;
+      if (browser != gBrowser.selectedBrowser) {
+        return;
+      }
+    }
     let doc = this.window.document;
     let rows = [];
     let body = doc.createDocumentFragment();

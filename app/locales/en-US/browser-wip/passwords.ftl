@@ -322,6 +322,22 @@ passwords-import-no-columns = This CSV file has no website and password columns.
 passwords-import-newer = This file was made by a newer version of { -brand-short-name }.
 passwords-import-empty = No logins found in this file.
 
+## System keyring (Linux)
+
+passwords-use-keyring = Unlock with your system keyring
+passwords-keyring-waiting = Unlocking with your system keyring…
+passwords-keyring-failed = Your system keyring couldn’t unlock your passwords. Use your master password.
+settings-passwords-keyring-label = Unlock with your system keyring
+settings-passwords-keyring-help = Unlocks your passwords for filling with a key kept in your desktop’s keyring (GNOME Keyring, KWallet, KeePassXC), so you rarely type the master password. Showing, copying and exporting still ask for it. Any program running as you can read the keyring while your session is unlocked.
+settings-passwords-keyring-none = No system keyring is running. Start one that offers the Secret Service, such as GNOME Keyring, KWallet or KeePassXC, then come back.
+settings-passwords-keyring-confirm = Turn on
+settings-passwords-keyring-master =
+    .placeholder = Master password, to turn it on
+    .aria-label = Master password
+settings-passwords-keyring-on = Your system keyring can now unlock your passwords.
+settings-passwords-keyring-cancelled = Your keyring stayed locked. Nothing changed.
+settings-passwords-keyring-error = Your system keyring couldn’t be set up.
+
 ## Windows Hello
 
 passwords-use-hello = Use Windows Hello

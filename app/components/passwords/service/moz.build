@@ -15,9 +15,14 @@ XPCOM_MANIFESTS += [
 ]
 
 SOURCES += [
+    "LinuxKeyring.cpp",
     "PasswordVault.cpp",
     "WindowsUnlock.cpp",
 ]
+
+if CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk":
+    # The system keyring through libsecret (loaded at run time) and GDBus.
+    CXXFLAGS += CONFIG["GLIB_CFLAGS"]
 
 if CONFIG["OS_ARCH"] == "WINNT":
     # Windows Hello (KeyCredentialManager through WinRT), the TPM check, and

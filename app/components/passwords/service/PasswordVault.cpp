@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "PasswordVault.h"
+#include "LinuxKeyring.h"
 #include "WindowsUnlock.h"
 
 #include <inttypes.h>
@@ -569,9 +570,17 @@ PasswordVault::Open(const nsACString& aDir, JSContext* aCx,
                  st = bws_open(dir.get(), &core.mStore, &fixed);
                  if (st == BWV_OK) {
                    core.mPermsFixed = fixed;
-                   // Windows Hello signs again when the key is replaced.
+                   // The keyring gets a new entry, and Windows Hello signs
+                   // again, when the key is replaced; at start, keyring
+                   // entries of other generations are tidied up.
                    static const bwt_providers kProviders = {
-                       nullptr, nullptr, nullptr, nullptr,
+                       nullptr,
+#ifdef MOZ_WIDGET_GTK
+                       linux_keyring::Store, linux_keyring::Lookup,
+                       linux_keyring::DeleteExcept,
+#else
+                       nullptr, nullptr, nullptr,
+#endif
 #ifdef XP_WIN
                        windows_unlock::HelloSign
 #else
@@ -1072,19 +1081,22 @@ NS_IMETHODIMP
 PasswordVault::Slots(JSContext* aCx, Promise** aPromise) {
   return Run(aCx, aPromise, "PasswordVault::Slots", [](Core& core) {
     bool hello = false;
+    bool keyring = false;
     bool recovery = false;
     bool device = false;
     bwv_vault* vault = nullptr;
     if (core.mStore && LoadFile(core.mStore, &vault) == BWV_OK) {
       hello = bwv_has_slot(vault, BWV_SLOT_HELLO);
+      keyring = bwv_has_slot(vault, BWV_SLOT_KEYRING);
       recovery = bwv_has_slot(vault, BWV_SLOT_RECOVERY);
       uint8_t id[BWV_ID_BYTES];
       bwv_get_id(vault, id);
       device = windows_unlock::DeviceKeyExists(id);
     }
     bwv_free(vault);
-    return Text(nsCString(nsPrintfCString(R"({"hello":%s,"recovery":%s,"device":%s})",
+    return Text(nsCString(nsPrintfCString(R"({"hello":%s,"keyring":%s,"recovery":%s,"device":%s})",
                                           hello ? "true" : "false",
+                                          keyring ? "true" : "false",
                                           recovery ? "true" : "false",
                                           device ? "true" : "false")),
                 false);
@@ -1255,6 +1267,177 @@ PasswordVault::CheckHello(JSContext* aCx, Promise** aPromise) {
       return Flag(false);
     }
     return st == BWV_OK ? Flag(true) : Done(st);
+  });
+}
+
+// The key of `aVault`'s keyring slot, from the keyring (its desktop may
+// ask to unlock it first).
+static bwv_status KeyringKey(const bwv_vault* aVault, bwv_key** aOut) {
+  uint8_t id[BWV_ID_BYTES];
+  bwv_get_id(aVault, id);
+  uint8_t gen[kSlotInputsMax];
+  size_t genLen = 0;
+  bwv_status st = bwv_slot_inputs(aVault, BWV_SLOT_KEYRING, nullptr, gen, &genLen);
+  if (st == BWV_OK && genLen != BWV_ITEM_TAG_BYTES) {
+    st = BWV_E_FORMAT;
+  }
+  uint8_t raw[BWV_KEY_BYTES];
+  if (st == BWV_OK) {
+    st = linux_keyring::Lookup(nullptr, id, gen, raw);
+  }
+  bwv_key* key = nullptr;
+  if (st == BWV_OK) {
+    key = bwv_key_new();
+    if (key) {
+      bwv_key_import(key, raw);
+    } else {
+      st = BWV_E_NOMEM;
+    }
+  }
+  Wipe(raw, sizeof(raw));
+  if (st != BWV_OK) {
+    return st;
+  }
+  *aOut = key;
+  return BWV_OK;
+}
+
+NS_IMETHODIMP
+PasswordVault::KeyringAvailable(JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::KeyringAvailable", [](Core& core) {
+    return Flag(linux_keyring::Available());
+  });
+}
+
+NS_IMETHODIMP
+PasswordVault::EnableKeyring(const nsACString& aMasterPassword, JSContext* aCx,
+                             Promise** aPromise) {
+  return Run(
+      aCx, aPromise, "PasswordVault::EnableKeyring",
+      [pw = Own(aMasterPassword)](Core& core) mutable {
+        bwv_vault* vault = core.Vault();
+        if (!vault) {
+          Wipe(pw);
+          return Done(BWV_E_LOCKED);
+        }
+        // Adding an unlock method needs the master password (§5.1).
+        bwv_status st = CheckMaster(core.mStore, pw);
+        Wipe(pw);
+        if (st != BWV_OK) {
+          return Done(st);
+        }
+        if (!linux_keyring::Available()) {
+          return Done(BWV_E_PROVIDER);
+        }
+        uint8_t id[BWV_ID_BYTES];
+        bwv_get_id(vault, id);
+        bool hadSlot = bwv_has_slot(vault, BWV_SLOT_KEYRING);
+        uint8_t oldGen[kSlotInputsMax];
+        if (hadSlot) {
+          bwv_slot_inputs(vault, BWV_SLOT_KEYRING, nullptr, oldGen, nullptr);
+        }
+        // A fresh key under a new generation; the old entry, if any, stays
+        // until the vault on disk uses the new one.
+        st = bwv_prepare_slot(vault, BWV_SLOT_KEYRING, nullptr);
+        uint8_t gen[kSlotInputsMax];
+        size_t genLen = 0;
+        if (st == BWV_OK) {
+          st = bwv_prepared_inputs(vault, BWV_SLOT_KEYRING, nullptr, gen, &genLen);
+        }
+        if (st == BWV_OK && genLen != BWV_ITEM_TAG_BYTES) {
+          st = BWV_E_FORMAT;
+        }
+        bwv_key* key = st == BWV_OK ? bwv_key_new() : nullptr;
+        if (st == BWV_OK && !key) {
+          st = BWV_E_NOMEM;
+        }
+        bool stored = false;
+        if (st == BWV_OK) {
+          uint8_t raw[BWV_KEY_BYTES];
+          bwv_key_generate(key);
+          bwv_key_export(key, raw);
+          st = linux_keyring::Store(nullptr, id, gen, raw);
+          Wipe(raw, sizeof(raw));
+          stored = st == BWV_OK;
+        }
+        if (st == BWV_OK) {
+          st = bwv_set_slot(vault, BWV_SLOT_KEYRING, key);
+        }
+        bwv_key_free(key);
+        if (st == BWV_OK) {
+          st = bwt_save(core.mSession);
+        }
+        if (st == BWV_OK) {
+          linux_keyring::DeleteExcept(nullptr, id, gen);
+        } else if (stored) {
+          // The vault on disk still has the old slot, or none.
+          linux_keyring::DeleteExcept(nullptr, id, hadSlot ? oldGen : nullptr);
+        }
+        return Done(st);
+      });
+}
+
+NS_IMETHODIMP
+PasswordVault::DisableKeyring(JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::DisableKeyring", [](Core& core) {
+    bwv_vault* vault = core.Vault();
+    if (!vault) {
+      return Done(BWV_E_LOCKED);
+    }
+    uint8_t id[BWV_ID_BYTES];
+    bwv_get_id(vault, id);
+    bwv_status st = BWV_OK;
+    if (bwv_has_slot(vault, BWV_SLOT_KEYRING)) {
+      st = bwv_remove_slot(vault, BWV_SLOT_KEYRING);
+      if (st == BWV_OK) {
+        st = bwt_save(core.mSession);
+      }
+    }
+    if (st == BWV_OK) {
+      linux_keyring::DeleteExcept(nullptr, id, nullptr);
+    }
+    return Done(st);
+  });
+}
+
+NS_IMETHODIMP
+PasswordVault::UnlockWithKeyring(JSContext* aCx, Promise** aPromise) {
+  return Run(aCx, aPromise, "PasswordVault::UnlockWithKeyring", [](Core& core) {
+    bwv_status st = core.mSession ? BWV_OK : BWV_E_STATE;
+    bwv_vault* vault = nullptr;
+    if (st == BWV_OK) {
+      st = LoadFile(core.mStore, &vault);
+    }
+    if (st == BWV_OK && !bwv_has_slot(vault, BWV_SLOT_KEYRING)) {
+      st = BWV_E_NO_SLOT;
+    }
+    bwv_key* key = nullptr;
+    if (st == BWV_OK) {
+      st = KeyringKey(vault, &key);
+    }
+    if (st == BWV_OK) {
+      st = bwv_unlock(vault, BWV_SLOT_KEYRING, key);
+    }
+    bwv_key_free(key);
+    if (st == BWV_OK) {
+      st = bwv_open_body(vault);
+    }
+    nsCString index;
+    if (st == BWV_OK) {
+      uint8_t* data = nullptr;
+      size_t len = 0;
+      st = bwv_get_index(vault, &data, &len);
+      if (st == BWV_OK) {
+        index.Assign(reinterpret_cast<const char*>(data), len);
+        bwv_secret_free(data);
+      }
+    }
+    if (st != BWV_OK) {
+      bwv_free(vault);
+      return Done(st);
+    }
+    bwt_attach(core.mSession, vault);
+    return Text(std::move(index), true);
   });
 }
 
@@ -1555,9 +1738,10 @@ PasswordVault::StartOver(const nsACString& aDate, JSContext* aCx,
                }
                bws_remove(core.mStore, BWS_STAGED);
                if (haveId) {
-                 // Hello can't open it any more anyway: only its master
-                 // password can (Settings › Open an older vault…).
+                 // Hello and the keyring can't open it any more anyway: only
+                 // its master password can (Settings › Open an older vault…).
                  windows_unlock::HelloDelete(id);
+                 linux_keyring::DeleteExcept(nullptr, id, nullptr);
                }
                return Text(nsCString(name + ".bwv"_ns), false);
              });
