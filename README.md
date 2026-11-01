@@ -47,9 +47,13 @@ need only `./mach build faster`.
 
 ```sh
 tests/unit/run.sh                                        # no Gecko needed
+tools/runtime/fetch-test-deps.sh                         # once: strace and gnome-keyring, into ~/.cache
+tools/runtime/check.py ../mozilla-central/obj-browser-wip/dist/bin    # runtime checks, all parts
 tools/netsilence/run.sh ../mozilla-central/obj-browser-wip/dist/bin   # no background network calls
 tools/wayland-shot.sh <dist/bin> /tmp/p shot.png         # screenshot on headless Weston
 ```
+
+What the runtime checks need and what they can't check headless (to do by hand): [docs/MANUAL-CHECKS.md](docs/MANUAL-CHECKS.md).
 
 ## Licenses
 

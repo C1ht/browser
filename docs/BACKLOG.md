@@ -2,6 +2,5 @@
 
 Agreed work that isn't scheduled yet.
 
-## Content blocking
-
-- **Blocked page with a proceed option.** Show a "page blocked" screen when a page opened in a tab matches one of the lists' `$document` rules. There are 590 of them in EasyList, for scam and pop-under landing pages. The screen needs a way to continue anyway. Until it exists, top-level pages are not blocked ([CONTENT-BLOCKING.md](CONTENT-BLOCKING.md#top-level-pages-are-not-blocked)).
+- **Clear site data.** A per-site and an all-sites "Clear site data" (cookies, storage, cache, permissions), which also clears the new tab page's favorite icons (`SiteIcons.clear()` / `SiteIcons.forget()`). Today only Clear history → All clears them.
+- **Decode favorite icons in a content process.** `SiteIcons.sys.mjs` decodes and re-encodes icons in the parent process, as tab icons are drawn there today (decoders listed in PLAN.md §7). Moving the decode and re-encode into a sandboxed content process would keep a decoder bug out of the parent.

@@ -39,20 +39,24 @@ Both use the vendored EasyList, EasyPrivacy and Fanboy Social lists (`app/compon
 - **Startup.** Requests made before the engines are built are held, then checked. They are let go unchecked straight away if the build fails, if protection is turned off, or after 10 seconds. If the engines fail to build or take longer than that, the shield shows a crossed-out icon on every site and says "Ad and tracker blocking isn't working".
 - **Logging.** `MOZ_LOG=BrowserWipBlocker:3` logs startup, rule counts and state changes. Level `:4` adds each check's main-thread time, and `:5` adds the URL. The log stays local; nothing is sent anywhere.
 
-### Top-level pages are not blocked
+### Blocked pages
 
-Pages opened in a tab are never blocked in this phase, even when a rule matches them. EasyList has **590 `$document` rules** for whole pages: scam and pop-under landing pages. uBlock Origin shows a "page blocked" screen for these, with a way to continue anyway.
+EasyList has **594 rules for whole pages** (`$document`): scam, pop-up and pop-under landing pages. A page opened in a tab that one of them matches shows a "This page was blocked" screen instead, as uBlock Origin does.
 
-Cancelling the load without such a screen would leave an error page and no way forward, so these rules are not applied until that screen exists. It's in the [backlog](BACKLOG.md).
+- **Only `$document` rules.** adblock-rust matches a document request against every rule without a type option too, which would block a whole site for one of its ad paths. So pages are checked against a third engine built from just these rules (`IsDocumentRule`, `CheckPage` in `NetworkBlocker.cpp`), with the page's own host as the source.
+- **Typed and bookmarked addresses count.** The browser triggers those loads, but it's still the user visiting the site, so the system-principal exemption that applies to other requests doesn't apply to pages.
+- **The screen.** The load is cancelled with `NS_ERROR_HARMFUL_URI`, for which docshell shows `about:blocked` (`urlclassifier.alternate_error_page`) with the address in `u`, as for Safe Browsing. `about:blocked` is `blocked.html`, an error page in the content process: everything is inline under a CSP naming its hashes, so there's no chrome:// file a website could load to detect the browser. Its two buttons go through the `BlockedPage` actor:
+  - **Go back** goes back, or to a new tab.
+  - **Open it anyway** lets pages on that exact host through until quitting (separately for private windows; `nsIBrowserWipBlocker.allowPage`), then loads the page in place of the screen. The parent reads the address from the screen's own document URI, never from what the page sends.
+- **Switches.** The shield's per-site switch covers pages too; `browserwip.contentblocking.blockpages.enabled` turns this off altogether.
 
-Frames (`subdocument`) and everything else a page loads are blocked as usual.
+Frames (`subdocument`) and everything else a page loads are blocked as usual, by the main engines.
 
 ### What isn't supported yet
 
 | Item | Status | Back in |
 |---|---|---|
 | `$redirect=` and `$redirect-rule=` (28 rules, all in EasyPrivacy) | Left out of the engine. Without the stand-in resources the engine would block these requests instead of answering them, which breaks pages that need the stand-in. The count is logged at startup. | Phase 2 |
-| Top-level pages (`$document`) | Not blocked, as described above. | When the blocked page exists |
 | `$popup` | Never matches. | |
 | `$csp=` | Ignored. | |
 | `$removeparam` | Ignored. The engine works out the rewritten URL, but the FFI doesn't return it. | |
@@ -60,6 +64,10 @@ Frames (`subdocument`) and everything else a page loads are blocked as usual.
 | `!#if` and `!#include` | Not processed. | |
 | Requests that aren't HTTP (`data:`, `blob:`, `file:`), and responses a service worker serves from its own cache | Not seen. A service worker's own network requests are seen. | |
 | Cosmetic and scriptlet rules (`+js`, procedural `#?#` rules, `:has-text` and the like) | Element hiding keeps working as before (`compile_lists.py`, `ContentBlockingChild.sys.mjs`). Scriptlets run only for the opt-in YouTube blocker, below. | Phase 2 |
+
+### The new tab page's privacy report
+
+The tab browser passes each page's newly blocked trackers to `ProtectionStats.sys.mjs`, which keeps per-day totals, trackers blocked and the pages they were blocked on, in `protection-stats.json` in the profile for 30 days. It stores counts only, never which sites; private windows aren't counted. The new tab page shows the last seven days.
 
 ### Behaviour changes from the URL-classifier tables
 
@@ -85,6 +93,7 @@ Frames (`subdocument`) and everything else a page loads are blocked as usual.
   - odd URLs
   - the "not working" shield
   - DNS lookups for blocked hosts
+  - blocked pages: only `$document` rules, typed addresses too, the screen's Go back and Open it anyway, the session exception, the pref
 
 ## YouTube ads (opt-in)
 

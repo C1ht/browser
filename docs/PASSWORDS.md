@@ -10,8 +10,22 @@ mockups*).
 
 **Built so far (Stage 2):**
 
-- **Master password, recovery key and Windows Hello.** The keyring
-  (Linux) is not built yet (§18 part 3).
+- **Master password, recovery key, Windows Hello and the system keyring.**
+  - The keyring (Linux, §5.2): `service/LinuxKeyring.cpp` loads libsecret
+    with dlopen and stores the keyring slot's key under the schema
+    `org.browserwip.Vault`. Settings › Passwords › "Unlock with your
+    system keyring" turns it on with the master password. While it's on,
+    a click in a login field, the unlock panel and about:passwords unlock
+    through it straight away; it fails over to the master password
+    (and isn't tried by itself again for a minute). Showing and copying
+    still take the master password.
+  - The key replacement stores a new generation and deletes the old one;
+    at start, entries of other generations are tidied up, but only when a
+    Secret Service is already running, and without unlocking anything, so
+    a browser that never used the keyring never starts a keyring daemon.
+  - "Is there a keyring" asks the bus daemon (owner or activatable
+    `org.freedesktop.secrets`), never the Secret Service itself.
+  - fprintd ("Confirm with fingerprint") is not built.
 - **Forgotten master password (§6):**
   - the recovery key, offered at setup (panel and about:passwords) and
     in Settings, shown once with Print and "I've written it down";
@@ -577,7 +591,12 @@ frame. The frame's own URL report is never trusted.
    the system principal or extension pages.
 3. **Other subdomains of the same site** (same registrable domain under the
    public suffix list, via `Services.eTLD`):
-   - never filled automatically and never offered by default
+   - never filled automatically and never offered by default: the dropdown
+     and the key button's panel list this origin's logins, with a "Show all
+     for example.com" row that adds the parent domain's and the other
+     subdomains', grouped under "Saved for …". In the dropdown that row
+     appears in Standard only; the panel, which only lists usernames,
+     always has it
    - an entry can list extra origins in `also`, which you add yourself in
      the manager or by choosing "Also use on login.example.com" in the
      dropdown (§17 Q5)
@@ -856,7 +875,7 @@ minutes and needs no Gecko build:
 | cross-OS | Linux makes `vault-linux.bwv` and Windows makes `vault-windows.bwv` (artifacts); each opens the other's and checks every entry. Both also open `tests/fixtures/v1-windows.bwv`, a v1 vault committed to the repo, so format drift between releases is caught. |
 | fuzz (ubuntu, libFuzzer) | the header/body parser and the slot unwrapper, 5 minutes per push, with a corpus in the repo. Windows replays the corpus as regression tests. |
 | matching (Node, both OSes) | origin rules: exact origin; ports; `http` refused; IDN look-alikes (`раypal.com` vs `paypal.com`), `paypal.com.evil.io`, `xn--` forms; trailing dots; IPv4/IPv6; subdomains; PSL edge cases (`github.io`, `co.uk`); `also` lists; opaque/`data:`/`file:` |
-| no keyring | Linux job with no `org.freedesktop.secrets`: unlock asks for the password and never writes a keyring slot. A second run starts `gnome-keyring-daemon` in `dbus-run-session` and checks the keyring round trip. |
+| no keyring | `tools/runtime/check.py --part 11`, on a session bus of its own: with no `org.freedesktop.secrets`, the keyring isn't offered and Settings says why; then with `gnome-keyring-daemon` on it, the round trip (Settings on and off, unlock, a click in a login field, the key replacement's generations, a restart). `check.py` takes gnome-keyring-daemon from `tools/runtime/fetch-test-deps.sh`'s cache, or PATH, and stops before running anything if it has none (docs/MANUAL-CHECKS.md). `BWV_KEYRING_DAEMON` and `BWV_KEYRING_LIBS` point at one elsewhere. |
 
 The **Gecko build** (existing `release.yml`, run manually, as you asked)
 adds runtime part 7:

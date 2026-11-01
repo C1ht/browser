@@ -280,6 +280,62 @@ My suggestion: allow CRLite only, as one documented exception, and keep Safe Bro
 
 ---
 
+## 7. Favorite icons on the new tab page
+
+`app/components/library/SiteIcons.sys.mjs`, rules in `SiteIconRules.sys.mjs`.
+
+**No default tiles.** Favorites is the bookmarks bar. When the bar is empty, it shows "Sites on your bookmarks bar show up here. Imported ones show a letter until you visit them." with an **Import bookmarks…** button, which takes the HTML file other browsers export, as about:bookmarks does. Imported bookmarks are never fetched for.
+
+**Where an icon comes from**, in order:
+
+1. A visit (never in a private window). `FaviconParent` asks the page for its largest icon, an apple-touch-icon first, and the page loads it like the tab icon: in the page's process, with the page's principal, cookies and content blocking.
+   - If that largest icon is the one the tab already loaded, nothing loads again.
+   - In Strict and Anonymous, an icon on another site isn't loaded; the tab's icon is kept instead.
+   - Otherwise it's one image request the page itself declared, beyond the tab icon.
+2. Adding a favorite from the page you're on (the star). The icon the page already loaded for its tab. No fetch.
+3. A typed favorite, only with **Download icons for my favorites (contacts each site)** on. Off by default, and always off in Strict, Anonymous and private windows. It fetches once, when the favorite is added.
+
+**The fetch.**
+
+- One attempt per favorite and one fetch at a time. A failure is remembered until the next visit to the site.
+- No background refresh: an icon is only replaced by a visit.
+- Favorites on the local network or a private address get no fetch; they get their icon on a visit.
+
+**Network stack.**
+
+- The channel's loading principal is the site's own origin (`NetUtil.newChannel`), so proxy settings, DNS settings and the network blocker apply. The blocker skips only system-principal requests (`NetworkBlocker.cpp`).
+- `LOAD_ANONYMOUS` and `SEC_COOKIES_OMIT`: no cookies are sent or stored. There is no Referer and no Origin.
+- `INHIBIT_CACHING` and `INHIBIT_PERSISTENT_CACHING`: nothing is written to the HTTP cache. Anonymous connections are pooled apart from the ones pages use. No partition key is set, as for any first-party load of that site.
+
+**Limits.**
+
+- HTTPS only.
+- The first 64 KB of the home page.
+- An icon of at most 1 MB, and at most 1024 px.
+- 10 s for the page and the icon together.
+- At most 3 redirects, each HTTPS and on the same site. "Same site" uses the public suffix list including its private section, so a.github.io and b.github.io are different sites.
+- Icons on other domains are skipped.
+- Never a local name (localhost, .local, .lan, .internal, .home.arpa, single-label names) or a private, loopback, link-local, CGNAT, unique-local or multicast address. Addresses are checked twice: by resolving the name before connecting, and from the connection's remote address before any body is read.
+  - Through a proxy the proxy picks the address, so only names are checked.
+  - DNS rebinding can still get one GET sent to a private address before the second check cancels it, because Necko can't pin the resolved address.
+
+**Decoding (parent process).**
+
+- Accepted formats: PNG, ICO and SVG, told by their bytes, not by Content-Type. Sizes are read from the PNG IHDR and the ICO directory, including PNGs inside an ICO, before anything is decoded.
+- Decoders touched: `nsPNGDecoder` (libpng); `nsICODecoder`, which uses `nsBMPDecoder` or `nsPNGDecoder` for its images; and, for SVG, `VectorImage` (the expat XML parser, SVG layout and painting). SVG is drawn as an image, so no scripts run and nothing external loads, onto a canvas in a windowless document.
+- Every icon is re-encoded to a PNG of at most 128 px with `nsPNGEncoder`, and only that PNG is kept, in `favorite-icons.json` in the profile. The new tab page then decodes only those PNGs.
+- Icons from visits go through the same checks and re-encoding.
+
+**Deleting.** Removing a favorite from the bar deletes its icon. Clear history → All deletes them all.
+
+**Tests.**
+
+- `tests/unit/site-icon-rules.test.mjs`.
+- Runtime part 12, which includes a first-run request log: a fresh profile and a new tab make no request and no DNS lookup.
+- The runtime checks reach their 127.0.0.1 test sites through `browserwip.newtab.siteIcons.testHosts`. That pref is read only when `BWV_AUTOMATION=1` is set and Marionette is running.
+
+**Private browsing.** This browser has no private-window command. Gecko's permanent private browsing pref (`browser.privatebrowsing.autostart`) makes every window private, and in that case nothing is fetched and no icon is kept, neither here nor in history.
+
 ## Stage 3 order (after approval)
 
 1. **Scaffolding and build config:** `fetch-gecko.sh`, project directory, branding, launcher, package manifest. Verify with `mach configure`, then a full compile and a launch to a blank window. Checkpoint.
