@@ -57,6 +57,8 @@ newtab-report-mode-custom = Your own mix of privacy settings. Ads and trackers a
 
 newtab-customize = Customize
 newtab-customize-sections = Show on new tabs
+newtab-site-icons = Download icons for my favorites (contacts each site)
+newtab-site-icons-off = Off in Strict privacy and private windows.
 newtab-customize-background = Background
 newtab-background-plain =
     .title = Plain

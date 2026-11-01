@@ -15,6 +15,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   ContentPermissionPrompt: "resource://gre/modules/browserwip/ContentPermissionPrompt.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
   SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
+  SiteIcons: "resource://gre/modules/browserwip/SiteIcons.sys.mjs",
   YouTubeBlocking: "resource://gre/modules/browserwip/YouTubeBlocking.sys.mjs",
 });
 
@@ -296,5 +297,6 @@ BrowserWipGlue.prototype = {
     lazy.ContentBlockingLists.start();
     lazy.YouTubeBlocking.init();
     lazy.SessionStore.init();
+    lazy.SiteIcons.init();
   },
 };

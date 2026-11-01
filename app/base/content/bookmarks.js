@@ -14,6 +14,9 @@
  */
 
 const BookmarksLib = ChromeUtils.importESModule("resource://gre/modules/browserwip/Library.sys.mjs");
+const { SiteIcons: BookmarksSiteIcons } = ChromeUtils.importESModule(
+  "resource://gre/modules/browserwip/SiteIcons.sys.mjs"
+);
 const BOOKMARK_EVENTS = [
   "bookmark-added",
   "bookmark-removed",
@@ -132,6 +135,12 @@ var BookmarksUI = {
     let bookmark = await this.Library.bookmarkFor(url);
     let added = false;
     if (!bookmark) {
+      // If it lands on the bookmarks bar, the new tab page's tile uses the
+      // icon this page already loaded instead of fetching one.
+      BookmarksSiteIcons.expectAdd(url, {
+        iconURL: gBrowser.selectedTab.favicon ?? null,
+        isPrivate: PrivateBrowsingUtils.isWindowPrivate(window),
+      });
       bookmark = await this.Library.addBookmark({ url, title: gBrowser.selectedBrowser.contentTitle || url });
       added = true;
     }

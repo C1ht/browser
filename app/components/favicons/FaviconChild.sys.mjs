@@ -22,6 +22,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
 
 // Larger icons are not worth sending around for a 16-pixel tab icon.
 const MAX_ICON_BYTES = 256 * 1024;
+// A favorite's tile icon (SiteIcons keeps at most 1 MB).
+const MAX_LARGE_ICON_BYTES = 1024 * 1024;
 // Links usually arrive one after another while the head is parsed.
 const SETTLE_MS = 100;
 // The tab draws icons at 16 CSS pixels, twice that on high-DPI screens.
@@ -43,6 +45,22 @@ function score(link) {
     return 100;
   }
   return Math.max(...sizes.map(n => 500 - Math.abs(n - WANTED_SIZE) - (n < WANTED_SIZE ? 50 : 0)));
+}
+
+// Same registrable domain (the whole public suffix list); IP addresses
+// only match themselves.
+function sameSite(a, b) {
+  try {
+    let hostA = new URL(a).hostname;
+    let hostB = new URL(b).hostname;
+    return hostA == hostB || Services.eTLD.getBaseDomainFromHost(hostA) == Services.eTLD.getBaseDomainFromHost(hostB);
+  } catch (e) {
+    return false;
+  }
+}
+
+function largest(link) {
+  return score(link) == 1000 ? 4096 : Math.max(0, ...[...link.sizes].map(s => parseInt(s, 10) || 0));
 }
 
 function toBase64(buffer) {
@@ -104,14 +122,64 @@ export class FaviconChild extends JSWindowActorChild {
     }
     this._lastURL = url;
 
+    let pageURL = doc.documentURI;
+    this._fetch(node, url, MAX_ICON_BYTES).then(dataURL => {
+      if (dataURL && this._lastURL == url) {
+        this._lastIcon = { pageURL, dataURL };
+        this.sendAsyncMessage("Favicon:Set", this._lastIcon);
+      }
+    });
+  }
+
+  receiveMessage(message) {
+    if (message.name == "Favicon:WantLarge") {
+      return this._large(message.data ?? {});
+    }
+    return null;
+  }
+
+  /**
+   * For a favorite's site (FaviconParent asks): the page's largest icon,
+   * an apple-touch-icon first, loaded like the tab's. { dataURL, touch };
+   * { sameAsTab: true } when that is the tab's icon (nothing loads again);
+   * null when the page declares none larger. sameSiteOnly (Strict and
+   * Anonymous): icons on another site aren't loaded.
+   */
+  async _large({ sameSiteOnly = false }) {
+    let doc = this.document;
+    if (!doc) {
+      return null;
+    }
+    let ok = link => !sameSiteOnly || sameSite(link.href, doc.documentURI);
+    let touches = [...doc.querySelectorAll("link[rel][href]")].filter(
+      l => (l.relList.contains("apple-touch-icon") || l.relList.contains("apple-touch-icon-precomposed")) && ok(l)
+    );
+    let large =
+      touches[0] ??
+      iconLinks(doc)
+        .filter(l => ok(l) && (score(l) == 1000 || [...l.sizes].some(s => parseInt(s, 10) >= 64)))
+        .reduce((best, l) => (!best || largest(l) > largest(best) ? l : best), null);
+    if (!large) {
+      return null;
+    }
+    if (large.href == this._lastURL) {
+      return { sameAsTab: true };
+    }
+    let dataURL = await this._fetch(large, large.href, MAX_LARGE_ICON_BYTES);
+    return dataURL ? { dataURL, touch: large == touches[0] } : null;
+  }
+
+  // The icon at url as a data: URL, loaded with node (a <link> or the
+  // document) as its context: the page's principal, cookies and blocking.
+  _fetch(node, url, maxBytes) {
     let uri;
     try {
       uri = Services.io.newURI(url);
     } catch (e) {
-      return;
+      return Promise.resolve(null);
     }
     if (!["http", "https", "data"].includes(uri.scheme)) {
-      return;
+      return Promise.resolve(null);
     }
 
     let security =
@@ -139,40 +207,41 @@ export class FaviconChild extends JSWindowActorChild {
     }
     channel.loadFlags |= Ci.nsIRequest.LOAD_BACKGROUND | Ci.nsIRequest.VALIDATE_NEVER | Ci.nsIRequest.LOAD_FROM_CACHE;
 
-    let pageURL = doc.documentURI;
-    lazy.NetUtil.asyncFetch(channel, (stream, status, request) => {
-      try {
-        if (!Components.isSuccessCode(status) || this._lastURL != url) {
-          return;
-        }
-        if (request instanceof Ci.nsIHttpChannel && !request.requestSucceeded) {
-          return;
-        }
-        let length = stream.available();
-        if (!length || length > MAX_ICON_BYTES) {
-          return;
-        }
-        let input = Cc["@mozilla.org/binaryinputstream;1"].createInstance(Ci.nsIBinaryInputStream);
-        input.setInputStream(stream);
-        let buffer = new ArrayBuffer(length);
-        input.readArrayBuffer(length, buffer);
+    return new Promise(resolve => {
+      lazy.NetUtil.asyncFetch(channel, (stream, status, request) => {
+        try {
+          if (!Components.isSuccessCode(status)) {
+            return;
+          }
+          if (request instanceof Ci.nsIHttpChannel && !request.requestSucceeded) {
+            return;
+          }
+          let length = stream.available();
+          if (!length || length > maxBytes) {
+            return;
+          }
+          let input = Cc["@mozilla.org/binaryinputstream;1"].createInstance(Ci.nsIBinaryInputStream);
+          input.setInputStream(stream);
+          let buffer = new ArrayBuffer(length);
+          input.readArrayBuffer(length, buffer);
 
-        let type = request.contentType;
-        if (type != "image/svg+xml") {
-          // What the bytes are, not what the server claims (as Firefox).
-          let sniffer = Cc["@mozilla.org/image/loader;1"].createInstance(Ci.nsIContentSniffer);
-          type = sniffer.getMIMETypeFromContent(request, new Uint8Array(buffer), length);
+          let type = request.contentType;
+          if (type != "image/svg+xml") {
+            // What the bytes are, not what the server claims (as Firefox).
+            let sniffer = Cc["@mozilla.org/image/loader;1"].createInstance(Ci.nsIContentSniffer);
+            type = sniffer.getMIMETypeFromContent(request, new Uint8Array(buffer), length);
+          }
+          if (!type?.startsWith("image/")) {
+            return;
+          }
+          resolve(`data:${type};base64,${toBase64(buffer)}`);
+        } catch (e) {
+          // No icon; the tab keeps its letter tile.
+        } finally {
+          stream?.close();
+          resolve(null);
         }
-        if (!type?.startsWith("image/")) {
-          return;
-        }
-        this._lastIcon = { pageURL, dataURL: `data:${type};base64,${toBase64(buffer)}` };
-        this.sendAsyncMessage("Favicon:Set", this._lastIcon);
-      } catch (e) {
-        // No icon; the tab keeps its letter tile.
-      } finally {
-        stream?.close();
-      }
+      });
     });
   }
 }

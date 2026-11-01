@@ -6,7 +6,8 @@
 <!-- New tab (newtab.js): a search bar, your favorites (the bookmarks bar;
      no default tiles) and what the blocker stopped this week,
      in sections you can turn off. This page fetches nothing: icons are the
-     ones stored with history and bookmarks; backgrounds are gradients. -->
+     ones kept by SiteIcons.sys.mjs or stored with history; backgrounds are
+     gradients. -->
 <html>
 <head>
   <meta charset="utf-8"/>
@@ -71,6 +72,10 @@
     <label class="check"><input type="checkbox" data-section="search"/><span data-l10n-id="newtab-search-section"></span></label>
     <label class="check"><input type="checkbox" data-section="favorites"/><span data-l10n-id="newtab-favorites"></span></label>
     <label class="check"><input type="checkbox" data-section="report"/><span data-l10n-id="newtab-report"></span></label>
+    <div class="check-group">
+      <label class="check"><input id="site-icons" type="checkbox"/><span data-l10n-id="newtab-site-icons"></span></label>
+      <p id="site-icons-note" class="check-note" data-l10n-id="newtab-site-icons-off" hidden="hidden"></p>
+    </div>
     <h3 id="backgrounds-title" data-l10n-id="newtab-customize-background"></h3>
     <div id="backgrounds" role="radiogroup" aria-labelledby="backgrounds-title">
       <button type="button" role="radio" data-background="plain" data-l10n-id="newtab-background-plain"></button>

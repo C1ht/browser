@@ -33,6 +33,7 @@ export {
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  SiteIcons: "resource://gre/modules/browserwip/SiteIcons.sys.mjs",
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
   setTimeout: "resource://gre/modules/Timer.sys.mjs",
 });
@@ -188,6 +189,9 @@ export const Library = {
   async clearHistory(range) {
     if (range == "all") {
       await PlacesUtils.history.clear();
+      // The new tab page's favorite icons came from visits, or from the
+      // sites themselves.
+      await lazy.SiteIcons.clear();
       return;
     }
     let beginDate =

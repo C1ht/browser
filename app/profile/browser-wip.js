@@ -60,6 +60,10 @@ pref("browserwip.search.suggest.enabled", false);
 // The address bar offers to turn them on once.
 pref("browserwip.search.suggest.offered", false);
 
+// New tab page: fetching icons for favorites you add (SiteIcons.sys.mjs).
+// Off by default; never in Strict or Anonymous or in private windows.
+pref("browserwip.newtab.siteIcons", false);
+
 // The bookmarks bar, between the toolbar and the tabs (Ctrl+Shift+B).
 pref("browserwip.bookmarks.bar", false);
 

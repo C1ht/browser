@@ -518,6 +518,26 @@ body[ready] #newtab {
   accent-color: var(--accent);
 }
 
+.check:has(input:disabled) {
+  color: var(--muted);
+  cursor: default;
+}
+
+.check:has(input:disabled):hover {
+  background-color: transparent;
+}
+
+.check-note {
+  margin: -2px 0 4px;
+  padding-inline: 28px 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.check-note[hidden] {
+  display: none;
+}
+
 #backgrounds {
   display: flex;
   gap: 8px;

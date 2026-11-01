@@ -6,6 +6,10 @@
 
 const { PlacesUtils } = ChromeUtils.importESModule("resource://gre/modules/PlacesUtils.sys.mjs");
 const { Library } = ChromeUtils.importESModule("resource://gre/modules/browserwip/Library.sys.mjs");
+const { SiteIcons, FETCH_PREF, CHANGED_TOPIC, hostOf } = ChromeUtils.importESModule(
+  "resource://gre/modules/browserwip/SiteIcons.sys.mjs"
+);
+const { PrivateBrowsingUtils } = ChromeUtils.importESModule("resource://gre/modules/PrivateBrowsingUtils.sys.mjs");
 const { currentEngine } = ChromeUtils.importESModule(
   "resource://gre/modules/browserwip/SearchEngines.sys.mjs"
 );
@@ -24,8 +28,6 @@ const SECTION_PREF = section => `browserwip.newtab.${section}`;
 const BACKGROUND_PREF = "browserwip.newtab.background";
 
 // "news.ycombinator.com" -> "ycombinator", for a bookmark without a title.
-const hostOf = url => new URL(url).hostname.replace(/^www\./, "");
-
 function siteName(host) {
   try {
     let base = Services.eTLD.getBaseDomainFromHost(host);
@@ -54,9 +56,15 @@ async function favorites() {
     });
 }
 
-// The icon history or the bookmark has: { src, touch }, or null for a
-// letter tile. This page never fetches anything.
+// The favorite's kept icon (SiteIcons: from a visit, from the page it was
+// added on, or fetched when it was added), else the one history or the
+// bookmark has: { src, touch }, or null for a letter tile. This page never
+// fetches anything.
 async function siteIcon(site) {
+  let kept = await SiteIcons.get(site.url).catch(() => null);
+  if (kept) {
+    return kept;
+  }
   for (let page of site.pages) {
     try {
       let icon = await PlacesUtils.favicons.getFaviconForPage(Services.io.newURI(page), 64);
@@ -105,6 +113,9 @@ var NewTab = {
     );
     this._initSearch();
     Customize.init(() => this.render());
+    let rerender = () => this.render();
+    Services.obs.addObserver(rerender, CHANGED_TOPIC);
+    window.addEventListener("unload", () => Services.obs.removeObserver(rerender, CHANGED_TOPIC), { once: true });
     this.render();
   },
 
@@ -280,6 +291,20 @@ var Customize = {
     this.button = document.getElementById("customize");
     this.panel = document.getElementById("customize-panel");
     this.button.addEventListener("click", () => this.toggle());
+    this.icons = document.getElementById("site-icons");
+    this.icons.addEventListener("change", () => Services.prefs.setBoolPref(FETCH_PREF, this.icons.checked));
+    this._updateIcons();
+    let update = () => this._updateIcons();
+    Services.obs.addObserver(update, "browserwip:privacy-mode-changed");
+    Services.prefs.addObserver(FETCH_PREF, update);
+    window.addEventListener(
+      "unload",
+      () => {
+        Services.obs.removeObserver(update, "browserwip:privacy-mode-changed");
+        Services.prefs.removeObserver(FETCH_PREF, update);
+      },
+      { once: true }
+    );
     for (let box of this.panel.querySelectorAll("input[data-section]")) {
       box.checked = Services.prefs.getBoolPref(SECTION_PREF(box.dataset.section), true);
       box.addEventListener("change", () => {
@@ -305,6 +330,22 @@ var Customize = {
         this.button.focus();
       }
     });
+  },
+
+  // Off, and not switchable, in Strict and Anonymous and in private
+  // windows; the note says why and is the checkbox's description.
+  _updateIcons() {
+    let reason = SiteIcons.blockedReason(PrivateBrowsingUtils.isContentWindowPrivate(window));
+    let locked = reason == "mode" || reason == "private";
+    let note = document.getElementById("site-icons-note");
+    this.icons.checked = !reason;
+    this.icons.disabled = locked;
+    note.hidden = !locked;
+    if (locked) {
+      this.icons.setAttribute("aria-describedby", note.id);
+    } else {
+      this.icons.removeAttribute("aria-describedby");
+    }
   },
 
   toggle(open = this.panel.hidden) {
