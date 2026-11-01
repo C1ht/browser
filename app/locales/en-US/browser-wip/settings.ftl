@@ -4,6 +4,25 @@
 
 settings-page-title = Settings
 settings-heading = Settings
+settings-search-field =
+    .placeholder = Search settings
+    .aria-label = Search settings
+# $query (String) - what was typed in the search field
+settings-search-empty = No settings match “{ $query }”
+settings-nav-general = General
+settings-nav-search = Search and history
+settings-privacy-intro = Choose how much websites can learn about you. Each setting can also be changed on its own below, which makes a custom mix.
+settings-privacy-group-connections = Connections and calls
+settings-privacy-group-tracking = Tracking
+settings-privacy-group-fingerprinting = Fingerprinting
+settings-privacy-group-security = Security
+settings-blocking-heading = Ads and trackers
+settings-blocking-always-label = Ads and trackers are blocked on every site
+settings-blocking-always-help = With EasyList and EasyPrivacy, built in and never downloaded. To allow one site, turn off its protections with the shield in the address bar.
+settings-blocking-pages-label = Block scam and pop-up pages
+settings-blocking-pages-help = Pages on EasyList’s list of scam, pop-up and pop-under sites show a warning instead. You can still open them from there.
+settings-passwords-group-unlock = Saving and unlocking
+settings-passwords-group-keep = Recovery and backups
 settings-privacy-heading = Privacy
 settings-restart-needed = Some changes take effect after a restart.
 settings-restart = Restart now
@@ -11,7 +30,6 @@ settings-startup-heading = When { -brand-short-name } starts
 settings-startup-newtab = Open a new tab
 settings-startup-restore = Continue where you left off
 settings-startup-help = After a crash your tabs always come back. You can also bring them back from the menu with “Restore previous session”.
-settings-search-heading = Search
 settings-search-engine = Search with
 settings-downloads-heading = Downloads
 settings-downloads-folder = Save files to
@@ -24,10 +42,17 @@ settings-appearance-auto = Automatic
 settings-appearance-light = Light
 settings-appearance-dark = Dark
 settings-about-heading = About
+settings-about-name = { -brand-full-name }
 # $version (String) - app version; $gecko (String) - engine version
-settings-about-version = { -brand-full-name } { $version }, Gecko { $gecko }
-settings-about-lists = Ad and tracker blocking uses EasyList, EasyPrivacy and Fanboy’s Social Blocking List by the EasyList authors, under CC BY-SA 3.0. The lists ship with the browser and are never downloaded.
-settings-about-youtube = “Block YouTube ads” uses the YouTube rules of uBlock Origin’s filter lists, by Raymond Hill and the uBlock Origin contributors, under GPLv3. They are downloaded only while it is on.
+settings-about-version = Version { $version } · Gecko { $gecko }
+settings-about-lists-title = Ad and tracker lists
+settings-about-lists = EasyList, EasyPrivacy and Fanboy’s Social Blocking List, by the EasyList authors, under CC BY-SA 3.0. Included with the browser, never downloaded.
+# $date (Number) - when the included lists were taken
+settings-about-lists-snapshot = Snapshot from { DATETIME($date, dateStyle: "long") }.
+settings-about-youtube-title = YouTube rules
+settings-about-youtube = uBlock Origin’s filter lists, by Raymond Hill and the uBlock Origin contributors, under GPLv3. Downloaded only while “Block YouTube ads” is on.
+settings-about-font-title = Font
+settings-about-font = Instrument Sans, under the SIL Open Font License 1.1.
 
 ## YouTube ads
 

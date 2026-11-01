@@ -3,7 +3,9 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
-<!-- about:settings. Every control applies immediately. -->
+<!-- about:settings. Every control applies immediately. A sidebar of sections
+     with a search over every setting (settings.js); each section is cards of
+     rows. Section and subsection ids are deep links (about:settings#youtube). -->
 <html>
 <head>
   <meta charset="utf-8"/>
@@ -20,251 +22,357 @@
   <script src="chrome://browser-wip/content/settings.js"></script>
 </head>
 <body>
-  <main id="settings">
-    <h1 data-l10n-id="settings-heading"></h1>
+  <div class="settings-shell">
+    <nav id="settings-nav" aria-labelledby="settings-title">
+      <h1 id="settings-title" data-l10n-id="settings-heading"></h1>
+      <div class="settings-search">
+        <img class="icon" src="chrome://browser-wip/skin/icons/search.svg" alt=""/>
+        <input id="settings-search" type="search" data-l10n-id="settings-search-field"/>
+      </div>
+      <ul>
+        <li><a href="#general" data-section="general"><img class="icon" src="chrome://browser-wip/skin/icons/site-info.svg" alt=""/><span data-l10n-id="settings-nav-general"></span></a></li>
+        <li><a href="#privacy" data-section="privacy"><img class="icon" src="chrome://browser-wip/skin/icons/lock-page.svg" alt=""/><span data-l10n-id="settings-privacy-heading"></span></a></li>
+        <li><a href="#blocking" data-section="blocking"><img class="icon" src="chrome://browser-wip/skin/icons/shield.svg" alt=""/><span data-l10n-id="settings-blocking-heading"></span></a></li>
+        <li><a href="#passwords" data-section="passwords"><img class="icon" src="chrome://browser-wip/skin/icons/key.svg" alt=""/><span data-l10n-id="settings-passwords-heading"></span></a></li>
+        <li><a href="#search" data-section="search"><img class="icon" src="chrome://browser-wip/skin/icons/search.svg" alt=""/><span data-l10n-id="settings-nav-search"></span></a></li>
+        <li><a href="#about" data-section="about"><img class="icon" src="chrome://browser-wip/skin/icons/info.svg" alt=""/><span data-l10n-id="settings-about-heading"></span></a></li>
+      </ul>
+    </nav>
 
-    <section id="privacy" aria-labelledby="privacy-heading">
-      <h2 id="privacy-heading" data-l10n-id="settings-privacy-heading"></h2>
-      <div id="modes" class="modes"></div>
-      <div id="toggles" class="toggles"></div>
-      <div id="restart-row" class="inline-row" hidden="hidden">
+    <main id="settings">
+      <div id="restart-row" class="banner" hidden="hidden">
         <p data-l10n-id="settings-restart-needed"></p>
         <button id="restart" class="secondary" type="button" data-l10n-id="settings-restart"></button>
       </div>
-    </section>
+      <p id="settings-empty" hidden="hidden"></p>
 
-    <section id="youtube" aria-labelledby="youtube-heading">
-      <h2 id="youtube-heading" data-l10n-id="settings-youtube-heading"></h2>
-      <div class="toggle-row">
-        <div>
-          <label id="youtube-ads-label" for="youtube-ads" data-l10n-id="settings-youtube-ads-label"></label>
-          <span class="help" data-l10n-id="settings-youtube-ads-help"></span>
-        </div>
-        <button id="youtube-ads" class="switch" type="button" role="switch" aria-labelledby="youtube-ads-label"></button>
-      </div>
-      <div id="youtube-ads-confirm" role="group" aria-labelledby="youtube-ads-disclaimer" hidden="hidden">
-        <p id="youtube-ads-disclaimer" data-l10n-id="settings-youtube-ads-disclaimer"></p>
-        <div class="button-row">
-          <button id="youtube-ads-accept" class="primary" type="button" data-l10n-id="settings-youtube-ads-accept"></button>
-          <button id="youtube-ads-cancel" class="secondary" type="button" data-l10n-id="settings-youtube-ads-cancel"></button>
-        </div>
-      </div>
-      <div id="youtube-ads-status-row" class="inline-row" hidden="hidden">
-        <p id="youtube-ads-status" role="status"></p>
-        <button id="youtube-ads-update" class="secondary" type="button" data-l10n-id="settings-youtube-ads-update"></button>
-      </div>
-    </section>
-
-    <section id="passwords" aria-labelledby="passwords-heading">
-      <h2 id="passwords-heading" data-l10n-id="settings-passwords-heading"></h2>
-      <div class="inline-row">
-        <p id="passwords-status"></p>
-        <div class="button-row">
-          <button id="passwords-lock" class="secondary" type="button" data-l10n-id="settings-passwords-lock"></button>
-          <button id="passwords-manage" class="secondary" type="button" data-l10n-id="settings-passwords-manage"></button>
-        </div>
-      </div>
-      <div class="toggle-row">
-        <div>
-          <label id="passwords-offer-label" for="passwords-offer" data-l10n-id="settings-passwords-offer-label"></label>
-          <span class="help" data-l10n-id="settings-passwords-offer-help"></span>
-        </div>
-        <button id="passwords-offer" class="switch" type="button" role="switch" aria-labelledby="passwords-offer-label"></button>
-      </div>
-      <div id="passwords-hello-row" class="toggle-row" hidden="hidden">
-        <div>
-          <label id="passwords-hello-label" for="passwords-hello" data-l10n-id="settings-passwords-hello-label"></label>
-          <span class="help" data-l10n-id="settings-passwords-hello-help"></span>
-        </div>
-        <button id="passwords-hello" class="switch" type="button" role="switch" aria-labelledby="passwords-hello-label"></button>
-      </div>
-      <form id="passwords-hello-form" class="change-form" hidden="hidden">
-        <input id="passwords-hello-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-hello-master"/>
-        <div class="button-row">
-          <button id="passwords-hello-submit" class="primary" type="submit" data-l10n-id="settings-passwords-hello-confirm"></button>
-          <button id="passwords-hello-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
-        </div>
-      </form>
-      <p id="passwords-hello-result" role="status" hidden="hidden"></p>
-      <div id="passwords-device-row" class="toggle-row" hidden="hidden">
-        <div>
-          <label id="passwords-device-label" for="passwords-device" data-l10n-id="settings-passwords-device-label"></label>
-          <span id="passwords-device-help" class="help" data-l10n-id="settings-passwords-device-help"></span>
-        </div>
-        <button id="passwords-device" class="switch" type="button" role="switch" aria-labelledby="passwords-device-label"
-                aria-describedby="passwords-device-help"></button>
-      </div>
-      <form id="passwords-device-form" class="change-form" hidden="hidden">
-        <input id="passwords-device-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-recovery-master"/>
-        <div class="button-row">
-          <button id="passwords-device-submit" class="primary" type="submit"></button>
-          <button id="passwords-device-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
-        </div>
-      </form>
-      <p id="passwords-device-result" role="status" hidden="hidden"></p>
-      <div class="inline-row">
-        <span id="passwords-lock-after-label" data-l10n-id="settings-passwords-lock-after"></span>
-        <div id="passwords-lock-after" class="segmented" role="radiogroup" aria-labelledby="passwords-lock-after-label">
-          <button type="button" role="radio" data-value="5" data-l10n-id="settings-passwords-minutes" data-l10n-args='{"minutes": 5}'></button>
-          <button type="button" role="radio" data-value="15" data-l10n-id="settings-passwords-minutes" data-l10n-args='{"minutes": 15}'></button>
-          <button type="button" role="radio" data-value="30" data-l10n-id="settings-passwords-minutes" data-l10n-args='{"minutes": 30}'></button>
-          <button type="button" role="radio" data-value="60" data-l10n-id="settings-passwords-hour"></button>
-          <button type="button" role="radio" data-value="240" data-l10n-id="settings-passwords-hours"></button>
-        </div>
-      </div>
-      <div id="passwords-transfer-row" class="inline-row" hidden="hidden">
-        <span data-l10n-id="settings-passwords-transfer"></span>
-        <div class="button-row">
-          <button id="passwords-import" class="secondary" type="button" data-l10n-id="passwords-menu-import"></button>
-          <button id="passwords-export" class="secondary" type="button" data-l10n-id="passwords-menu-export"></button>
-        </div>
-      </div>
-      <div id="passwords-recovery-row" class="inline-row" hidden="hidden">
-        <div class="stacked">
-          <span data-l10n-id="settings-passwords-recovery-label"></span>
-          <span id="passwords-recovery-status" class="help"></span>
-        </div>
-        <button id="passwords-recovery" class="secondary" type="button"></button>
-      </div>
-      <form id="passwords-recovery-form" class="change-form" hidden="hidden">
-        <input id="passwords-recovery-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-recovery-master"/>
-        <p id="passwords-recovery-result" role="status" hidden="hidden"></p>
-        <div class="button-row">
-          <button id="passwords-recovery-submit" class="primary" type="submit" data-l10n-id="settings-passwords-recovery-confirm"></button>
-          <button id="passwords-recovery-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
-        </div>
-      </form>
-      <div id="passwords-recovery-shown" class="recovery-box" hidden="hidden">
-        <p class="muted" data-l10n-id="passwords-recovery-text"></p>
-        <p id="passwords-recovery-code" class="recovery-code"></p>
-        <p class="muted" data-l10n-id="passwords-recovery-keep"></p>
-        <div class="button-row">
-          <button id="passwords-recovery-print" class="secondary" type="button" data-l10n-id="passwords-recovery-print"></button>
-          <button id="passwords-recovery-done" class="primary" type="button" data-l10n-id="passwords-recovery-done"></button>
-        </div>
-      </div>
-      <div id="passwords-older-row" class="inline-row" hidden="hidden">
-        <span class="help" data-l10n-id="settings-passwords-older-help"></span>
-        <button id="passwords-older" class="secondary" type="button" data-l10n-id="settings-passwords-older"></button>
-      </div>
-      <details id="passwords-change-box" class="advanced" hidden="hidden">
-        <summary data-l10n-id="settings-passwords-change"></summary>
-        <form id="passwords-change-form" class="change-form">
-          <input id="passwords-current" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-current"/>
-          <input id="passwords-new" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-new"/>
-          <input id="passwords-repeat" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-repeat"/>
-          <label class="check-row">
-            <input id="passwords-exposed" type="checkbox"/>
-            <span data-l10n-id="settings-passwords-exposed"></span>
-          </label>
-          <p id="passwords-change-result" role="status" hidden="hidden"></p>
-          <div><button id="passwords-change-submit" class="primary" type="submit" data-l10n-id="settings-passwords-change-button"></button></div>
-        </form>
-        <form id="passwords-replace-form" class="change-form">
-          <span class="help" data-l10n-id="settings-passwords-replace-help"></span>
-          <input id="passwords-replace-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-recovery-master"/>
-          <div><button id="passwords-replace-submit" class="secondary" type="submit" data-l10n-id="settings-passwords-replace"></button></div>
-        </form>
-        <p id="passwords-replace-status" class="help" role="status" hidden="hidden"></p>
-        <div id="passwords-replace-shown" class="recovery-box" hidden="hidden">
-          <p class="muted" data-l10n-id="settings-passwords-replace-code"></p>
-          <p id="passwords-replace-code" class="recovery-code"></p>
-          <div class="button-row">
-            <button id="passwords-replace-print" class="secondary" type="button" data-l10n-id="passwords-recovery-print"></button>
-            <button id="passwords-replace-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
-            <button id="passwords-replace-stored" class="primary" type="button" data-l10n-id="settings-passwords-replace-stored"></button>
+      <section id="general" aria-labelledby="general-heading">
+        <h2 id="general-heading" data-l10n-id="settings-nav-general"></h2>
+        <div class="card">
+          <div id="startup" class="inline-row">
+            <div class="stacked">
+              <span id="startup-heading" class="label" data-l10n-id="settings-startup-heading"></span>
+              <span class="help" data-l10n-id="settings-startup-help"></span>
+            </div>
+            <div class="segmented" role="radiogroup" aria-labelledby="startup-heading">
+              <button type="button" role="radio" data-value="newtab" data-l10n-id="settings-startup-newtab"></button>
+              <button type="button" role="radio" data-value="restore" data-l10n-id="settings-startup-restore"></button>
+            </div>
+          </div>
+          <div id="appearance" class="inline-row">
+            <span id="appearance-heading" class="label" data-l10n-id="settings-appearance-heading"></span>
+            <div class="segmented" role="radiogroup" aria-labelledby="appearance-heading">
+              <button type="button" role="radio" data-value="auto" data-l10n-id="settings-appearance-auto"></button>
+              <button type="button" role="radio" data-value="light" data-l10n-id="settings-appearance-light"></button>
+              <button type="button" role="radio" data-value="dark" data-l10n-id="settings-appearance-dark"></button>
+            </div>
           </div>
         </div>
-        <div id="passwords-replace-done" class="recovery-box" role="status" hidden="hidden">
-          <p id="passwords-replace-done-text"></p>
-          <p class="muted" data-l10n-id="settings-passwords-replace-copies"></p>
+        <div class="group">
+          <h3 id="downloads-heading" data-l10n-id="settings-downloads-heading"></h3>
+          <div id="downloads" class="card" aria-labelledby="downloads-heading">
+            <div class="inline-row">
+              <div class="folder">
+                <span data-l10n-id="settings-downloads-folder"></span>
+                <span id="downloads-folder" class="muted"></span>
+              </div>
+              <button id="downloads-change" class="secondary" type="button" data-l10n-id="settings-downloads-change"></button>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <label id="downloads-ask-label" for="downloads-ask" data-l10n-id="settings-downloads-ask-label"></label>
+                <span class="help" data-l10n-id="settings-downloads-ask-help"></span>
+              </div>
+              <button id="downloads-ask" class="switch" type="button" role="switch" aria-labelledby="downloads-ask-label"></button>
+            </div>
+          </div>
         </div>
-      </details>
-      <p class="muted" data-l10n-id="passwords-protects-text"></p>
-    </section>
+      </section>
 
-    <section id="startup" aria-labelledby="startup-heading">
-      <h2 id="startup-heading" data-l10n-id="settings-startup-heading"></h2>
-      <div class="segmented" role="radiogroup" aria-labelledby="startup-heading">
-        <button type="button" role="radio" data-value="newtab" data-l10n-id="settings-startup-newtab"></button>
-        <button type="button" role="radio" data-value="restore" data-l10n-id="settings-startup-restore"></button>
-      </div>
-      <p class="muted" data-l10n-id="settings-startup-help"></p>
-    </section>
-
-    <section id="search" aria-labelledby="search-heading">
-      <h2 id="search-heading" data-l10n-id="settings-search-heading"></h2>
-      <div class="inline-row">
-        <label for="search-engine" data-l10n-id="settings-search-engine"></label>
-        <select id="search-engine">
-          <option value="brave">Brave Search</option>
-          <option value="duckduckgo">DuckDuckGo</option>
-          <option value="startpage">Startpage</option>
-          <option value="mojeek">Mojeek</option>
-        </select>
-      </div>
-      <div class="toggle-row">
-        <div>
-          <label id="search-suggest-label" for="search-suggest" data-l10n-id="settings-search-suggest-label"></label>
-          <span id="search-suggest-help" class="help"></span>
+      <section id="privacy" aria-labelledby="privacy-heading">
+        <h2 id="privacy-heading" data-l10n-id="settings-privacy-heading"></h2>
+        <p class="section-intro" data-l10n-id="settings-privacy-intro"></p>
+        <div id="modes" class="modes"></div>
+        <div class="group">
+          <h3 data-l10n-id="settings-privacy-group-connections"></h3>
+          <div id="toggles-connections" class="card toggles"></div>
         </div>
-        <button id="search-suggest" class="switch" type="button" role="switch" aria-labelledby="search-suggest-label"
-                aria-describedby="search-suggest-help"></button>
-      </div>
-    </section>
-
-    <section id="history" aria-labelledby="history-heading">
-      <h2 id="history-heading" data-l10n-id="settings-history-heading"></h2>
-      <div class="toggle-row">
-        <div>
-          <label id="history-remember-label" for="history-remember" data-l10n-id="settings-history-remember-label"></label>
-          <span class="help" data-l10n-id="settings-history-remember-help"></span>
+        <div class="group">
+          <h3 data-l10n-id="settings-privacy-group-tracking"></h3>
+          <div id="toggles-tracking" class="card toggles"></div>
         </div>
-        <button id="history-remember" class="switch" type="button" role="switch" aria-labelledby="history-remember-label"></button>
-      </div>
-      <div class="inline-row">
-        <span data-l10n-id="settings-history-clear-label"></span>
-        <div class="button-row">
-          <button id="history-clear" class="secondary" type="button" data-l10n-id="settings-history-clear"></button>
-          <button id="history-open" class="secondary" type="button" data-l10n-id="settings-history-open"></button>
+        <div class="group">
+          <h3 data-l10n-id="settings-privacy-group-fingerprinting"></h3>
+          <div id="toggles-fingerprinting" class="card toggles"></div>
         </div>
-      </div>
-    </section>
-
-    <section id="downloads" aria-labelledby="downloads-heading">
-      <h2 id="downloads-heading" data-l10n-id="settings-downloads-heading"></h2>
-      <div class="inline-row">
-        <div class="folder">
-          <span data-l10n-id="settings-downloads-folder"></span>
-          <span id="downloads-folder" class="muted"></span>
+        <div class="group">
+          <h3 data-l10n-id="settings-privacy-group-security"></h3>
+          <div id="toggles-security" class="card toggles"></div>
         </div>
-        <button id="downloads-change" class="secondary" type="button" data-l10n-id="settings-downloads-change"></button>
-      </div>
-      <div class="toggle-row">
-        <div>
-          <label id="downloads-ask-label" for="downloads-ask" data-l10n-id="settings-downloads-ask-label"></label>
-          <span class="help" data-l10n-id="settings-downloads-ask-help"></span>
+      </section>
+
+      <section id="blocking" aria-labelledby="blocking-heading">
+        <h2 id="blocking-heading" data-l10n-id="settings-blocking-heading"></h2>
+        <div class="card">
+          <div class="inline-row info-row">
+            <img class="row-icon icon" src="chrome://browser-wip/skin/icons/shield.svg" alt=""/>
+            <div class="stacked">
+              <span class="label" data-l10n-id="settings-blocking-always-label"></span>
+              <span class="help" data-l10n-id="settings-blocking-always-help"></span>
+            </div>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <label id="blocking-pages-label" for="blocking-pages" data-l10n-id="settings-blocking-pages-label"></label>
+              <span class="help" data-l10n-id="settings-blocking-pages-help"></span>
+            </div>
+            <button id="blocking-pages" class="switch" type="button" role="switch" aria-labelledby="blocking-pages-label"></button>
+          </div>
         </div>
-        <button id="downloads-ask" class="switch" type="button" role="switch" aria-labelledby="downloads-ask-label"></button>
-      </div>
-    </section>
+        <div class="group">
+          <h3 id="youtube-heading" data-l10n-id="settings-youtube-heading"></h3>
+          <div id="youtube" class="card" aria-labelledby="youtube-heading">
+            <div class="toggle-row">
+              <div>
+                <label id="youtube-ads-label" for="youtube-ads" data-l10n-id="settings-youtube-ads-label"></label>
+                <span class="help" data-l10n-id="settings-youtube-ads-help"></span>
+              </div>
+              <button id="youtube-ads" class="switch" type="button" role="switch" aria-labelledby="youtube-ads-label"></button>
+            </div>
+            <div id="youtube-ads-confirm" role="group" aria-labelledby="youtube-ads-disclaimer" hidden="hidden">
+              <p id="youtube-ads-disclaimer" data-l10n-id="settings-youtube-ads-disclaimer"></p>
+              <div class="button-row">
+                <button id="youtube-ads-accept" class="primary" type="button" data-l10n-id="settings-youtube-ads-accept"></button>
+                <button id="youtube-ads-cancel" class="secondary" type="button" data-l10n-id="settings-youtube-ads-cancel"></button>
+              </div>
+            </div>
+            <div id="youtube-ads-status-row" class="inline-row" hidden="hidden">
+              <p id="youtube-ads-status" role="status"></p>
+              <button id="youtube-ads-update" class="secondary" type="button" data-l10n-id="settings-youtube-ads-update"></button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section id="appearance" aria-labelledby="appearance-heading">
-      <h2 id="appearance-heading" data-l10n-id="settings-appearance-heading"></h2>
-      <div class="segmented" role="radiogroup" aria-labelledby="appearance-heading">
-        <button type="button" role="radio" data-value="auto" data-l10n-id="settings-appearance-auto"></button>
-        <button type="button" role="radio" data-value="light" data-l10n-id="settings-appearance-light"></button>
-        <button type="button" role="radio" data-value="dark" data-l10n-id="settings-appearance-dark"></button>
-      </div>
-    </section>
+      <section id="passwords" aria-labelledby="passwords-heading">
+        <h2 id="passwords-heading" data-l10n-id="settings-passwords-heading"></h2>
+        <div class="card">
+          <div class="inline-row">
+            <p id="passwords-status"></p>
+            <div class="button-row">
+              <button id="passwords-lock" class="secondary" type="button" data-l10n-id="settings-passwords-lock"></button>
+              <button id="passwords-manage" class="secondary" type="button" data-l10n-id="settings-passwords-manage"></button>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <h3 data-l10n-id="settings-passwords-group-unlock"></h3>
+          <div class="card">
+            <div class="toggle-row">
+              <div>
+                <label id="passwords-offer-label" for="passwords-offer" data-l10n-id="settings-passwords-offer-label"></label>
+                <span class="help" data-l10n-id="settings-passwords-offer-help"></span>
+              </div>
+              <button id="passwords-offer" class="switch" type="button" role="switch" aria-labelledby="passwords-offer-label"></button>
+            </div>
+            <div id="passwords-hello-row" class="toggle-row" hidden="hidden">
+              <div>
+                <label id="passwords-hello-label" for="passwords-hello" data-l10n-id="settings-passwords-hello-label"></label>
+                <span class="help" data-l10n-id="settings-passwords-hello-help"></span>
+              </div>
+              <button id="passwords-hello" class="switch" type="button" role="switch" aria-labelledby="passwords-hello-label"></button>
+            </div>
+            <form id="passwords-hello-form" class="change-form" hidden="hidden">
+              <input id="passwords-hello-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-hello-master"/>
+              <div class="button-row">
+                <button id="passwords-hello-submit" class="primary" type="submit" data-l10n-id="settings-passwords-hello-confirm"></button>
+                <button id="passwords-hello-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
+              </div>
+            </form>
+            <p id="passwords-hello-result" role="status" hidden="hidden"></p>
+            <div id="passwords-keyring-row" class="toggle-row" hidden="hidden">
+              <div>
+                <label id="passwords-keyring-label" for="passwords-keyring" data-l10n-id="settings-passwords-keyring-label"></label>
+                <span id="passwords-keyring-help" class="help"></span>
+              </div>
+              <button id="passwords-keyring" class="switch" type="button" role="switch" aria-labelledby="passwords-keyring-label"
+                      aria-describedby="passwords-keyring-help"></button>
+            </div>
+            <form id="passwords-keyring-form" class="change-form" hidden="hidden">
+              <input id="passwords-keyring-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-keyring-master"/>
+              <div class="button-row">
+                <button id="passwords-keyring-submit" class="primary" type="submit" data-l10n-id="settings-passwords-keyring-confirm"></button>
+                <button id="passwords-keyring-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
+              </div>
+            </form>
+            <p id="passwords-keyring-result" role="status" hidden="hidden"></p>
+            <div id="passwords-device-row" class="toggle-row" hidden="hidden">
+              <div>
+                <label id="passwords-device-label" for="passwords-device" data-l10n-id="settings-passwords-device-label"></label>
+                <span id="passwords-device-help" class="help" data-l10n-id="settings-passwords-device-help"></span>
+              </div>
+              <button id="passwords-device" class="switch" type="button" role="switch" aria-labelledby="passwords-device-label"
+                      aria-describedby="passwords-device-help"></button>
+            </div>
+            <form id="passwords-device-form" class="change-form" hidden="hidden">
+              <input id="passwords-device-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-recovery-master"/>
+              <div class="button-row">
+                <button id="passwords-device-submit" class="primary" type="submit"></button>
+                <button id="passwords-device-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
+              </div>
+            </form>
+            <p id="passwords-device-result" role="status" hidden="hidden"></p>
+            <div class="inline-row">
+              <span id="passwords-lock-after-label" data-l10n-id="settings-passwords-lock-after"></span>
+              <div id="passwords-lock-after" class="segmented" role="radiogroup" aria-labelledby="passwords-lock-after-label">
+                <button type="button" role="radio" data-value="5" data-l10n-id="settings-passwords-minutes" data-l10n-args='{"minutes": 5}'></button>
+                <button type="button" role="radio" data-value="15" data-l10n-id="settings-passwords-minutes" data-l10n-args='{"minutes": 15}'></button>
+                <button type="button" role="radio" data-value="30" data-l10n-id="settings-passwords-minutes" data-l10n-args='{"minutes": 30}'></button>
+                <button type="button" role="radio" data-value="60" data-l10n-id="settings-passwords-hour"></button>
+                <button type="button" role="radio" data-value="240" data-l10n-id="settings-passwords-hours"></button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <h3 data-l10n-id="settings-passwords-group-keep"></h3>
+          <div class="card">
+            <div id="passwords-transfer-row" class="inline-row" hidden="hidden">
+              <span data-l10n-id="settings-passwords-transfer"></span>
+              <div class="button-row">
+                <button id="passwords-import" class="secondary" type="button" data-l10n-id="passwords-menu-import"></button>
+                <button id="passwords-export" class="secondary" type="button" data-l10n-id="passwords-menu-export"></button>
+              </div>
+            </div>
+            <div id="passwords-recovery-row" class="inline-row" hidden="hidden">
+              <div class="stacked">
+                <span data-l10n-id="settings-passwords-recovery-label"></span>
+                <span id="passwords-recovery-status" class="help"></span>
+              </div>
+              <button id="passwords-recovery" class="secondary" type="button"></button>
+            </div>
+            <form id="passwords-recovery-form" class="change-form" hidden="hidden">
+              <input id="passwords-recovery-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-recovery-master"/>
+              <p id="passwords-recovery-result" role="status" hidden="hidden"></p>
+              <div class="button-row">
+                <button id="passwords-recovery-submit" class="primary" type="submit" data-l10n-id="settings-passwords-recovery-confirm"></button>
+                <button id="passwords-recovery-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
+              </div>
+            </form>
+            <div id="passwords-recovery-shown" class="recovery-box" hidden="hidden">
+              <p class="muted" data-l10n-id="passwords-recovery-text"></p>
+              <p id="passwords-recovery-code" class="recovery-code"></p>
+              <p class="muted" data-l10n-id="passwords-recovery-keep"></p>
+              <div class="button-row">
+                <button id="passwords-recovery-print" class="secondary" type="button" data-l10n-id="passwords-recovery-print"></button>
+                <button id="passwords-recovery-done" class="primary" type="button" data-l10n-id="passwords-recovery-done"></button>
+              </div>
+            </div>
+            <div id="passwords-older-row" class="inline-row" hidden="hidden">
+              <span class="help" data-l10n-id="settings-passwords-older-help"></span>
+              <button id="passwords-older" class="secondary" type="button" data-l10n-id="settings-passwords-older"></button>
+            </div>
+            <details id="passwords-change-box" class="advanced" hidden="hidden">
+              <summary data-l10n-id="settings-passwords-change"></summary>
+              <form id="passwords-change-form" class="change-form">
+                <input id="passwords-current" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-current"/>
+                <input id="passwords-new" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-new"/>
+                <input id="passwords-repeat" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-repeat"/>
+                <label class="check-row">
+                  <input id="passwords-exposed" type="checkbox"/>
+                  <span data-l10n-id="settings-passwords-exposed"></span>
+                </label>
+                <p id="passwords-change-result" role="status" hidden="hidden"></p>
+                <div><button id="passwords-change-submit" class="primary" type="submit" data-l10n-id="settings-passwords-change-button"></button></div>
+              </form>
+              <form id="passwords-replace-form" class="change-form">
+                <span class="help" data-l10n-id="settings-passwords-replace-help"></span>
+                <input id="passwords-replace-master" class="field" type="password" autocomplete="off" data-l10n-id="settings-passwords-recovery-master"/>
+                <div><button id="passwords-replace-submit" class="secondary" type="submit" data-l10n-id="settings-passwords-replace"></button></div>
+              </form>
+              <p id="passwords-replace-status" class="help" role="status" hidden="hidden"></p>
+              <div id="passwords-replace-shown" class="recovery-box" hidden="hidden">
+                <p class="muted" data-l10n-id="settings-passwords-replace-code"></p>
+                <p id="passwords-replace-code" class="recovery-code"></p>
+                <div class="button-row">
+                  <button id="passwords-replace-print" class="secondary" type="button" data-l10n-id="passwords-recovery-print"></button>
+                  <button id="passwords-replace-cancel" class="secondary" type="button" data-l10n-id="passwords-cancel"></button>
+                  <button id="passwords-replace-stored" class="primary" type="button" data-l10n-id="settings-passwords-replace-stored"></button>
+                </div>
+              </div>
+              <div id="passwords-replace-done" class="recovery-box" role="status" hidden="hidden">
+                <p id="passwords-replace-done-text"></p>
+                <p class="muted" data-l10n-id="settings-passwords-replace-copies"></p>
+              </div>
+            </details>
+          </div>
+        </div>
+        <p class="section-note" data-l10n-id="passwords-protects-text"></p>
+      </section>
 
-    <section id="about" aria-labelledby="about-heading">
-      <h2 id="about-heading" data-l10n-id="settings-about-heading"></h2>
-      <p id="version"></p>
-      <p class="muted" data-l10n-id="settings-about-lists"></p>
-      <p class="muted" data-l10n-id="settings-about-youtube"></p>
-      <p class="muted" id="lists-snapshot"></p>
-    </section>
-  </main>
+      <section id="search" aria-labelledby="search-heading">
+        <h2 id="search-heading" data-l10n-id="settings-nav-search"></h2>
+        <div class="card">
+          <div class="inline-row">
+            <label for="search-engine" data-l10n-id="settings-search-engine"></label>
+            <select id="search-engine">
+              <option value="brave">Brave Search</option>
+              <option value="duckduckgo">DuckDuckGo</option>
+              <option value="startpage">Startpage</option>
+              <option value="mojeek">Mojeek</option>
+            </select>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <label id="search-suggest-label" for="search-suggest" data-l10n-id="settings-search-suggest-label"></label>
+              <span id="search-suggest-help" class="help"></span>
+            </div>
+            <button id="search-suggest" class="switch" type="button" role="switch" aria-labelledby="search-suggest-label"
+                    aria-describedby="search-suggest-help"></button>
+          </div>
+        </div>
+        <div class="group">
+          <h3 id="history-heading" data-l10n-id="settings-history-heading"></h3>
+          <div id="history" class="card" aria-labelledby="history-heading">
+            <div class="toggle-row">
+              <div>
+                <label id="history-remember-label" for="history-remember" data-l10n-id="settings-history-remember-label"></label>
+                <span class="help" data-l10n-id="settings-history-remember-help"></span>
+              </div>
+              <button id="history-remember" class="switch" type="button" role="switch" aria-labelledby="history-remember-label"></button>
+            </div>
+            <div class="inline-row">
+              <span data-l10n-id="settings-history-clear-label"></span>
+              <div class="button-row">
+                <button id="history-clear" class="secondary" type="button" data-l10n-id="settings-history-clear"></button>
+                <button id="history-open" class="secondary" type="button" data-l10n-id="settings-history-open"></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="about" aria-labelledby="about-heading">
+        <h2 id="about-heading" data-l10n-id="settings-about-heading"></h2>
+        <div class="card about">
+          <div class="about-product">
+            <img src="chrome://branding/content/icon64.png" width="48" height="48" alt=""/>
+            <div class="stacked">
+              <span class="about-name" data-l10n-id="settings-about-name"></span>
+              <span id="version" class="help"></span>
+            </div>
+          </div>
+          <dl class="credits">
+            <dt data-l10n-id="settings-about-lists-title"></dt>
+            <dd><span data-l10n-id="settings-about-lists"></span> <span id="lists-snapshot"></span></dd>
+            <dt data-l10n-id="settings-about-youtube-title"></dt>
+            <dd data-l10n-id="settings-about-youtube"></dd>
+            <dt data-l10n-id="settings-about-font-title"></dt>
+            <dd data-l10n-id="settings-about-font"></dd>
+          </dl>
+        </div>
+      </section>
+    </main>
+  </div>
 </body>
 </html>

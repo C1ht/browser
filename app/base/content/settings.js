@@ -6,28 +6,25 @@
 
 "use strict";
 
+const { AppConstants } = ChromeUtils.importESModule("resource://gre/modules/AppConstants.sys.mjs");
 const { ContentBlockingLists } = ChromeUtils.importESModule(
   "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs"
 );
 
 window.addEventListener("DOMContentLoaded", () => {
   let restartRow = document.getElementById("restart-row");
+  // The fine-tuning switches, grouped. History has its own section below.
+  let group = id => document.getElementById(`toggles-${id}`);
   let privacyControls = new PrivacyControls({
     cards: document.getElementById("modes"),
-    toggles: document.getElementById("toggles"),
-    toggleIds: [
-      "httpsOnly",
-      "blockSocial",
-      "noHistory",
-      "jit",
-      "webrtc",
-      "noStorageHeuristics",
-      "webrtcOff",
-      "resistFingerprinting",
-      "utcTimezone",
-      "spoofEnglish",
-      "letterboxing",
-      "hideReferrer",
+    toggleGroups: [
+      { element: group("connections"), ids: ["httpsOnly", "webrtcOff", "webrtc", "hideReferrer"] },
+      { element: group("tracking"), ids: ["blockSocial", "noStorageHeuristics"] },
+      {
+        element: group("fingerprinting"),
+        ids: ["resistFingerprinting", "utcTimezone", "spoofEnglish", "letterboxing"],
+      },
+      { element: group("security"), ids: ["jit"] },
     ],
     live: true,
     onChange(mode, pendingRestart) {
@@ -266,6 +263,19 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!unlocked) {
       $("passwords-hello-form").hidden = true;
     }
+    // The system keyring (Linux): shown there; usable when a keyring is
+    // running or can start. Turning it on or off needs the vault unlocked.
+    let keyring = PasswordVault.keyring;
+    $("passwords-keyring-row").hidden = AppConstants.platform != "linux" || state == "none";
+    $("passwords-keyring").setAttribute("aria-checked", String(keyring.enrolled));
+    $("passwords-keyring").disabled = !unlocked || (!keyring.available && !keyring.enrolled);
+    document.l10n.setAttributes(
+      $("passwords-keyring-help"),
+      keyring.available || keyring.enrolled ? "settings-passwords-keyring-help" : "settings-passwords-keyring-none"
+    );
+    if (!unlocked) {
+      $("passwords-keyring-form").hidden = true;
+    }
     // This computer only: where there's a TPM; needs a recovery key first.
     let device = PasswordVault.device;
     $("passwords-device-row").hidden = !device.available || state == "none";
@@ -418,6 +428,49 @@ window.addEventListener("DOMContentLoaded", () => {
     } else {
       $("passwords-hello-form").hidden = false;
       $("passwords-hello-master").focus();
+    }
+  });
+  let keyringResult = l10n => {
+    document.l10n.setAttributes($("passwords-keyring-result"), l10n);
+    $("passwords-keyring-result").hidden = false;
+  };
+  $("passwords-keyring").addEventListener("click", async () => {
+    $("passwords-keyring-result").hidden = true;
+    if (PasswordVault.keyring.enrolled) {
+      await PasswordVault.disableKeyring().catch(() => keyringResult("settings-passwords-keyring-error"));
+      syncPasswords();
+    } else {
+      $("passwords-keyring-form").hidden = false;
+      $("passwords-keyring-master").focus();
+    }
+  });
+  $("passwords-keyring-label").addEventListener("click", e => {
+    e.preventDefault();
+    $("passwords-keyring").click();
+  });
+  $("passwords-keyring-cancel").addEventListener("click", () => {
+    $("passwords-keyring-master").value = "";
+    $("passwords-keyring-form").hidden = true;
+  });
+  $("passwords-keyring-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    let submit = $("passwords-keyring-submit");
+    submit.disabled = true;
+    try {
+      await PasswordVault.enableKeyring($("passwords-keyring-master").value);
+      $("passwords-keyring-form").hidden = true;
+      keyringResult("settings-passwords-keyring-on");
+    } catch (err) {
+      keyringResult(
+        {
+          "wrong-password": "passwords-wrong-password",
+          cancelled: "settings-passwords-keyring-cancelled",
+        }[err.code] ?? "settings-passwords-keyring-error"
+      );
+    } finally {
+      $("passwords-keyring-master").value = "";
+      submit.disabled = false;
+      syncPasswords();
     }
   });
   $("passwords-hello-label").addEventListener("click", e => {
@@ -595,20 +648,150 @@ window.addEventListener("DOMContentLoaded", () => {
     .catch(() => {})
     .then(syncPasswords);
 
+  // Ads and trackers: pages the lists block as a whole get a warning
+  // screen (NetworkBlocker.cpp); on unless turned off here.
+  const BLOCK_PAGES_PREF = "browserwip.contentblocking.blockpages.enabled";
+  let blockPages = document.getElementById("blocking-pages");
+  let syncBlockPages = () =>
+    blockPages.setAttribute("aria-checked", String(Services.prefs.getBoolPref(BLOCK_PAGES_PREF, true)));
+  blockPages.addEventListener("click", () => {
+    Services.prefs.setBoolPref(BLOCK_PAGES_PREF, blockPages.getAttribute("aria-checked") != "true");
+    syncBlockPages();
+  });
+  document.getElementById("blocking-pages-label").addEventListener("click", e => {
+    e.preventDefault();
+    blockPages.click();
+  });
+  syncBlockPages();
+
   // About.
   document.l10n.setAttributes(document.getElementById("version"), "settings-about-version", {
     version: Services.appinfo.version,
     gecko: Services.appinfo.platformVersion,
   });
   try {
-    let { snapshot } = ContentBlockingLists.stats;
-    document.getElementById("lists-snapshot").textContent = snapshot ?? "";
+    // "github.com/easylist/easylist <commit> <date>": the date says how fresh.
+    let date = Date.parse(ContentBlockingLists.stats.snapshot?.split(" ").at(-1));
+    if (date) {
+      document.l10n.setAttributes(document.getElementById("lists-snapshot"), "settings-about-lists-snapshot", {
+        date,
+      });
+    }
   } catch (e) {
     // Lists missing from a broken build; the rest of the page still works.
   }
 
-  // Deep links: about:settings#search
-  if (location.hash) {
-    document.querySelector(location.hash)?.scrollIntoView();
-  }
+  SettingsNav.init();
 });
+
+/**
+ * The sidebar: a link per section, the one in view marked, and a search
+ * that shows only the settings (rows, and the privacy modes) whose words
+ * match, hiding sections and groups left empty.
+ */
+var SettingsNav = {
+  init() {
+    this.links = [...document.querySelectorAll("#settings-nav a[data-section]")];
+    this.sections = this.links.map(a => document.getElementById(a.dataset.section));
+    this.search = document.getElementById("settings-search");
+    this.empty = document.getElementById("settings-empty");
+
+    for (let link of this.links) {
+      link.addEventListener("click", e => {
+        e.preventDefault();
+        this.goTo(link.dataset.section);
+      });
+    }
+    window.addEventListener("scroll", () => this._markCurrent(), { passive: true });
+    window.addEventListener("resize", () => this._markCurrent());
+    this.search.addEventListener("input", () => this._filter());
+    this.search.addEventListener("keydown", e => {
+      if (e.key == "Escape" && this.search.value) {
+        this.search.value = "";
+        this._filter();
+        e.preventDefault();
+      }
+    });
+
+    // Deep links (about:settings#youtube), once the page has its layout.
+    let target = location.hash && document.querySelector(location.hash);
+    if (target) {
+      requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+    }
+    this._markCurrent();
+  },
+
+  goTo(id) {
+    if (this.search.value) {
+      this.search.value = "";
+      this._filter();
+    }
+    let reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(id).scrollIntoView({ block: "start", behavior: reduce ? "instant" : "smooth" });
+    history.replaceState(null, "", `#${id}`);
+    this._mark(id);
+  },
+
+  // The section whose top has passed a line near the top of the window,
+  // below the sections bar in a narrow window (the last section, at the
+  // very bottom of the page).
+  _markCurrent() {
+    let atEnd = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+    let narrow = window.matchMedia("(max-width: 900px)").matches;
+    let line = narrow ? document.getElementById("settings-nav").getBoundingClientRect().bottom + 24 : 120;
+    let visible = this.sections.filter(s => !s.hasAttribute("filtered"));
+    let current = atEnd ? visible.at(-1) : visible.findLast(s => s.getBoundingClientRect().top <= line) ?? visible[0];
+    this._mark(current?.id);
+  },
+
+  _mark(id) {
+    for (let link of this.links) {
+      if (link.dataset.section == id) {
+        if (!link.hasAttribute("aria-current")) {
+          link.setAttribute("aria-current", "true");
+          // Across the top, the bar scrolls sideways to keep it in view
+          // (by itself: scrolling the page now would stop a smooth scroll).
+          let list = link.closest("ul");
+          let item = link.getBoundingClientRect();
+          let box = list.getBoundingClientRect();
+          if (item.left < box.left) {
+            list.scrollLeft -= box.left - item.left + 16;
+          } else if (item.right > box.right) {
+            list.scrollLeft += item.right - box.right + 16;
+          }
+        }
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    }
+  },
+
+  _filter() {
+    let terms = this.search.value.toLowerCase().split(/\s+/).filter(Boolean);
+    let matches = el => terms.every(t => el.textContent.toLowerCase().includes(t));
+    document.body.toggleAttribute("searching", !!terms.length);
+    let found = 0;
+    for (let section of this.sections) {
+      let shown = 0;
+      // Rows in cards; the privacy modes count as one.
+      for (let unit of section.querySelectorAll(".card > *, #modes")) {
+        let hit = !terms.length || (unit.matches(".toggle-row, .inline-row, #modes") && matches(unit));
+        unit.toggleAttribute("filtered", !hit);
+        shown += hit && !unit.hidden ? 1 : 0;
+      }
+      // Cards, and groups (heading and card), with nothing left go too:
+      // settings.css hides them.
+      section.toggleAttribute("filtered", !!terms.length && !shown);
+      found += shown;
+    }
+    for (let link of this.links) {
+      link.toggleAttribute("dimmed", document.getElementById(link.dataset.section).hasAttribute("filtered"));
+    }
+    this.empty.hidden = !terms.length || found > 0;
+    if (!this.empty.hidden) {
+      document.l10n.setAttributes(this.empty, "settings-search-empty", { query: this.search.value.trim() });
+    }
+    window.scrollTo(0, 0);
+    this._markCurrent();
+  },
+};

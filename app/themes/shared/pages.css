@@ -5,6 +5,12 @@
 /* Shared look for the app's own pages (new tab, first run, settings): the
  * Folio tokens from browser.css, with the page surface as the background. */
 
+/* Rules that set `display` (.toggle-row, .change-form, ...) would otherwise
+   show elements the page has hidden. */
+[hidden] {
+  display: none !important;
+}
+
 @font-face {
   font-family: "Instrument Sans";
   src: url("chrome://browser-wip/skin/fonts/InstrumentSans.ttf") format("truetype");

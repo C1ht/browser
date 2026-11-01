@@ -41,13 +41,18 @@ class PrivacyControls {
    *   cards: element to fill with one card per mode
    *   toggles: element to fill with switch rows
    *   toggleIds: which toggles to show, in order
+   *   toggleGroups: instead of the two above, [{ element, ids }]: each
+   *     group's toggles go into its own element (Settings)
    *   live: apply immediately (Settings) or hold until commit() (first run)
    *   onChange: called after any change
    */
-  constructor({ cards, toggles, toggleIds, live, onChange = () => {} }) {
+  constructor({ cards, toggles, toggleIds, toggleGroups, live, onChange = () => {} }) {
     this.live = live;
     this.onChange = onChange;
-    this.toggleIds = toggleIds;
+    this.toggleIds = toggleGroups ? toggleGroups.flatMap(g => g.ids) : toggleIds;
+    this.toggleTarget = new Map(
+      toggleGroups ? toggleGroups.flatMap(g => g.ids.map(id => [id, g.element])) : []
+    );
     this.state = PrivacyModes.state;
     this.cardsEl = cards;
     this.togglesEl = toggles;
@@ -142,7 +147,7 @@ class PrivacyControls {
         sw.click();
       });
       row.append(text, sw);
-      this.togglesEl.append(row);
+      (this.toggleTarget.get(id) ?? this.togglesEl).append(row);
       this.switches[id] = { sw, row };
     }
   }

@@ -2,32 +2,322 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* Settings: one readable column of sections. */
+/* Settings: a sidebar of sections with a search, beside the sections
+   themselves, each made of cards of rows (settings.js, SettingsNav). */
+
+:root {
+  --settings-bg: var(--surface);
+  --card-bg: var(--page-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --settings-bg: #191D20;
+    --card-bg: var(--surface);
+  }
+}
+
+html {
+  background-color: var(--settings-bg);
+  scroll-padding-top: 32px;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.settings-shell {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 720px);
+  justify-content: center;
+  gap: 56px;
+  padding: 40px 32px 120px;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+/* ---------- Sidebar ---------- */
+
+#settings-nav {
+  position: sticky;
+  top: 40px;
+  align-self: start;
+  display: grid;
+  gap: 18px;
+}
+
+#settings-nav h1 {
+  padding-inline: 10px;
+}
+
+.settings-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.settings-search > .icon {
+  position: absolute;
+  inset-inline-start: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+#settings-search {
+  appearance: none;
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  padding-inline: 34px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background-color: var(--card-bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+
+#settings-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+#settings-nav ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#settings-nav a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: var(--fg);
+  font-size: 14.5px;
+  text-decoration: none;
+  transition: background-color 120ms, opacity 120ms;
+}
+
+#settings-nav a .icon {
+  color: var(--muted);
+}
+
+#settings-nav a:hover {
+  background-color: var(--hover-bg);
+}
+
+#settings-nav a[aria-current] {
+  background-color: var(--accent-soft);
+  font-weight: 600;
+}
+
+#settings-nav a[aria-current] .icon {
+  color: var(--accent);
+}
+
+/* While searching: sections with nothing that matches. */
+#settings-nav a[dimmed] {
+  opacity: 0.45;
+}
+
+/* ---------- Sections ---------- */
 
 #settings {
-  width: min(720px, 100% - 48px);
-  margin: 0 auto;
-  padding-block: 48px 80px;
   display: grid;
-  gap: 40px;
+  align-content: start;
+  gap: 48px;
+  min-width: 0;
 }
 
 #settings > section {
   display: grid;
-  gap: 16px;
+  align-content: start;
+  gap: 12px;
+}
+
+#settings h2 {
+  margin-bottom: 4px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--fg);
+}
+
+#settings h3 {
+  margin: 16px 0 0;
+  padding-inline: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.section-intro {
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.section-note {
+  padding-inline: 4px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+/* Search: rows, groups and sections that don't match. */
+[filtered] {
+  display: none !important;
+}
+
+body[searching] :is(.section-intro, .section-note, .custom-note) {
+  display: none;
+}
+
+#settings-empty {
+  padding: 48px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* ---------- Cards and rows ---------- */
+
+.card {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background-color: var(--card-bg);
+  overflow: hidden;
+}
+
+/* A card with nothing in it now (rows hidden until a vault exists, or by a
+   search) goes, and so does its group, heading and all. */
+.card:not(:has(> :not([hidden], [filtered]))),
+.group:not(:has(> .card > :not([hidden], [filtered]))) {
+  display: none;
+}
+
+.group {
+  display: grid;
+  gap: 12px;
+}
+
+body[searching] #settings h3 {
+  margin-top: 0;
+}
+
+/* A line between rows, whichever of them are shown. */
+.card > :not([hidden], [filtered]) ~ :not([hidden], [filtered]) {
+  border-top: 1px solid var(--line);
+}
+
+.card > .toggle-row,
+.card > .inline-row {
+  padding: 14px 18px;
+  border-bottom: 0;
+}
+
+.card > :is(form, p, details, div):not(.toggle-row, .inline-row) {
+  padding: 14px 18px;
+  margin: 0;
 }
 
 .inline-row:not([hidden]) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px 24px;
   flex-wrap: wrap;
+}
+
+.label,
+.toggle-row label {
+  font-weight: 500;
+}
+
+.help {
+  display: block;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.stacked {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.info-row {
+  justify-content: flex-start !important;
+  flex-wrap: nowrap !important;
+}
+
+.row-icon {
+  width: 20px;
+  height: 20px;
+  padding: 8px;
+  border-radius: 10px;
+  background-color: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* The privacy modes sit on the page, as cards of their own. */
+#privacy .mode {
+  background-color: var(--card-bg);
+}
+
+#privacy .mode:hover {
+  background-color: color-mix(in srgb, var(--card-bg) 92%, var(--fg));
+}
+
+.custom-note {
+  padding-inline: 4px;
+}
+
+select {
+  appearance: none;
+  min-width: 170px;
+  height: 36px;
+  padding-inline: 12px 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--card-bg) url("chrome://browser-wip/skin/icons/chevron-down.svg") no-repeat right 11px center / 14px;
+  -moz-context-properties: fill;
+  fill: var(--muted);
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+select:-moz-locale-dir(rtl) {
+  background-position: left 11px center;
+}
+
+.segmented {
+  background-color: var(--settings-bg);
+}
+
+.segmented button[aria-checked="true"] {
+  background-color: var(--card-bg);
+  box-shadow: 0 1px 2px rgba(15, 20, 25, 0.12), 0 0 0 1px var(--line);
 }
 
 #downloads .folder {
   display: grid;
   min-width: 0;
+  flex: 1 1 260px;
 }
 
 #downloads-folder {
@@ -35,11 +325,115 @@
   font-size: 13.5px;
 }
 
+/* Some changes need a restart: says so above everything. */
+#restart-row:not([hidden]) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 #restart-row {
-  padding: 12px 14px;
-  border-radius: 10px;
+  position: sticky;
+  top: 16px;
+  z-index: 1;
+  padding: 12px 14px 12px 18px;
+  border-radius: 12px;
   background-color: var(--warn-bg);
   color: var(--warn-fg);
+  box-shadow: 0 6px 18px -10px rgba(15, 20, 25, 0.4);
+}
+
+/* ---------- About ---------- */
+
+.about-product {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+}
+
+.about-name {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.credits {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 10px 20px;
+  margin: 0;
+  padding: 16px 18px 18px;
+  font-size: 13.5px;
+}
+
+.credits dt {
+  font-weight: 500;
+}
+
+.credits dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* ---------- Narrow windows: the sections across the top ---------- */
+
+@media (max-width: 900px) {
+  .settings-shell {
+    grid-template-columns: minmax(0, 720px);
+    gap: 28px;
+    padding: 24px 20px 96px;
+  }
+
+  #settings-nav {
+    top: 0;
+    z-index: 2;
+    margin-inline: -20px;
+    padding: 12px 20px;
+    gap: 12px;
+    background-color: var(--settings-bg);
+    border-bottom: 1px solid var(--line);
+  }
+
+  #settings-nav h1 {
+    display: none;
+  }
+
+  #settings-nav ul {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  #settings-nav a {
+    white-space: nowrap;
+  }
+
+  html {
+    scroll-padding-top: 130px;
+  }
+
+  #restart-row {
+    top: 130px;
+  }
+}
+
+@media (max-width: 560px) {
+  .credits {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .credits dd {
+    margin-bottom: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #settings-nav a,
+  #settings-search {
+    transition: none;
+  }
 }
 
 /* YouTube */
@@ -47,7 +441,8 @@
 #youtube-ads-confirm:not([hidden]) {
   display: grid;
   gap: 12px;
-  padding: 12px 14px;
+  margin: 0 14px 14px;
+  padding: 14px 16px;
   border-radius: 10px;
   background-color: var(--warn-bg);
   color: var(--warn-fg);
@@ -85,11 +480,6 @@
   margin: 3px 0 0;
 }
 
-.stacked {
-  display: grid;
-  gap: 2px;
-}
-
 /* The recovery key, shown once after it's made. */
 .recovery-box {
   display: grid;
@@ -120,8 +510,9 @@
 
 /* Printing while the recovery key is shown prints only the key. */
 @media print {
-  body:has(#passwords-recovery-shown:not([hidden])) :is(nav, header, section:not(#passwords)),
-  body:has(#passwords-recovery-shown:not([hidden])) #passwords > :not(#passwords-recovery-shown),
+  body:has(#passwords-recovery-shown:not([hidden])) :is(#settings-nav, #settings > :not(#passwords)),
+  body:has(#passwords-recovery-shown:not([hidden])) #passwords > :not(:has(#passwords-recovery-shown)),
+  body:has(#passwords-recovery-shown:not([hidden])) #passwords .card > :not(#passwords-recovery-shown),
   #passwords-recovery-shown .button-row {
     display: none !important;
   }
@@ -142,7 +533,7 @@
   font-size: 14px;
   border: 1px solid var(--line-strong);
   border-radius: 9px;
-  background-color: var(--page-bg);
+  background-color: var(--card-bg);
   color: var(--fg);
   outline: none;
 }
