@@ -69,6 +69,10 @@ var PasswordsUI = {
     $("passwords-never").addEventListener("command", () => this._never());
     $("passwords-more-manage").addEventListener("command", () => this.openManager());
     $("passwords-saved-undo").addEventListener("click", () => this._undoAutosave());
+    $("passwords-site-all").addEventListener("click", () => {
+      this._siteShowAll = !this._siteShowAll;
+      this._fillSiteView(gBrowser.selectedBrowser);
+    });
 
     // Unlock
     $("passwords-unlock-form").addEventListener("submit", e => {
@@ -373,6 +377,7 @@ var PasswordsUI = {
     // A recovery key is shown once; closing the panel is the end of it
     // (Settings can make a new one).
     this.$("passwords-recovery-code").replaceChildren();
+    this._siteShowAll = false;
     for (let id of ["passwords-setup-password", "passwords-setup-confirm"]) {
       this.$(id).type = "password";
     }
@@ -523,51 +528,73 @@ var PasswordsUI = {
     return passwordsHostOf(this._siteOrigin(browser));
   },
 
+  // This origin's logins; the rest of the site's ("accounts.example.com"
+  // and "example.com" on "mail.example.com") behind "Show all".
   _fillSiteView(browser) {
     let doc = this.window.document;
     let vault = PasswordsLazy.PasswordVault;
     let origin = this._siteOrigin(browser);
-    doc.l10n.setAttributes(this.title, "passwords-site-title", { site: vault.siteName(origin) });
-    let entries = vault.match(origin).exact;
+    let host = passwordsHostOf(origin);
+    doc.l10n.setAttributes(this.title, "passwords-site-title", { site: host });
+    let { exact, sameSite } = vault.matchSite(origin);
+    let showAll = this._siteShowAll && sameSite.length > 0;
     let list = this.$("passwords-site-list");
-    list.replaceChildren();
-    this.text.hidden = entries.length > 0;
-    doc.l10n.setAttributes(this.text, "passwords-site-none");
-    for (let entry of entries) {
-      let row = doc.createElement("div");
-      row.className = "passwords-site-row";
-      row.setAttribute("role", "listitem");
-      let text = doc.createElement("div");
-      text.className = "passwords-option-text";
-      let name = doc.createElement("span");
-      name.className = "passwords-option-primary";
-      if (entry.username) {
-        name.textContent = entry.username;
-      } else {
-        doc.l10n.setAttributes(name, "passwords-dropdown-no-username");
+    list.replaceChildren(...exact.map(entry => this._siteRow(entry)));
+    if (showAll) {
+      for (let [other, entries] of Map.groupBy(sameSite, e => e.origin)) {
+        let group = doc.createElement("div");
+        group.className = "passwords-group";
+        doc.l10n.setAttributes(group, "passwords-dropdown-saved-for", { host: passwordsHostOf(other) });
+        list.append(group, ...entries.map(entry => this._siteRow(entry)));
       }
-      let where = doc.createElement("span");
-      where.className = "passwords-option-secondary";
-      where.textContent = passwordsHostOf(entry.origin);
-      text.append(name, where);
-      row.append(text);
-      if (entry.username) {
-        let copy = doc.createElement("button");
-        copy.className = "passwords-icon-button";
-        doc.l10n.setAttributes(copy, "passwords-copy-username");
-        let icon = doc.createElement("img");
-        icon.className = "icon";
-        icon.src = "chrome://browser-wip/skin/icons/copy.svg";
-        icon.alt = "";
-        copy.append(icon);
-        copy.addEventListener("click", () => {
-          vault.copyText(entry.username);
-          doc.l10n.setAttributes(copy, "passwords-copied");
-        });
-        row.append(copy);
-      }
-      list.append(row);
     }
+    this.text.hidden = exact.length > 0 || showAll;
+    doc.l10n.setAttributes(this.text, "passwords-site-none", { host });
+    let all = this.$("passwords-site-all");
+    all.hidden = !sameSite.length;
+    if (showAll) {
+      doc.l10n.setAttributes(all, "passwords-site-show-less", { host });
+    } else {
+      doc.l10n.setAttributes(all, "passwords-site-show-all", { site: vault.siteName(origin), count: sameSite.length });
+    }
+  },
+
+  _siteRow(entry) {
+    let doc = this.window.document;
+    let vault = PasswordsLazy.PasswordVault;
+    let row = doc.createElement("div");
+    row.className = "passwords-site-row";
+    row.setAttribute("role", "listitem");
+    let text = doc.createElement("div");
+    text.className = "passwords-option-text";
+    let name = doc.createElement("span");
+    name.className = "passwords-option-primary";
+    if (entry.username) {
+      name.textContent = entry.username;
+    } else {
+      doc.l10n.setAttributes(name, "passwords-dropdown-no-username");
+    }
+    let where = doc.createElement("span");
+    where.className = "passwords-option-secondary";
+    where.textContent = passwordsHostOf(entry.origin);
+    text.append(name, where);
+    row.append(text);
+    if (entry.username) {
+      let copy = doc.createElement("button");
+      copy.className = "passwords-icon-button";
+      doc.l10n.setAttributes(copy, "passwords-copy-username");
+      let icon = doc.createElement("img");
+      icon.className = "icon";
+      icon.src = "chrome://browser-wip/skin/icons/copy.svg";
+      icon.alt = "";
+      copy.append(icon);
+      copy.addEventListener("click", () => {
+        vault.copyText(entry.username);
+        doc.l10n.setAttributes(copy, "passwords-copied");
+      });
+      row.append(copy);
+    }
+    return row;
   },
 
   async _toggleCapturedPassword() {
@@ -929,14 +956,28 @@ var PasswordsUI = {
       let typed = request.kind == "username" ? (request.value ?? "").toLowerCase() : "";
       if (typed) {
         exact = exact.filter(e => e.username.toLowerCase().startsWith(typed));
+        sameSite = sameSite.filter(e => e.username.toLowerCase().startsWith(typed));
       }
       if (request.kind != "new-password") {
         for (let entry of exact) {
           add(this._entryOption(entry, passwordsHostOf(entry.origin)), () => this._fill(actor, entry.id));
         }
-        // Another origin of the same site: click only, never by keyboard
-        // alone in a frame, and filling also adds this origin (§17 Q5).
-        if (sameSite.length) {
+        // Other origins of the same site only after "Show all for
+        // example.com": click only, never by keyboard alone in a frame, and
+        // filling also adds this origin (§17 Q5).
+        if (sameSite.length && !request.showSite) {
+          if (body.childElementCount) {
+            add(this._separator());
+          }
+          add(
+            this._option(
+              "chevron-down.svg",
+              { l10n: "passwords-dropdown-show-site", args: { site: vault.siteName(request.origin) } },
+              { l10n: "passwords-dropdown-show-site-count", args: { count: sameSite.length } }
+            ),
+            () => this.openDropdown(browser, actor, { ...request, showSite: true })
+          );
+        } else if (sameSite.length) {
           let byOrigin = Map.groupBy(sameSite, e => e.origin);
           for (let [origin, entries] of byOrigin) {
             if (body.childElementCount) {
@@ -1022,7 +1063,7 @@ var PasswordsUI = {
         span.classList.add("mono");
       }
       if (part.l10n) {
-        doc.l10n.setAttributes(span, part.l10n);
+        doc.l10n.setAttributes(span, part.l10n, part.args);
       } else {
         span.textContent = part.text;
       }

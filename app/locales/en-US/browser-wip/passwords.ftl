@@ -78,7 +78,12 @@ passwords-error = Something went wrong. Your passwords weren’t changed.
 ## The site panel (key button, nothing waiting)
 
 passwords-site-title = Passwords for { $site }
-passwords-site-none = No logins saved for this site.
+# $host (String) - e.g. "mail.example.com"
+passwords-site-none = No logins saved for { $host }.
+# $site (String) - the parent domain, e.g. "example.com"; $count (Number) - logins saved on its other subdomains
+passwords-site-show-all = Show all for { $site } ({ $count })
+# $host (String) - e.g. "mail.example.com"
+passwords-site-show-less = Show only { $host }
 passwords-site-intro-title = Save passwords in { -brand-short-name }
 passwords-site-intro = Sign in to a site and { -brand-short-name } offers to keep the login, encrypted on this device under a master password.
 passwords-copy-username =
@@ -96,6 +101,14 @@ passwords-dropdown-locked = Passwords are locked
 passwords-dropdown-unlock = Unlock…
 passwords-dropdown-iframe = Sign in to { $host } (inside { $top })
 passwords-dropdown-saved-for = Saved for { $host }
+# $site (String) - the parent domain, e.g. "example.com"
+passwords-dropdown-show-site = Show all for { $site }
+# $count (Number) - logins saved on the site's other subdomains or the parent domain
+passwords-dropdown-show-site-count =
+    { $count ->
+        [one] 1 more login on this site
+       *[other] { $count } more logins on this site
+    }
 passwords-dropdown-also-use = Click to fill · also use here
 passwords-dropdown-no-username = (no username)
 passwords-dropdown-generate = Use a strong password

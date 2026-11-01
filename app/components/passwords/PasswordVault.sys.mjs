@@ -771,6 +771,17 @@ export const PasswordVault = {
     return matchEntries(this._index.entries, frameOrigin, { getBaseDomain, allowSameSite });
   },
 
+  /**
+   * Like match(), but sameSite lists every other origin of the site in any
+   * mode: for showing what's saved there, not for filling.
+   */
+  matchSite(frameOrigin) {
+    if (this.state != "unlocked") {
+      return { exact: [], sameSite: [] };
+    }
+    return matchEntries(this._index.entries, frameOrigin, { getBaseDomain, allowSameSite: true });
+  },
+
   /** The entry saved for origin with username, if any. */
   find(origin, username) {
     return this._index ? findLogin(this._index.entries, origin, username) : null;
