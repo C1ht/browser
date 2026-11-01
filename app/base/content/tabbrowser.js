@@ -649,6 +649,12 @@ class TabBrowser {
       entries.some(([state, blocked]) => blocked && state & BLOCKED_TRACKER_STATES)
     ).length;
     if (blockedOrigins != tab.blockedTrackers) {
+      // The new tab page's privacy report counts what each page blocked
+      // (counts only; not in private windows).
+      let added = blockedOrigins - (tab.blockedTrackers ?? 0);
+      if (added > 0 && !PrivateBrowsingUtils.isBrowserPrivate(tab.linkedBrowser)) {
+        ProtectionStats.add(added, !tab.blockedTrackers);
+      }
       tab.blockedTrackers = blockedOrigins;
       this._notify(tab, "TabAttrModified");
     }

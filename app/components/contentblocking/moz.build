@@ -9,6 +9,7 @@ EXTRA_JS_MODULES.browserwip += [
     "BlockedPageParent.sys.mjs",
     "ContentBlockingChild.sys.mjs",
     "ContentBlockingLists.sys.mjs",
+    "ProtectionStats.sys.mjs",
 ]
 
 # The vendored filter lists. Network rules ship as list text, which the

@@ -3,23 +3,83 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
-<!-- New tab: the address field above has focus; this page only offers the
-     sites you visit most, from local history. Nothing remote. -->
+<!-- New tab (newtab.js): a search bar, your favorites (the bookmarks bar;
+     no default tiles) and what the blocker stopped this week,
+     in sections you can turn off. This page fetches nothing: icons are the
+     ones stored with history and bookmarks; backgrounds are gradients. -->
 <html>
 <head>
   <meta charset="utf-8"/>
   <meta http-equiv="Content-Security-Policy"
-        content="default-src chrome:; style-src chrome:; object-src 'none'"/>
+        content="default-src chrome:; style-src chrome:; img-src chrome: data:; object-src 'none'"/>
   <title data-l10n-id="newtab-page-title"></title>
   <link rel="stylesheet" href="chrome://browser-wip/skin/pages.css"/>
   <link rel="stylesheet" href="chrome://browser-wip/skin/newtab.css"/>
+  <link rel="localization" href="branding/brand.ftl"/>
   <link rel="localization" href="browser-wip/newtab.ftl"/>
   <script src="chrome://browser-wip/content/newtab.js"></script>
 </head>
 <body>
   <main id="newtab">
-    <img id="mark" src="chrome://branding/content/icon.svg" alt=""/>
-    <nav id="top-sites" data-l10n-id="newtab-top-sites" hidden="hidden"></nav>
+    <div id="calm" hidden="hidden">
+      <img id="mark" src="chrome://branding/content/icon.svg" alt=""/>
+      <p id="calm-text"></p>
+    </div>
+
+    <form id="search" role="search" hidden="hidden">
+      <img class="icon" src="chrome://browser-wip/skin/icons/search.svg" alt=""/>
+      <input id="search-input" type="text" autocomplete="off" spellcheck="false"/>
+    </form>
+
+    <section id="favorites" class="tiles-section" aria-labelledby="favorites-title" hidden="hidden">
+      <div class="section-head">
+        <h2 id="favorites-title" data-l10n-id="newtab-favorites"></h2>
+        <button class="more" type="button" hidden="hidden"></button>
+      </div>
+      <div class="tiles"></div>
+      <div class="favorites-empty" hidden="hidden">
+        <p id="favorites-hint" data-l10n-id="newtab-favorites-empty"></p>
+        <button id="import-bookmarks" class="pill-button" type="button" data-l10n-id="newtab-import-bookmarks"></button>
+        <p id="import-status" role="status" hidden="hidden"></p>
+      </div>
+    </section>
+
+    <section id="report" aria-labelledby="report-title" hidden="hidden">
+      <div class="section-head">
+        <h2 id="report-title" data-l10n-id="newtab-report"></h2>
+      </div>
+      <a class="report-card" href="about:settings#privacy">
+        <span class="report-badge">
+          <img class="icon" src="chrome://browser-wip/skin/icons/shield.svg" alt=""/>
+        </span>
+        <span class="report-summary">
+          <span id="report-number"></span>
+          <span id="report-text"></span>
+        </span>
+        <span id="report-chart" aria-hidden="true"></span>
+        <span id="report-mode"></span>
+      </a>
+    </section>
   </main>
+
+  <button id="customize" type="button" aria-haspopup="dialog" aria-expanded="false">
+    <img class="icon" src="chrome://browser-wip/skin/icons/site-info.svg" alt=""/>
+    <span data-l10n-id="newtab-customize"></span>
+  </button>
+  <div id="customize-panel" role="dialog" aria-labelledby="customize-title" hidden="hidden">
+    <h3 id="customize-title" data-l10n-id="newtab-customize-sections"></h3>
+    <label class="check"><input type="checkbox" data-section="search"/><span data-l10n-id="newtab-search-section"></span></label>
+    <label class="check"><input type="checkbox" data-section="favorites"/><span data-l10n-id="newtab-favorites"></span></label>
+    <label class="check"><input type="checkbox" data-section="report"/><span data-l10n-id="newtab-report"></span></label>
+    <h3 id="backgrounds-title" data-l10n-id="newtab-customize-background"></h3>
+    <div id="backgrounds" role="radiogroup" aria-labelledby="backgrounds-title">
+      <button type="button" role="radio" data-background="plain" data-l10n-id="newtab-background-plain"></button>
+      <button type="button" role="radio" data-background="glow" data-l10n-id="newtab-background-glow"></button>
+      <button type="button" role="radio" data-background="dusk" data-l10n-id="newtab-background-dusk"></button>
+      <button type="button" role="radio" data-background="meadow" data-l10n-id="newtab-background-meadow"></button>
+      <button type="button" role="radio" data-background="sand" data-l10n-id="newtab-background-sand"></button>
+    </div>
+  </div>
+
 </body>
 </html>

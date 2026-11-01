@@ -12,6 +12,8 @@ ChromeUtils.defineESModuleGetters(this, {
   ContentBlockingLists: "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
+  PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+  ProtectionStats: "resource://gre/modules/browserwip/ProtectionStats.sys.mjs",
   SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
 });
 const RESTORE_WINDOW_ARG = "browserwip:restore-window";
