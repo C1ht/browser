@@ -47,7 +47,9 @@
      "rule": "||facebook.com/plugins/like.php?$third-party (Fanboy Social)", "why": "social list: allowed in Standard, blocked in Strict"},
     {"id": "h23", "page": "http://news.example.com/", "kind": "image", "via": "http://redirect.example.net/__redirect?to=http%3A%2F%2Fg.doubleclick.net%2Fpixel2.gif", "url": "http://g.doubleclick.net/pixel2.gif", "expect": "block",
      "rule": "||g.doubleclick.net^", "why": "an allowed URL redirecting to a blocked one: the redirect target is checked"},
-    {"id": "h24", "page": "http://news.example.com/", "kind": "document", "url": "http://news.example.com/smartpop/", "expect": "allow",
-     "rule": ".com/smartpop/$document", "why": "top-level pages are not blocked in phase 1 ($document rules; docs/CONTENT-BLOCKING.md)"}
+    {"id": "h24", "page": "http://news.example.com/", "kind": "document", "url": "http://news.example.com/smartpop/", "expect": "block",
+     "rule": ".com/smartpop/$document", "why": "a page opened in a tab that a $document rule matches: the blocked-page screen (docs/CONTENT-BLOCKING.md)"},
+    {"id": "h25", "page": "http://news.example.com/", "kind": "document", "url": "http://0019x.com/", "expect": "allow",
+     "rule": "||0019x.com^", "why": "a rule without $document blocks the host's requests, not a page opened in a tab"}
   ]
 }
