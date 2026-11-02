@@ -165,20 +165,25 @@ class TabBrowser {
    *   select, index, pinned, openWindowInfo, triggeringPrincipal,
    *   policyContainer, referrerInfo, name, opener (a tab),
    *   lazy (a restored tab: load url only when the tab is first selected),
-   *   title (shown until then), icon (a data: URL for its site icon)
+   *   title (shown until then), icon (a data: URL for its site icon),
+   *   remoteType (the process type, for a browser about to adopt another's
+   *   page; null for the parent process)
    */
   addTab(url, options = {}) {
     let { select = true, openWindowInfo = null, opener = null, name = null } = options;
 
     let tab = this._createTabElement();
-    let remoteType = openWindowInfo
-      ? openWindowInfo.isRemote
-        ? ChromeUtils.predictRemoteTypeForURI(null, { window: this.window })
-        : null
-      : ChromeUtils.predictRemoteTypeForURI(url ?? "about:blank", {
-          window: this.window,
-          preferredRemoteType: opener?.linkedBrowser.remoteType,
-        });
+    let remoteType;
+    if ("remoteType" in options) {
+      remoteType = options.remoteType;
+    } else if (openWindowInfo) {
+      remoteType = openWindowInfo.isRemote ? ChromeUtils.predictRemoteTypeForURI(null, { window: this.window }) : null;
+    } else {
+      remoteType = ChromeUtils.predictRemoteTypeForURI(url ?? "about:blank", {
+        window: this.window,
+        preferredRemoteType: opener?.linkedBrowser.remoteType,
+      });
+    }
 
     let browser = this._createBrowser({ remoteType, openWindowInfo, name });
     tab.linkedBrowser = browser;
@@ -313,6 +318,9 @@ class TabBrowser {
     if (filter) {
       tab.linkedBrowser.webProgress?.removeProgressListener(filter);
       filter.removeProgressListener(listener);
+      // Once only: a tab that moved to another window is closed after this.
+      this._filters.delete(tab);
+      this._listeners.delete(tab);
     }
   }
 
@@ -337,7 +345,11 @@ class TabBrowser {
     tab.audible = null;
   }
 
-  async removeTab(tab, { skipPermitUnload = false } = {}) {
+  /**
+   * Closes a tab. adopted: it moved to another window (adoptTab), so it
+   * isn't offered by "Reopen closed tab".
+   */
+  async removeTab(tab, { skipPermitUnload = false, adopted = false } = {}) {
     if (!tab || tab.closing) {
       return;
     }
@@ -358,7 +370,7 @@ class TabBrowser {
     }
 
     let url = tab.pendingLoad?.url ?? browser.currentURI?.spec;
-    if (url && url != "about:blank") {
+    if (url && url != "about:blank" && !adopted) {
       this._closedTabs.push({ url, index: this.tabs.indexOf(tab) });
       this._closedTabs.splice(0, this._closedTabs.length - MAX_CLOSED_TABS);
     }
@@ -382,6 +394,162 @@ class TabBrowser {
     if (closed) {
       this.addTab(closed.url, { index: closed.index });
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // Moving tabs between windows
+
+  /**
+   * Moves a tab from another window here, page and all: its docshell is
+   * swapped into a new browser in this window, so nothing reloads and the
+   * page keeps its state (scroll position, form fields, a playing video).
+   * index: where in the strip (the end by default).
+   */
+  adoptTab(otherTab, { index = null, select = true } = {}) {
+    let other = otherTab.ownerDocument.defaultView.gBrowser;
+    let pinned = otherTab.hasAttribute("pinned");
+    let tab;
+    if (otherTab.pendingLoad) {
+      // A restored tab that never loaded: nothing to move but its address.
+      let { url, title } = otherTab.pendingLoad;
+      tab = this.addTab(url, { index, pinned, lazy: true, title, icon: otherTab.favicon, select: false });
+    } else {
+      tab = this.addTab(null, { index, pinned, select: false, remoteType: otherTab.linkedBrowser.remoteType || null });
+      this._swapBrowsers(tab, otherTab);
+    }
+    other.removeTab(otherTab, { skipPermitUnload: true, adopted: true });
+    if (select || !this.selectedTab) {
+      this.selectTab(tab);
+    } else {
+      tab.linkedBrowser.docShellIsActive = false;
+    }
+    return tab;
+  }
+
+  _swapBrowsers(tab, otherTab) {
+    let other = otherTab.ownerDocument.defaultView.gBrowser;
+    let browser = tab.linkedBrowser;
+    let otherBrowser = otherTab.linkedBrowser;
+    // Both browsers' webProgress objects change hands: detach first.
+    other._removeProgressListener(otherTab);
+    other._unregisterAudible(otherTab);
+    this._removeProgressListener(tab);
+    this._unregisterAudible(tab);
+    browser.swapDocShells(otherBrowser);
+    // The key session restore and others use to recognize a tab's browser.
+    [browser.permanentKey, otherBrowser.permanentKey] = [otherBrowser.permanentKey, browser.permanentKey];
+    browser.userTypedValue = otherBrowser.userTypedValue ?? null;
+    for (let key of ["blockedTrackers", "securityState", "progress"]) {
+      tab[key] = otherTab[key];
+    }
+    for (let attr of ["busy", "soundplaying", "muted", "sharing"]) {
+      tab.toggleAttribute(attr, otherTab.hasAttribute(attr));
+    }
+    this._addProgressListener(tab);
+    this._registerAudible(tab);
+    this.setTabIcon(tab, otherTab.favicon ?? null);
+    this._updateTabIdentity(tab);
+  }
+
+  /**
+   * Opens a tab in a window of its own: dragged off the strip, or "Move to
+   * new window". The new window adopts it (browser.js). screenX/screenY: where
+   * it was dropped, where the platform lets windows be placed.
+   */
+  tearOffTab(tab, { screenX = null, screenY = null } = {}) {
+    if (this.tabs.length < 2 || tab.closing) {
+      return null;
+    }
+    let w = this.window;
+    let features = ["chrome", "all", "dialog=no"];
+    features.push(PrivateBrowsingUtils.isWindowPrivate(w) ? "private" : "non-private");
+    if (w.windowState == w.STATE_NORMAL) {
+      features.push(`width=${w.innerWidth}`, `height=${w.innerHeight}`);
+    }
+    if (screenX != null && this._hasScreenCoordinates) {
+      features.push(`left=${Math.round(screenX - 80)}`, `top=${Math.round(screenY - 20)}`);
+    }
+    return w.openDialog(Services.prefs.getStringPref("browser.chromeURL"), "_blank", features.join(","), tab);
+  }
+
+  // Wayland gives windows no position on the screen: a window can't be
+  // placed, and another window's tab strip can't be found under the pointer.
+  get _hasScreenCoordinates() {
+    try {
+      return Cc["@mozilla.org/gfx/info;1"].getService(Ci.nsIGfxInfo).windowProtocol != "wayland";
+    } catch (e) {
+      return true;
+    }
+  }
+
+  // The other browser windows a tab from this one may move to.
+  _otherWindows() {
+    let isPrivate = PrivateBrowsingUtils.isWindowPrivate(this.window);
+    return [...Services.wm.getEnumerator("navigator:browser")].filter(
+      win =>
+        win != this.window &&
+        !win.closed &&
+        win.gBrowser &&
+        win.windowState != win.STATE_MINIMIZED &&
+        PrivateBrowsingUtils.isWindowPrivate(win) == isPrivate
+    );
+  }
+
+  // The window whose tab strip is at this point of the screen, or null.
+  _windowWithStripAt(screenX, screenY) {
+    if (!this._hasScreenCoordinates) {
+      return null;
+    }
+    // A little above and below the strip still counts.
+    let SLACK = 12;
+    for (let win of this._otherWindows()) {
+      let box = win.gBrowser.tabContainer.getBoundingClientRect();
+      let x = screenX - win.mozInnerScreenX;
+      let y = screenY - win.mozInnerScreenY;
+      if (x >= box.left && x <= box.right && y >= box.top - SLACK && y <= box.bottom + SLACK) {
+        return win;
+      }
+    }
+    return null;
+  }
+
+  // Where a tab dropped at screenX goes in this strip: before the first tab
+  // whose middle is past it.
+  _indexAtScreenX(screenX) {
+    let x = screenX - this.window.mozInnerScreenX;
+    let index = this.tabs.findIndex(t => {
+      let r = t.getBoundingClientRect();
+      return r.left + r.width / 2 > x;
+    });
+    return index < 0 ? this.tabs.length : index;
+  }
+
+  // A tab dragged off the strip and let go: onto another window's strip,
+  // or into a new window of its own.
+  _dropDetachedTab(tab, event) {
+    let target = this._windowWithStripAt(event.screenX, event.screenY);
+    if (target) {
+      target.gBrowser.adoptTab(tab, { index: target.gBrowser._indexAtScreenX(event.screenX) });
+      target.focus();
+      return;
+    }
+    this.tearOffTab(tab, { screenX: event.screenX, screenY: event.screenY });
+  }
+
+  // What follows the pointer once a tab is off the strip: a copy of it.
+  _createDragGhost(tab) {
+    let ghost = tab.cloneNode(true);
+    for (let attr of ["dragging", "detaching", "id", "tabindex"]) {
+      ghost.removeAttribute(attr);
+    }
+    ghost.setAttribute("selected", "true");
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.querySelector(".tab-close")?.remove();
+    ghost.classList.add("tab-drag-ghost");
+    ghost.style.transform = "";
+    ghost.style.width = `${tab.getBoundingClientRect().width}px`;
+    (this.document.body ?? this.document.documentElement).append(ghost);
+    return ghost;
   }
 
   // ---------------------------------------------------------------------
@@ -780,6 +948,13 @@ class TabBrowser {
     let scrollStart = strip.scrollLeft;
     let pointerX = startX;
     let autoScroll = 0;
+    // Dragged well above or below the strip, the tab comes off it: let go
+    // there, it opens in a window of its own, or joins another window's
+    // strip it's dropped on.
+    let DETACH = 30;
+    let detached = false;
+    let ghost = null;
+    let grabOffset = 0;
 
     let update = () => {
       let dx = pointerX - startX + (strip.scrollLeft - scrollStart);
@@ -836,6 +1011,35 @@ class TabBrowser {
       }
     };
 
+    let canDetach = () => this.tabs.length > 1 || this._otherWindows().length > 0;
+    let setDetached = on => {
+      if (on == detached) {
+        return;
+      }
+      detached = on;
+      tab.toggleAttribute("detaching", on);
+      strip.toggleAttribute("detaching", on);
+      if (on) {
+        this.window.cancelAnimationFrame(autoScroll);
+        autoScroll = 0;
+        for (let t of this.tabs) {
+          t.style.transform = "";
+        }
+        ghost = this._createDragGhost(tab);
+      } else {
+        ghost?.remove();
+        ghost = null;
+        update();
+      }
+    };
+    let moveGhost = e => {
+      // It stays inside the window; let go outside, the tab still comes off.
+      let width = ghost.getBoundingClientRect().width;
+      let x = Math.max(0, Math.min(e.clientX - grabOffset, this.window.innerWidth - width));
+      let y = Math.max(0, Math.min(e.clientY - 14, this.window.innerHeight - 30));
+      ghost.style.transform = `translate(${x}px, ${y}px)`;
+    };
+
     let onMove = e => {
       pointerX = e.clientX;
       if (!dragging) {
@@ -853,8 +1057,15 @@ class TabBrowser {
         strip.setAttribute("reordering", "true");
         rects = this.tabs.map(t => t.getBoundingClientRect());
         originIndex = this.tabs.indexOf(tab);
+        grabOffset = startX - rects[originIndex].left;
         scrollStart = strip.scrollLeft;
         strip.addEventListener("scroll", update);
+      }
+      let box = strip.getBoundingClientRect();
+      setDetached((e.clientY < box.top - DETACH || e.clientY > box.bottom + DETACH) && canDetach());
+      if (detached) {
+        moveGhost(e);
+        return;
       }
       update();
       if (!autoScroll) {
@@ -862,7 +1073,7 @@ class TabBrowser {
       }
     };
 
-    let onUp = () => {
+    let onUp = e => {
       this.window.removeEventListener("pointermove", onMove);
       this.window.removeEventListener("pointerup", onUp);
       this.window.removeEventListener("pointercancel", onUp);
@@ -871,6 +1082,20 @@ class TabBrowser {
       }
       this.window.cancelAnimationFrame(autoScroll);
       strip.removeEventListener("scroll", update);
+      if (detached) {
+        ghost?.remove();
+        for (let t of this.tabs) {
+          t.style.transform = "";
+        }
+        tab.removeAttribute("dragging");
+        tab.removeAttribute("detaching");
+        strip.removeAttribute("reordering");
+        strip.removeAttribute("detaching");
+        if (e.type == "pointerup") {
+          this._dropDetachedTab(tab, e);
+        }
+        return;
+      }
       let center = tab.dropCenter;
       let target = originIndex;
       for (let [t, i] of tab.groupIndices) {

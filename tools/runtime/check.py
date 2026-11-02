@@ -491,6 +491,65 @@ def part4(bindir, base, shots):
           return gBrowser.tabs.indexOf(tab);""")
         record(4, "dragging a tab reorders it", order == 2, f"dragged tab now at {order}")
 
+        # Dragging a tab well below the strip and letting go opens it in a
+        # window of its own; the page moves as it is (no reload).
+        DRAG_OFF = """let [tab, clientY, screenX, screenY] = arguments;
+          let r = tab.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+          let fire = (target, type, cx, cy, sx, sy) => target.dispatchEvent(new PointerEvent(type,
+            { bubbles: true, clientX: cx, clientY: cy, screenX: sx, screenY: sy, button: 0,
+              buttons: type == "pointerup" ? 0 : 1, pointerId: 1, isPrimary: true, pointerType: "mouse" }));
+          fire(tab.querySelector(".tab-label"), "pointerdown", x, y, x, y);
+          for (let i = 1; i <= 8; i++) fire(window, "pointermove", x + 4 * i, y + ((clientY - y) * i) / 8, screenX, screenY);
+          let detaching = tab.hasAttribute("detaching") && !!document.querySelector(".tab-drag-ghost");
+          fire(window, "pointerup", x + 32, clientY, screenX, screenY);
+          return detaching;"""
+        OTHER = "[...Services.wm.getEnumerator('navigator:browser')].find(w => w != window)"
+        b.js("for (let t of gBrowser.tabs.slice(1)) gBrowser.removeTab(t, { skipPermitUnload: true });"
+             "gBrowser.selectTab(gBrowser.addTab(arguments[0]));", f"{base}/state.html")
+        state = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith('state ') && t;", timeout=15)
+        detaching = b.js("let tab = gBrowser.selectedTab; let s = gBrowser.tabContainer.getBoundingClientRect();"
+                         "return (function() {" + DRAG_OFF + "}).apply(null, [tab, s.bottom + 200, 400, 500]);")
+        moved = b.wait("let w = " + OTHER + """;
+          return w?.gBrowser?.selectedBrowser?.contentTitle && {
+            title: w.gBrowser.selectedBrowser.contentTitle, theirTabs: w.gBrowser.tabs.length, ourTabs: gBrowser.tabs.length,
+            leftovers: !!document.querySelector(".tab-drag-ghost, .tab[detaching]") };""", timeout=15)
+        record(4, "dragging a tab off the strip opens it in a new window, page not reloaded",
+               detaching and moved and moved["title"] == state and moved["theirTabs"] == 1 and moved["ourTabs"] == 1
+               and not moved["leftovers"], [state, detaching, moved])
+
+        # Dropped onto another window's strip, it joins that window there.
+        b.js("gBrowser.addTab(arguments[0], { select: false });", f"{base}/target.html")
+        b.wait("return gBrowser.tabs[1].linkedBrowser.contentTitle.startsWith('target');", timeout=15)
+        joined = b.js("let w = " + OTHER + """;
+          let s = w.gBrowser.tabContainer.getBoundingClientRect(), first = w.gBrowser.tabs[0].getBoundingClientRect();
+          let screenX = w.mozInnerScreenX + first.left + 2, screenY = w.mozInnerScreenY + s.top + s.height / 2;
+          let tab = gBrowser.tabs[1], own = gBrowser.tabContainer.getBoundingClientRect();
+          (function() {""" + DRAG_OFF + """}).apply(null, [tab, own.bottom + 200, screenX, screenY]);
+          return new Promise(r => setTimeout(() => r({ ourTabs: gBrowser.tabs.length,
+            theirs: w.gBrowser.tabs.map(t => t.linkedBrowser.contentTitle) }), 1000));""")
+        record(4, "dropped onto another window's tab strip, it joins that window where it lands",
+               joined["ourTabs"] == 1 and len(joined["theirs"]) == 2 and joined["theirs"][0].startswith("target")
+               and joined["theirs"][1] == state, joined)
+
+        # "Move to new window" (the tab's menu); and taking a window's last
+        # tab closes that window.
+        r = b.js("let w = " + OTHER + """;
+          w.gBrowser.tearOffTab(w.gBrowser.tabs[0]);
+          return new Promise(r => setTimeout(() => r([...Services.wm.getEnumerator('navigator:browser')].length), 3000));""")
+        windows = b.wait("let ws = [...Services.wm.getEnumerator('navigator:browser')];"
+                         "return ws.length == 3 && ws.every(w => w.gBrowser?.tabs.length == 1) && ws.length;", timeout=15)
+        record(4, "Move to new window opens the tab in a window of its own", windows == 3, [r, windows])
+        r = b.js("""let others = [...Services.wm.getEnumerator('navigator:browser')].filter(w => w != window);
+          for (let w of others) gBrowser.adoptTab(w.gBrowser.tabs[0]);
+          return new Promise(r => setTimeout(() => r({ windows: [...Services.wm.getEnumerator('navigator:browser')].length,
+            titles: gBrowser.tabs.map(t => t.linkedBrowser.contentTitle) }), 3000));""")
+        record(4, "taking a window's last tab closes that window", r["windows"] == 1 and len(r["titles"]) == 3
+               and state in r["titles"], r)
+        # Back to what the reorder check left: four tabs, the third selected.
+        b.js("""for (let t of gBrowser.tabs.slice(4)) gBrowser.removeTab(t, { skipPermitUnload: true });
+          while (gBrowser.tabs.length < 4) gBrowser.addTab("about:blank", { select: false });
+          gBrowser.selectTab(gBrowser.tabs[2]);""")
+
         closed = b.js("""
           let n = gBrowser.tabs.length, i = gBrowser.tabs.indexOf(gBrowser.selectedTab);
           let right = gBrowser.tabs[i + 1];

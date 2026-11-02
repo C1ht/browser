@@ -694,6 +694,27 @@ browser:focus-visible {
   transition: transform 150ms ease;
 }
 
+/* Off the strip: the tab waits in place, faded, and a copy follows the
+   pointer. Let go, it opens in a window of its own. */
+.tab[detaching] {
+  opacity: 0.35;
+}
+
+.tab-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  border-radius: var(--tab-radius);
+  box-shadow: 0 10px 28px -8px rgba(15, 20, 25, 0.45), 0 0 0 1px var(--line, rgba(0, 0, 0, 0.08));
+  pointer-events: none;
+  transition: none;
+}
+
+.tab-drag-ghost .tab-shoulder {
+  display: none;
+}
+
 /* At the far end of the strip, whatever the tabs take. */
 #tab-overview-button {
   margin-bottom: 3px;

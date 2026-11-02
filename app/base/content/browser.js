@@ -89,6 +89,13 @@ var BrowserWip = {
    * else the start page.
    */
   async _openInitialTabs() {
+    // A tab dragged out of another window, or "Move to new window"
+    // (TabBrowser.tearOffTab): this window takes it over, page and all.
+    let arg = window.arguments?.[0];
+    if (Element.isInstance(arg) && arg.linkedBrowser && !arg.closing) {
+      gBrowser.adoptTab(arg);
+      return;
+    }
     if (window.arguments?.[0] == RESTORE_WINDOW_ARG) {
       let state = SessionStore.takePendingWindow();
       if (state) {
@@ -396,6 +403,7 @@ var BrowserWip = {
       );
       document.getElementById("tab-ctx-mute").hidden = !target.hasAttribute("soundplaying") && !muted;
       document.getElementById("tab-ctx-close-others").disabled = gBrowser.tabs.length < 2;
+      document.getElementById("tab-ctx-move-window").disabled = gBrowser.tabs.length < 2;
       document.getElementById("tab-ctx-reopen").disabled = !gBrowser._closedTabs.length;
       menu.openPopupAtScreen(e.screenX, e.screenY, true, e);
     });
@@ -405,6 +413,7 @@ var BrowserWip = {
       gBrowser.addTab(tab.linkedBrowser.currentURI.spec, { index: gBrowser.tabs.indexOf(tab) + 1 })
     );
     on("tab-ctx-pin", tab => gBrowser.setPinned(tab, !tab.hasAttribute("pinned")));
+    on("tab-ctx-move-window", tab => gBrowser.tearOffTab(tab));
     on("tab-ctx-mute", tab => {
       let controller = tab.linkedBrowser.browsingContext?.mediaController;
       if (controller?.muted) {
