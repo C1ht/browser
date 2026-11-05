@@ -357,3 +357,11 @@ select {
   background-color: var(--page-bg);
   color: var(--fg);
 }
+
+/* The browser's mark (the ring, branding/mark.svg), drawn in the text
+   color so it reads in light and dark. */
+.brand-mark {
+  display: block;
+  background-color: var(--fg);
+  mask: url("chrome://branding/content/mark.svg") center / contain no-repeat;
+}

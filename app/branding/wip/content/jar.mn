@@ -5,6 +5,7 @@
 browser-wip.jar:
 % content branding %content/branding/ contentaccessible=yes
   content/branding/icon.svg       (../icon.svg)
+  content/branding/mark.svg       (../mark.svg)
   content/branding/about-logo.svg (../icon.svg)
   content/branding/icon16.png     (../default16.png)
   content/branding/icon32.png     (../default32.png)
