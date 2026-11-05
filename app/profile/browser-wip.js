@@ -64,6 +64,10 @@ pref("browserwip.search.suggest.offered", false);
 // Off by default; never in Strict or Anonymous or in private windows.
 pref("browserwip.newtab.siteIcons", false);
 
+// Checking GitHub once a day for a newer dev build (DevBuilds.sys.mjs).
+// Off by default; never in Strict or Anonymous.
+pref("browserwip.devBuilds.check", false);
+
 // The bookmarks bar, between the toolbar and the tabs (Ctrl+Shift+B).
 pref("browserwip.bookmarks.bar", false);
 

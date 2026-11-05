@@ -45,6 +45,20 @@ settings-about-heading = About
 settings-about-name = { -brand-full-name }
 # $version (String) - app version; $gecko (String) - engine version
 settings-about-version = Version { $version } · Gecko { $gecko }
+settings-dev-builds-label = Check for new dev builds
+settings-dev-builds-help = Once a day, asks GitHub whether a newer dev build is out. Contacts github.com; nothing is downloaded.
+settings-dev-builds-help-mode = Off in Strict privacy and Anonymous.
+settings-dev-builds-now = Check now
+settings-dev-builds-open = Open its page
+settings-dev-builds-checking = Checking…
+# $tag: this build's release, e.g. dev-20261105-360e538.
+settings-dev-builds-this = This is dev build { $tag }.
+# $checked: when GitHub was last asked.
+settings-dev-builds-current = This is the newest dev build. Checked { DATETIME($checked, month: "short", day: "numeric", hour: "numeric", minute: "numeric") }.
+# $date: when the newer build was published.
+settings-dev-builds-newer = A newer dev build is out, from { DATETIME($date, month: "short", day: "numeric") }.
+settings-dev-builds-failed = Couldn’t reach GitHub. Try again later.
+settings-dev-builds-unpublished = This browser wasn’t installed from a published dev build, so there’s nothing to compare it with.
 settings-about-lists-title = Ad and tracker lists
 settings-about-lists = EasyList, EasyPrivacy and Fanboy’s Social Blocking List, by the EasyList authors, under CC BY-SA 3.0. Included with the browser, never downloaded.
 # $date (Number) - when the included lists were taken

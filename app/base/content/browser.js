@@ -10,6 +10,7 @@ ChromeUtils.defineESModuleGetters(this, {
   AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
   ContentBlockingAllowList: "resource://gre/modules/ContentBlockingAllowList.sys.mjs",
   ContentBlockingLists: "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs",
+  DevBuilds: "resource://gre/modules/browserwip/DevBuilds.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
@@ -51,6 +52,7 @@ var BrowserWip = {
     });
     this._wireTabContextMenu();
     this._wireDeveloperMenus();
+    this._wireDevBuildNotice();
     gBrowser.tabContainer.addEventListener("TabSelect", () => this._onTabSelect());
     gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
       if (e.target == gBrowser.selectedTab) {
@@ -234,6 +236,7 @@ var BrowserWip = {
     cmd_viewSource: () => BrowserWip.viewSource(),
     cmd_taskManager: () => BrowserWip.openTab("about:processes"),
     cmd_emptyCacheReload: () => BrowserWip.emptyCacheAndReload(),
+    cmd_print: () => Printing.print(),
   },
 
   // Find in page: one toolkit findbar per window, bound to the selected tab.
@@ -300,7 +303,10 @@ var BrowserWip = {
     gURLBar.update();
     this._updateTitle();
     let browser = gBrowser.selectedBrowser;
-    if (browser.userTypedValue != null || gURLBar.input.value == "") {
+    if (browser.tabDialogBox?.getTabDialogManager().hasDialogs) {
+      // The tab's print preview (or another dialog over its page).
+      browser.tabDialogBox.focus();
+    } else if (browser.userTypedValue != null || gURLBar.input.value == "") {
       gURLBar.focusAndSelect();
     } else {
       browser.focus();
@@ -453,6 +459,29 @@ var BrowserWip = {
   duplicateTab(tab, { select = true } = {}) {
     let url = tab.pendingLoad?.url ?? tab.linkedBrowser.currentURI.spec;
     return gBrowser.addTab(url, { index: gBrowser.tabs.indexOf(tab) + 1, select });
+  },
+
+  // A newer dev build, found by the opt-in check (DevBuilds.sys.mjs): an
+  // item at the top of the app menu, and a dot on the menu button until its
+  // page has been opened.
+  _wireDevBuildNotice() {
+    let item = document.getElementById("app-menu-dev-build");
+    let separator = document.getElementById("app-menu-dev-build-separator");
+    let button = document.getElementById("app-menu-button");
+    let update = () => {
+      let newer = DevBuilds.newer;
+      item.hidden = separator.hidden = !newer;
+      button.toggleAttribute("notification", DevBuilds.unseen);
+      if (newer) {
+        document.l10n.setAttributes(item, "app-menu-dev-build", { date: Date.parse(newer.date) });
+      }
+    };
+    item.addEventListener("command", () => DevBuilds.openNewer(window));
+    Services.obs.addObserver(update, DevBuilds.CHANGED_TOPIC);
+    window.addEventListener("unload", () => Services.obs.removeObserver(update, DevBuilds.CHANGED_TOPIC), {
+      once: true,
+    });
+    update();
   },
 
   reload(skipCache) {

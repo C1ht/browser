@@ -114,6 +114,10 @@ tab-context-reopen =
 
 ## Menu
 
+# A newer dev build than this one is out (the opt-in check in Settings).
+# $date: when it was published.
+app-menu-dev-build =
+    .label = New dev build from { DATETIME($date, month: "short", day: "numeric") }…
 app-menu-new-tab =
     .label = New tab
 app-menu-new-window =
@@ -122,6 +126,8 @@ app-menu-restore-session =
     .label = Restore previous session
 app-menu-downloads =
     .label = Downloads
+app-menu-print =
+    .label = Print…
 app-menu-settings =
     .label = Settings
 app-menu-quit =

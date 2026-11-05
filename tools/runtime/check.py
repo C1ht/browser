@@ -39,7 +39,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PAGES = ROOT / "tests/runtime/pages"
 
 RESULTS = []
-ALL_PARTS = list(range(1, 14))
+ALL_PARTS = list(range(1, 16))
 # Headless Gecko (every check runs headless) can't do some things a real
 # window can; those checks are skipped there and listed in
 # docs/MANUAL-CHECKS.md for a headed run.
@@ -3712,6 +3712,255 @@ DT = """const { require } = ChromeUtils.importESModule("resource://devtools/shar
 const { gDevTools } = require("devtools/client/framework/devtools");"""
 
 
+# The print preview over the selected tab (printing.js): its state, from
+# the dialog toolkit's SubDialog put over the page.
+PREVIEW = """let browser = arguments[0] ?? gBrowser.selectedBrowser;
+  let dialog = browser.tabDialogBox?.getTabDialogManager()._dialogs[0];
+  let doc = dialog?._frame.contentDocument;
+  let stack = browser.closest(".browserStack").getBoundingClientRect();
+  let box = dialog?._box.getBoundingClientRect();
+  return { open: !!dialog, url: dialog?._frame.currentURI?.spec, ready: doc?.readyState,
+    sheets: doc?.querySelector("#sheet-count")?.textContent ?? "",
+    printer: doc?.querySelector("#printer-picker")?.value,
+    visible: !!dialog && dialog._overlay.checkVisibility({ visibilityProperty: true }),
+    overPage: !!box && box.left >= stack.left && box.right <= stack.right && box.top >= stack.top && box.bottom <= stack.bottom,
+    count: browser.tabDialogBox?.getTabDialogManager()._dialogs.length ?? 0 };"""
+
+
+def pdf_page_count(data):
+    """Pages in a PDF, page objects counted in its plain text and in its
+    compressed streams (Gecko's PDFs keep their objects compressed)."""
+    text = data
+    for stream in re.findall(rb"stream\r?\n(.*?)endstream", data, re.S):
+        try:
+            text += zlib.decompress(stream)
+        except zlib.error:
+            pass
+    return len(re.findall(rb"/Type\s*/Page(?![a-zA-Z])", text))
+
+
+def part14(bindir, base, shots):
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True})
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js("window.resizeTo(1280, 860);")
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0]);", f"{base}/print.html")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'print page';", timeout=15)
+
+        # -- Ctrl+P: the preview, over the page.
+        b.js("document.getElementById('key_print').doCommand();")
+        r = b.wait("let r = (function() {" + PREVIEW + "})(); return r.sheets.startsWith('3') && r;", timeout=30)
+        record(14, "Ctrl+P opens the print preview over the page, with the page's three sheets",
+               bool(r) and r["url"] == "chrome://global/content/print.html" and r["visible"] and r["overPage"], r)
+        if shots:
+            b.m.screenshot(str(Path(shots) / "print-preview.png"))
+        r = b.js("""document.getElementById("cmd_print").doCommand();
+          return new Promise(done => setTimeout(() => done((function() {""" + PREVIEW + """})()), 500));""")
+        record(14, "Ctrl+P again doesn't open a second preview", r["count"] == 1, r)
+        menu = b.js("""let item = document.getElementById("app-menu-print");
+          return { command: item.getAttribute("command"), key: item.getAttribute("key") };""")
+        record(14, "the app menu has Print, with Ctrl+P", menu == {"command": "cmd_print", "key": "key_print"}, menu)
+
+        # -- The preview belongs to its tab.
+        r = b.js("""let tab = gBrowser.selectedTab, browser = tab.linkedBrowser;
+          gBrowser.selectTab(gBrowser.addTab("about:blank"));
+          let away = (function() {""" + PREVIEW + """}).apply(null, [browser]);
+          let other = (function() {""" + PREVIEW + """})();
+          gBrowser.removeTab(gBrowser.selectedTab, { skipPermitUnload: true });
+          gBrowser.selectTab(tab);
+          return new Promise(done => setTimeout(() => done({ away, other, back: (function() {""" + PREVIEW + """})(),
+            focused: document.activeElement?.classList.contains("dialogFrame") }), 500));""")
+        record(14, "another tab doesn't show the preview; going back to the tab shows and focuses it",
+               r["away"]["open"] and not r["away"]["visible"] and not r["other"]["open"] and r["back"]["visible"]
+               and r["focused"], r)
+
+        # -- Save to PDF, through a stand-in file picker.
+        pdf = Path(tempfile.mkdtemp(prefix="wip-print-")) / "saved.pdf"
+        b.js("""let [path] = arguments;
+          let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
+          window.realPickerCID = registrar.contractIDToCID("@mozilla.org/filepicker;1");
+          window.mockPickerCID = Services.uuid.generateUUID();
+          registrar.registerFactory(mockPickerCID, "test file picker", "@mozilla.org/filepicker;1", {
+            createInstance(iid) {
+              let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsIFile);
+              file.initWithPath(path);
+              return { QueryInterface: ChromeUtils.generateQI(["nsIFilePicker"]), init() {}, appendFilter() {},
+                defaultExtension: "", defaultString: "", file, open(cb) { cb.done(Ci.nsIFilePicker.returnOK); } }
+                .QueryInterface(iid);
+            },
+          });""", str(pdf))
+        b.js("""let doc = gBrowser.selectedBrowser.tabDialogBox.getTabDialogManager()._dialogs[0]._frame.contentDocument;
+          doc.querySelector("#print-button").click();""")
+        saved = None
+        for _ in range(60):
+            if pdf.exists() and pdf.stat().st_size > 1000 and b.js("return !(function() {" + PREVIEW + "})().open;"):
+                saved = pdf.read_bytes()
+                break
+            time.sleep(0.5)
+        b.js("""let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
+          registrar.unregisterFactory(mockPickerCID, registrar.getClassObjectByContractID("@mozilla.org/filepicker;1", Ci.nsIFactory));
+          registrar.registerFactory(realPickerCID, "", "@mozilla.org/filepicker;1", null);""")
+        pages = pdf_page_count(saved or b"")
+        record(14, "Save to PDF writes the page as a three-page PDF, then the preview closes",
+               bool(saved) and saved.startswith(b"%PDF") and pages == 3, {"bytes": len(saved or b""), "pages": pages})
+
+        # -- A page's own Print button (window.print()).
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0]);", f"{base}/print.html?auto")
+        r = b.wait("let r = (function() {" + PREVIEW + "})(); return r.sheets.startsWith('3') && r;", timeout=30)
+        record(14, "a page's own Print button (window.print()) opens the same preview", bool(r) and r["visible"], r)
+
+        # -- Cancel, and leaving the page, close it.
+        b.js("""let doc = gBrowser.selectedBrowser.tabDialogBox.getTabDialogManager()._dialogs[0]._frame.contentDocument;
+          doc.querySelector("#cancel-button").click();""")
+        r = b.wait("let r = (function() {" + PREVIEW + "})(); return !r.open && r;", timeout=10)
+        alive = b.js("return gBrowser.selectedBrowser.contentTitle;")
+        record(14, "Cancel closes the preview and leaves the page as it was", bool(r) and alive == "print page", [r, alive])
+        b.js("document.getElementById('cmd_print').doCommand();")
+        b.wait("return (function() {" + PREVIEW + "})().sheets.startsWith('3');", timeout=30)
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0]);", f"{base}/target.html")
+        r = b.wait("let r = (function() {" + PREVIEW + "})(); return !r.open && r;", timeout=15)
+        record(14, "going to another site closes the preview", bool(r), r)
+    finally:
+        b.quit()
+
+
+class ReleasesHandler(http.server.BaseHTTPRequestHandler):
+    """A stand-in for GitHub's releases API: serves RELEASES, records each
+    request's path and headers in REQUESTS."""
+    RELEASES = []
+    REQUESTS = []
+
+    def do_GET(self):
+        ReleasesHandler.REQUESTS.append({"path": self.path, "headers": {k.lower(): v for k, v in self.headers.items()}})
+        body = json.dumps(ReleasesHandler.RELEASES).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+def part15(bindir, base, shots):
+    """The opt-in check for new dev builds (DevBuilds.sys.mjs)."""
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), ReleasesHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    api = f"http://127.0.0.1:{server.server_address[1]}"
+    repo = "C1ht/browser"
+    ours = {"tag": "dev-20261101-aaaaaaa", "commit": "a" * 40, "date": 1761998400, "repo": repo}
+
+    def release(tag, created):
+        return {"tag_name": tag, "name": f"Dev build {tag}", "draft": False, "prerelease": True,
+                "created_at": created, "html_url": f"https://github.com/{repo}/releases/tag/{tag}"}
+    older = release(ours["tag"], "2025-11-01T13:00:00Z")
+    newer = release("dev-20261105-bbbbbbb", "2026-11-05T15:00:00Z")
+    ReleasesHandler.REQUESTS.clear()
+    ReleasesHandler.RELEASES = [older, newer, release("v0.1.0", "2026-11-06T10:00:00Z")]
+
+    b = Browser(bindir, env={"BWV_AUTOMATION": "1"}, prefs={
+        "browserwip.firstrun.completed": True,
+        "browserwip.devBuilds.testApi": api,
+        "browserwip.devBuilds.testBuild": json.dumps(ours),
+    })
+    DB = 'const { DevBuilds } = ChromeUtils.importESModule("resource://gre/modules/browserwip/DevBuilds.sys.mjs");'
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        time.sleep(3)
+        r = b.js(DB + """return DevBuilds._readBuild().then(() => ({ reason: DevBuilds.blockedReason(), timer: !!DevBuilds._timer,
+          pref: Services.prefs.getBoolPref("browserwip.devBuilds.check") }));""")
+        record(15, "the check is off by default, and nothing asks GitHub",
+               r == {"reason": "pref", "timer": False, "pref": False} and not ReleasesHandler.REQUESTS,
+               [r, ReleasesHandler.REQUESTS])
+        r = b.js(DB + """Services.prefs.setBoolPref("browserwip.devBuilds.check", true);
+          return { reason: DevBuilds.blockedReason(), timer: !!DevBuilds._timer };""")
+        record(15, "switched on, a check is scheduled", r == {"reason": None, "timer": True}, r)
+
+        # -- A newer build: the menu offers it, the button shows a dot. The
+        # request carries no cookies and no Referer.
+        b.js("""Services.cookies.add("127.0.0.1", "/", "session", "secret", false, false, false,
+          Date.now() + 3600000, {}, Ci.nsICookie.SAMESITE_NONE, Ci.nsICookie.SCHEME_HTTP);""")
+        r = b.js(DB + """return DevBuilds.check().then(({ newer }) => new Promise(done => setTimeout(() => done({
+          newer: newer?.tag, item: !document.getElementById("app-menu-dev-build").hidden,
+          label: document.getElementById("app-menu-dev-build").label,
+          dot: document.getElementById("app-menu-button").hasAttribute("notification") }), 500)));""")
+        req = ReleasesHandler.REQUESTS[-1] if ReleasesHandler.REQUESTS else {}
+        record(15, "a newer dev build is offered at the top of the app menu, with a dot on the menu button",
+               r["newer"] == newer["tag_name"] and r["item"] and "Nov" in (r["label"] or "") and r["dot"], r)
+        record(15, "the check asks the releases API once, with no cookies and no Referer",
+               len(ReleasesHandler.REQUESTS) == 1 and req.get("path") == f"/repos/{repo}/releases?per_page=20"
+               and "cookie" not in req.get("headers", {}) and "referer" not in req.get("headers", {}), req)
+
+        r = b.js(DB + """let opened = [];
+          let real = BrowserWip.openTab;
+          BrowserWip.openTab = url => opened.push(url);
+          document.getElementById("app-menu-dev-build").doCommand();
+          BrowserWip.openTab = real;
+          return new Promise(done => setTimeout(() => done({ opened,
+            dot: document.getElementById("app-menu-button").hasAttribute("notification"),
+            item: !document.getElementById("app-menu-dev-build").hidden }), 300));""")
+        record(15, "the menu item opens the new build's release page; the dot goes, the item stays",
+               r == {"opened": [newer["html_url"]], "dot": False, "item": True}, r)
+
+        # -- This build is the newest: nothing offered.
+        ReleasesHandler.RELEASES = [older]
+        r = b.js(DB + """return DevBuilds.check({ manual: true }).then(({ newer }) => ({ newer,
+          item: !document.getElementById("app-menu-dev-build").hidden }));""")
+        record(15, "when this is the newest dev build, nothing is offered", r == {"newer": None, "item": False}, r)
+
+        # -- Settings, About.
+        b.js("BrowserWip.openSettings();")
+        b.wait("return gBrowser.selectedBrowser.currentURI.spec.startsWith('about:settings') && "
+               "gBrowser.selectedBrowser.contentDocument?.getElementById('dev-builds-status')?.textContent;", timeout=15)
+        ReleasesHandler.RELEASES = [older, newer]
+        r = b.js("""let doc = gBrowser.selectedBrowser.contentDocument;
+          let before = doc.getElementById("dev-builds-check").getAttribute("aria-checked");
+          doc.getElementById("dev-builds-now").click();
+          return new Promise(done => setTimeout(() => done({ before,
+            status: doc.getElementById("dev-builds-status").textContent,
+            open: !doc.getElementById("dev-builds-open").hidden }), 1500));""")
+        record(15, "Settings shows the switch, and Check now reports the newer build with a link to it",
+               r["before"] == "true" and "newer dev build" in r["status"] and r["open"], r)
+        if shots:
+            b.js("gBrowser.selectedBrowser.contentDocument.getElementById('dev-builds').scrollIntoView({ block: 'center' });")
+            b.m.screenshot(str(Path(shots) / "settings-dev-builds.png"))
+        r = b.js("""let doc = gBrowser.selectedBrowser.contentDocument;
+          doc.getElementById("dev-builds-check").click();
+          return new Promise(done => setTimeout(() => done({ pref: Services.prefs.getBoolPref("browserwip.devBuilds.check"),
+            checked: doc.getElementById("dev-builds-check").getAttribute("aria-checked") }), 300));""")
+        record(15, "the switch turns the check off", r == {"pref": False, "checked": "false"}, r)
+
+        # -- Strict privacy: no checks, and the switch says why.
+        b.js("""const { PrivacyModes } = ChromeUtils.importESModule("resource://gre/modules/browserwip/PrivacyModes.sys.mjs");
+          Services.prefs.setBoolPref("browserwip.devBuilds.check", true);
+          PrivacyModes.setMode("strict");""")
+        count = len(ReleasesHandler.REQUESTS)
+        r = b.js(DB + """let doc = gBrowser.selectedBrowser.contentDocument;
+          return DevBuilds.check().then(() => "checked", e => e.message).then(result => new Promise(done => setTimeout(() => done({
+            result, timer: !!DevBuilds._timer, disabled: doc.getElementById("dev-builds-check").disabled,
+            help: doc.getElementById("dev-builds-help").textContent }), 500)));""")
+        record(15, "in Strict privacy there are no checks, and Settings says so",
+               r["result"] == "mode" and not r["timer"] and r["disabled"] and "Strict" in r["help"]
+               and len(ReleasesHandler.REQUESTS) == count, r)
+        b.js("""const { PrivacyModes } = ChromeUtils.importESModule("resource://gre/modules/browserwip/PrivacyModes.sys.mjs");
+          PrivacyModes.setMode("standard");""")
+
+        # -- A local build (no dev-build.json): nothing to compare.
+        b.js("Services.prefs.clearUserPref('browserwip.devBuilds.testBuild');")
+        r = b.js(DB + """return DevBuilds._readBuild().then(() => { Services.obs.notifyObservers(null, DevBuilds.CHANGED_TOPIC);
+          let doc = gBrowser.selectedBrowser.contentDocument;
+          return new Promise(done => setTimeout(() => done({ reason: DevBuilds.blockedReason(),
+            status: doc.getElementById("dev-builds-status").textContent,
+            now: doc.getElementById("dev-builds-now").disabled, item: !document.getElementById("app-menu-dev-build").hidden }), 500)); });""")
+        record(15, "a build that wasn't published as a dev build never checks, and Settings says why",
+               r["reason"] == "unpublished" and "wasn’t installed from a published dev build" in r["status"]
+               and r["now"] and not r["item"], r)
+    finally:
+        b.quit()
+        server.shutdown()
+
+
 def part13(bindir, base, shots):
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), CacheHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -3915,7 +4164,8 @@ def main():
              7: lambda: part7(args.bindir, base), 8: lambda: part8(args.bindir, base, args.shots),
              9: lambda: part9(args.bindir, base), 10: lambda: part10(args.bindir, base),
              11: lambda: part11(args.bindir, base), 12: lambda: part12(args.bindir, base, args.shots),
-             13: lambda: part13(args.bindir, base, args.shots)}
+             13: lambda: part13(args.bindir, base, args.shots), 14: lambda: part14(args.bindir, base, args.shots),
+             15: lambda: part15(args.bindir, base, args.shots)}
     for p in args.part:
         try:
             parts[p]()

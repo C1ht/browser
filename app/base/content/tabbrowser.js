@@ -204,6 +204,15 @@ class TabBrowser {
     return browser?.closest(".browserContainer") ?? null;
   }
 
+  /** The dialogs over browser's page, such as the print preview (printing.js). */
+  getTabDialogBox(browser) {
+    if (!browser) {
+      throw new Error("getTabDialogBox needs a browser");
+    }
+    browser.tabDialogBox ??= new TabDialogBox(browser);
+    return browser.tabDialogBox;
+  }
+
   /** A tab for one of the browser's own pages (DevTools opens about:debugging). */
   addTrustedTab(url, options = {}) {
     return this.addTab(url, {
@@ -1510,8 +1519,9 @@ class TabBrowser {
     // the window, and Gecko loads into it itself.
     let open = (uri, openWindowInfo, where, params = {}, load = true) => {
       if (where == OPEN.OPEN_PRINT_BROWSER) {
-        // window.print() previews are not supported yet.
-        return null;
+        // window.print(): the page has made a copy of itself to print, and
+        // the print preview takes it (printing.js).
+        return PrintUtils.handleStaticCloneCreatedForPrint(openWindowInfo);
       }
       if (where == OPEN.OPEN_CURRENTWINDOW && !openWindowInfo) {
         if (uri && load) {

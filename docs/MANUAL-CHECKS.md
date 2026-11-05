@@ -5,6 +5,7 @@
 | Check | Steps | Expected |
 |---|---|---|
 | An embedded player goes fullscreen (part 4) | Open a page that embeds a video from another site, for example a YouTube embed on any blog. Click the player's fullscreen button. | The video fills the screen. The address bar and tabs are hidden. The fullscreen notice names the page's site. Esc brings the bars back. |
+| The print preview fills its area (part 14) | Open a long page, press Ctrl+P. Resize the window. | The preview's pages are centered on a gray area that fills the left of the dialog, and stay so after resizing. Headless screenshots show them at two thirds of the area (the preview is drawn at the printer's 144 dpi). |
 | Split view with a real pointer (part 4 simulates the drag events) | Drag a tab slowly over the middle of another tab, then let go. Click into the page that isn't selected. Drag the bar between the pages. | While the tab is over the middle, that tab shows both tabs side by side. Letting go splits the window. Clicking into the other page moves the address bar to it. The bar resizes the pages. |
 
 Headless Gecko has no real window to make fullscreen, and it doesn't grant a fullscreen request that comes from a frame in another process. A page's own fullscreen button works headless and stays an automatic check.

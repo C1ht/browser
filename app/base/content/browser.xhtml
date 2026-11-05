@@ -20,6 +20,8 @@
   <link rel="localization" href="branding/brand.ftl"/>
   <link rel="localization" href="browser-wip/browser.ftl"/>
   <link rel="localization" href="browser-wip/passwords.ftl"/>
+  <!-- The print preview's pages and their navigation (printing.js). -->
+  <link rel="localization" href="toolkit/printing/printUI.ftl"/>
   <script src="chrome://browser-wip/content/tabbrowser.js"/>
   <script src="chrome://browser-wip/content/letterbox.js"/>
   <script src="chrome://browser-wip/content/downloads.js"/>
@@ -30,6 +32,7 @@
   <script src="chrome://browser-wip/content/passwords.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
   <script src="chrome://browser-wip/content/bookmarks.js"/>
+  <script src="chrome://browser-wip/content/printing.js"/>
   <script src="chrome://browser-wip/content/browser.js"/>
 </head>
 <body>
@@ -63,6 +66,7 @@
     <xul:command id="cmd_viewSource"/>
     <xul:command id="cmd_taskManager"/>
     <xul:command id="cmd_emptyCacheReload"/>
+    <xul:command id="cmd_print"/>
   </xul:commandset>
 
   <!-- reserved="true": handled by the browser even when a page has focus.
@@ -99,10 +103,26 @@
     <xul:key id="key_bookmarks" key="o" modifiers="accel,shift" command="cmd_bookmarks"/>
     <xul:key id="key_history" key="h" modifiers="accel" command="cmd_history"/>
     <xul:key id="key_viewSource" key="u" modifiers="accel" command="cmd_viewSource"/>
+    <xul:key id="key_print" key="p" modifiers="accel" command="cmd_print"/>
   </xul:keyset>
+
+  <!-- A dialog over one tab's page, such as the print preview: cloned for
+       each tab by printing.js (TabDialogBox), filled by toolkit's
+       SubDialog.sys.mjs, which looks for these classes. -->
+  <template id="dialogStackTemplate">
+    <xul:stack class="dialogStack tab-dialog-box" hidden="true">
+      <xul:vbox class="dialogTemplate dialogOverlay" topmost="true" hidden="true">
+        <xul:hbox class="dialogBox">
+          <xul:browser class="dialogFrame" autoscroll="false" disablehistory="true"/>
+        </xul:hbox>
+      </xul:vbox>
+    </xul:stack>
+  </template>
 
   <xul:popupset id="main-popupset">
     <xul:menupopup id="app-menu" class="wip-menu">
+      <xul:menuitem id="app-menu-dev-build" class="app-menu-dev-build" hidden="true"/>
+      <xul:menuseparator id="app-menu-dev-build-separator" hidden="true"/>
       <xul:menuitem data-l10n-id="app-menu-new-tab" key="key_newTab" command="cmd_newTab"/>
       <xul:menuitem data-l10n-id="app-menu-new-window" key="key_newWindow" command="cmd_newWindow"/>
       <xul:menuitem id="app-menu-restore-session" data-l10n-id="app-menu-restore-session" command="cmd_restoreSession"/>
@@ -110,6 +130,7 @@
       <xul:menuitem data-l10n-id="app-menu-bookmarks" key="key_bookmarks" command="cmd_bookmarks"/>
       <xul:menuitem data-l10n-id="app-menu-history" key="key_history" command="cmd_history"/>
       <xul:menuitem data-l10n-id="app-menu-downloads" key="key_downloads" command="cmd_downloads"/>
+      <xul:menuitem id="app-menu-print" data-l10n-id="app-menu-print" key="key_print" command="cmd_print"/>
       <xul:menuitem data-l10n-id="app-menu-bookmarks-bar" type="checkbox" key="key_toggleBookmarksBar"
                     command="cmd_toggleBookmarksBar"/>
       <xul:menuitem data-l10n-id="app-menu-settings" command="cmd_settings"/>

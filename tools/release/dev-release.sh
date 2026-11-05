@@ -105,6 +105,10 @@ rm -rf "$out"
 mkdir -p "$out" "$work/stage"
 tar -C "$work/stage" -xf "$package"
 [[ -x "$work/stage/browser-wip/browser-wip" ]] || die "$package has no browser-wip/browser-wip"
+# Which dev build this is, for the browser's opt-in check for newer ones
+# (DevBuilds.sys.mjs, next to the browser in every package).
+printf '{"tag": "%s", "commit": "%s", "date": %s, "repo": "%s"}\n' "$tag" "$sha" "$epoch" "$github" \
+  > "$work/stage/browser-wip/dev-build.json"
 base="browser-wip-$tag-linux-x86_64"
 # Debian and RPM sort ~ before anything, so a dev build sorts before the
 # release of the same version.

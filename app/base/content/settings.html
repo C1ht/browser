@@ -362,6 +362,22 @@
               <span id="version" class="help"></span>
             </div>
           </div>
+          <!-- The opt-in check for new dev builds (DevBuilds.sys.mjs). -->
+          <div id="dev-builds" class="toggle-row">
+            <div>
+              <label id="dev-builds-label" for="dev-builds-check" data-l10n-id="settings-dev-builds-label"></label>
+              <span id="dev-builds-help" class="help" data-l10n-id="settings-dev-builds-help"></span>
+            </div>
+            <button id="dev-builds-check" class="switch" type="button" role="switch" aria-labelledby="dev-builds-label"
+                    aria-describedby="dev-builds-help"></button>
+          </div>
+          <div class="inline-row">
+            <span id="dev-builds-status" class="help" role="status"></span>
+            <span class="dev-builds-actions">
+              <button id="dev-builds-open" class="secondary" type="button" data-l10n-id="settings-dev-builds-open" hidden="hidden"></button>
+              <button id="dev-builds-now" class="secondary" type="button" data-l10n-id="settings-dev-builds-now"></button>
+            </span>
+          </div>
           <dl class="credits">
             <dt data-l10n-id="settings-about-lists-title"></dt>
             <dd><span data-l10n-id="settings-about-lists"></span> <span id="lists-snapshot"></span></dd>

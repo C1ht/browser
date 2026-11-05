@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>print page</title>
+<style>
+  section { break-after: page; font: 16px serif; }
+  @media print { #screen-only { display: none; } }
+</style>
+<p id="screen-only">Only on screen.</p>
+<button id="print" onclick="window.print()">Print</button>
+<section><h1>Page one</h1><p>The first printed page.</p></section>
+<section><h1>Page two</h1><p>The second printed page.</p></section>
+<section><h1>Page three</h1><p>The third printed page.</p></section>
+<script>
+  // ?auto: the page prints itself once loaded, as some sites' Print buttons do.
+  if (location.search == "?auto") {
+    addEventListener("load", () => window.print());
+  }
+</script>

@@ -358,6 +358,12 @@ select:-moz-locale-dir(rtl) {
   font-weight: 600;
 }
 
+/* The dev-build check's buttons, kept together when the row wraps. */
+.dev-builds-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .credits {
   display: grid;
   grid-template-columns: max-content 1fr;

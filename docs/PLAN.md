@@ -394,6 +394,30 @@ New tabs never land between a split view's two tabs; they go just after them.
 
 Runtime part 4 covers the preview, the side-by-side layout, both pages being active, clicking into the other page, switching away and back, resizing, tab placement, swapping the halves, session restore, closing one half, and a tab from another window.
 
+## 10. Printing
+
+Printing uses Gecko's own print preview, Firefox's, unchanged: toolkit's `printUtils.js` (PrintUtils) and `print.html`, with toolkit's printing actors.
+
+- **Opening it:** Ctrl+P, Print… in the app menu, or a page's own Print button (`window.print()`, which reaches PrintUtils through the tab browser's `OPEN_PRINT_BROWSER`).
+- **The preview:** a dialog over the tab's page. It shows the pages, the printers the desktop knows (CUPS) and Save to PDF. It belongs to its tab: another tab doesn't show it, coming back focuses it, and leaving the page or closing the tab closes it. Ctrl+P while it's open focuses it instead of opening another.
+- **How it works:** PrintUtils opens dialogs through `gBrowser.getTabDialogBox(browser)`. `printing.js` supplies that as a smaller TabDialogBox: Firefox's, without the content prompts and tab-switch permission this browser doesn't use. It uses toolkit's `SubDialog.sys.mjs` and the `dialogStackTemplate` markup it expects, placed in the page's `.browserStack` so a docked DevTools toolbox stays usable. The preview sizes itself with XUL `flex` attributes, which this HTML window doesn't map, so `browser.css` does it.
+
+Runtime part 14 covers Ctrl+P, the app menu, one preview per tab, switching tabs, Save to PDF (a three-page PDF, through a stand-in file picker), `window.print()`, Cancel and leaving the page.
+
+**Not checked headless:** the preview's pages fill their area on a real screen. Gecko draws a print preview at the printer's 144 dpi, and headless screenshots paste it in at CSS-pixel size, so there it shows at two thirds. See `docs/MANUAL-CHECKS.md`.
+
+## 11. New dev builds (opt-in)
+
+A published dev build (`tools/release/dev-release.sh`) carries `dev-build.json` next to the browser: its release tag, commit, commit time and repository. With **Check for new dev builds** on (Settings → About), `DevBuilds.sys.mjs` asks GitHub's API once a day for the repository's releases and looks for a newer dev build.
+
+- **Off by default.** In any privacy mode but Standard there are no checks, as with favorite icons, and the switch says why.
+- **The request:** one GET of `api.github.com/repos/<repo>/releases`, through the normal network stack, without cookies or a Referer. The first check of a day waits a minute after startup.
+- **A newer build:** an item at the top of the app menu ("New dev build from Nov 5…") and a dot on the menu button. The item opens the build's release page; the dot goes once it's been opened. Nothing is downloaded or installed.
+- **Check now** in Settings is the user's own request, so it works with the switch off.
+- **A local build** (no `dev-build.json`) has nothing to compare, never checks, and Settings says so.
+
+Runtime part 15 covers all of this against a local stand-in for the API, including that the request carries no cookies or Referer.
+
 ## Stage 3 order (after approval)
 
 1. **Scaffolding and build config:** `fetch-gecko.sh`, project directory, branding, launcher, package manifest. Verify with `mach configure`, then a full compile and a launch to a blank window. Checkpoint.

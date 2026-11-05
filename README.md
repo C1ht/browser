@@ -39,6 +39,10 @@ On other distributions, or without root, use `mozconfigs/dev-bootstrap`
 instead: it fetches Mozilla's toolchains into `~/.mozbuild` and needs only
 the GTK/X11/Wayland development libraries, plus `unzip` and `zip`.
 
+To start it from the desktop's app launcher, run
+`tools/install-launcher.sh ../mozilla-central/obj-browser-wip/dist/bin`
+once. Run it again after the icons change.
+
 `mozconfigs/dev` targets a 4-core machine with about 13 GB of usable memory:
 no debug symbols, 3 parallel jobs. After the first build, front-end changes
 need only `./mach build faster`.
@@ -72,6 +76,10 @@ tokens or profile files, the PKGBUILD builds with makepkg, and the checksums
 match, both locally and as GitHub serves the files. Its packaging tools come
 from `tools/release/fetch-release-deps.sh` (no root). The build uses
 `mozconfigs/ci-linux`, in `../mozilla-central/obj-release`.
+
+Each package carries `dev-build.json` (tag, commit, date), which the
+browser's opt-in "Check for new dev builds" (Settings → About) compares with
+the newest release on GitHub.
 
 ## Licenses
 

@@ -10,6 +10,9 @@ const { AppConstants } = ChromeUtils.importESModule("resource://gre/modules/AppC
 const { ContentBlockingLists } = ChromeUtils.importESModule(
   "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs"
 );
+const { DevBuilds, CHECK_PREF: DEV_BUILDS_PREF } = ChromeUtils.importESModule(
+  "resource://gre/modules/browserwip/DevBuilds.sys.mjs"
+);
 
 window.addEventListener("DOMContentLoaded", () => {
   let restartRow = document.getElementById("restart-row");
@@ -680,6 +683,60 @@ window.addEventListener("DOMContentLoaded", () => {
   } catch (e) {
     // Lists missing from a broken build; the rest of the page still works.
   }
+
+  // About: the opt-in check for new dev builds.
+  let devCheck = document.getElementById("dev-builds-check");
+  let devStatus = document.getElementById("dev-builds-status");
+  let devNow = document.getElementById("dev-builds-now");
+  let devOpen = document.getElementById("dev-builds-open");
+  let devFailed = false;
+  let syncDevBuilds = () => {
+    let reason = DevBuilds.blockedReason();
+    devCheck.setAttribute("aria-checked", String(Services.prefs.getBoolPref(DEV_BUILDS_PREF, false)));
+    devCheck.disabled = reason == "unpublished" || reason == "mode";
+    devNow.disabled = reason == "unpublished";
+    document.l10n.setAttributes(
+      document.getElementById("dev-builds-help"),
+      reason == "mode" ? "settings-dev-builds-help-mode" : "settings-dev-builds-help"
+    );
+    let newer = DevBuilds.newer;
+    devOpen.hidden = !newer;
+    if (reason == "unpublished") {
+      document.l10n.setAttributes(devStatus, "settings-dev-builds-unpublished");
+    } else if (devFailed) {
+      document.l10n.setAttributes(devStatus, "settings-dev-builds-failed");
+    } else if (newer) {
+      document.l10n.setAttributes(devStatus, "settings-dev-builds-newer", { date: Date.parse(newer.date) });
+    } else if (DevBuilds.lastCheck) {
+      document.l10n.setAttributes(devStatus, "settings-dev-builds-current", { checked: DevBuilds.lastCheck.getTime() });
+    } else {
+      document.l10n.setAttributes(devStatus, "settings-dev-builds-this", { tag: DevBuilds.build.tag });
+    }
+  };
+  devCheck.addEventListener("click", () => {
+    Services.prefs.setBoolPref(DEV_BUILDS_PREF, devCheck.getAttribute("aria-checked") != "true");
+  });
+  document.getElementById("dev-builds-label").addEventListener("click", e => {
+    e.preventDefault();
+    devCheck.click();
+  });
+  devNow.addEventListener("click", async () => {
+    devNow.disabled = true;
+    document.l10n.setAttributes(devStatus, "settings-dev-builds-checking");
+    try {
+      await DevBuilds.check({ manual: true });
+      devFailed = false;
+    } catch (e) {
+      devFailed = true;
+    }
+    syncDevBuilds();
+  });
+  devOpen.addEventListener("click", () => DevBuilds.openNewer(window.browsingContext.topChromeWindow));
+  Services.obs.addObserver(syncDevBuilds, DevBuilds.CHANGED_TOPIC);
+  window.addEventListener("unload", () => Services.obs.removeObserver(syncDevBuilds, DevBuilds.CHANGED_TOPIC));
+  // The build's own dev-build.json is read at startup; a page opened before
+  // that finished asks for it here.
+  (DevBuilds.build === undefined ? DevBuilds._readBuild() : Promise.resolve()).then(syncDevBuilds);
 
   SettingsNav.init();
 });

@@ -34,6 +34,7 @@
   --accent: #0B6E6E;
   --split-bg: rgba(27, 33, 38, 0.045);
   --split-preview-bg: #CFE3E2;
+  --dialog-backdrop: rgba(15, 20, 25, 0.35);
   --warn-fg: #8A4B00;
   --warn-bg: #FBEBD4;
   --rec-fg: #C2352B;
@@ -67,6 +68,7 @@
     --accent: #5EC4BE;
     --split-bg: rgba(255, 255, 255, 0.045);
     --split-preview-bg: #1E3A39;
+    --dialog-backdrop: rgba(0, 0, 0, 0.5);
     --warn-fg: #F2B866;
     --warn-bg: #3A2A14;
     --rec-fg: #F0786E;
@@ -126,6 +128,28 @@ body {
 .toolbar-button:hover:active:not([disabled]),
 .toolbar-button[open] {
   background-color: var(--active-bg);
+}
+
+/* Something in the menu to look at: a newer dev build (DevBuilds). */
+#app-menu-button[notification] {
+  position: relative;
+}
+
+#app-menu-button[notification]::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  inset-inline-end: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--chrome-bg);
+}
+
+.app-menu-dev-build {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .toolbar-button[disabled] {
@@ -921,6 +945,80 @@ browser:focus-visible {
   grid-area: 1 / 1;
   min-width: 0;
   min-height: 0;
+}
+
+/* Dialogs over a tab's page (printing.js): the print preview. Toolkit's
+   SubDialog.sys.mjs shows and sizes them, by these classes; the rules
+   follow Firefox's (content-area.css), placed over the page's own cell. */
+.browserStack > .dialogStack {
+  grid-area: 1 / 1;
+  z-index: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dialogStack.temporarilyHidden {
+  visibility: hidden;
+}
+
+.dialogOverlay {
+  align-items: center;
+  justify-content: center;
+  visibility: hidden;
+  background-color: var(--dialog-backdrop);
+}
+
+.dialogOverlay[topmost="true"] {
+  z-index: 1;
+}
+
+.dialogBox {
+  min-width: 0;
+  display: flex;
+  padding: 0;
+  overflow-x: auto;
+  background-clip: content-box;
+  border-radius: var(--tab-radius);
+  outline: 0.5px solid var(--field-border);
+  box-shadow: var(--panel-shadow);
+  /* Pixel-snapped, so its contents don't shift by a pixel as it moves. */
+  will-change: transform;
+}
+
+.dialogBox[resizable="true"] {
+  resize: both;
+  overflow: hidden;
+  min-height: 20em;
+}
+
+/* Up to the whole page, with a margin that grows with the room. */
+.dialogBox[sizeto="available"] {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  --box-max-width-default: clamp(80%, 100% + (600px - 100%) / 2, 100%);
+  --box-max-height-default: clamp(90%, 100% + (600px - 100%) / 2, 100%);
+  max-width: var(--box-max-width-requested, var(--box-max-width-default));
+  max-height: var(--box-max-height-requested, var(--box-max-height-default));
+}
+
+.dialogFrame {
+  margin: 0;
+  flex: 1;
+  width: 34em;
+}
+
+/* The print preview's pages (printUtils.js), beside its settings. It sizes
+   itself with XUL flex attributes, which this HTML window doesn't map. */
+.dialogBox > print-preview {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+print-preview > .previewStack {
+  flex: 1;
+  min-width: 0;
 }
 
 /* A tab whose page stopped (tabbrowser.js _onBrowserCrashed), over its
