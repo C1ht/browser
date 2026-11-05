@@ -12,6 +12,8 @@ name: Ad blocker engine
 
 on:
   push:
+    # Branches only: a dev build's tag (tools/release/dev-release.sh) runs nothing.
+    branches: ["**"]
     paths:
       - "app/components/contentblocking/**"
       - "tests/blocker/**"

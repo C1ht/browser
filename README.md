@@ -55,6 +55,24 @@ tools/wayland-shot.sh <dist/bin> /tmp/p shot.png         # screenshot on headles
 
 What the runtime checks need and what they can't check headless (to do by hand): [docs/MANUAL-CHECKS.md](docs/MANUAL-CHECKS.md).
 
+## Dev builds
+
+Every pushed commit can be published as an unstable dev build, a GitHub
+pre-release, built and packaged on this machine (not on GitHub Actions):
+
+```sh
+tools/release/dev-release.sh --dry-run   # build, package and check; publish nothing
+tools/release/dev-release.sh             # the same, then publish the pushed HEAD
+```
+
+It makes `.tar.zst`, `.tar.xz`, `.deb`, `.rpm`, `.AppImage` and an AUR
+`PKGBUILD` (template: `packaging/aur/PKGBUILD.in`), with `SHA256SUMS`. Before
+publishing it unpacks each package again and checks it: no private keys,
+tokens or profile files, the PKGBUILD builds with makepkg, and the checksums
+match, both locally and as GitHub serves the files. Its packaging tools come
+from `tools/release/fetch-release-deps.sh` (no root). The build uses
+`mozconfigs/ci-linux`, in `../mozilla-central/obj-release`.
+
 ## Licenses
 
 Code: MPL-2.0. Instrument Sans: SIL Open Font License 1.1

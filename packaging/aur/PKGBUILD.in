@@ -1,0 +1,46 @@
+# Maintainer: c1ht <notanderx@gmail.com>
+#
+# The PKGBUILD for one dev build of browser-wip, for the AUR. This is its
+# template: tools/release/dev-release.sh fills in the @...@ values (the
+# build's version, release, commit, dependencies and checksums) and attaches
+# the result to the build's GitHub release as PKGBUILD, with its .SRCINFO.
+
+pkgname=browser-wip-bin
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc="Web browser built on Gecko that blocks trackers and ads (unstable dev build)"
+arch=('x86_64')
+url="https://github.com/C1ht/browser"
+license=('MPL-2.0' 'OFL-1.1' 'CC-BY-SA-3.0')
+depends=(@DEPENDS@)
+optdepends=('libpulse: sound through PulseAudio or PipeWire'
+            'ffmpeg: H.264 and AAC video'
+            'mesa: hardware-accelerated rendering')
+provides=('browser-wip')
+conflicts=('browser-wip')
+# Already stripped when it was packaged.
+options=('!strip' '!debug')
+_raw="https://raw.githubusercontent.com/C1ht/browser/@COMMIT@"
+source=("@TARBALL@::https://github.com/C1ht/browser/releases/download/@TAG@/@TARBALL@"
+        "browser-wip.desktop::$_raw/app/branding/wip/linux/browser-wip.desktop"
+        "browser-wip.metainfo.xml::$_raw/app/branding/wip/linux/browser-wip.metainfo.xml"
+        "browser-wip-256.png::$_raw/app/branding/wip/default256.png"
+        "browser-wip.svg::$_raw/app/branding/wip/icon.svg")
+sha256sums=(@SHA256SUMS@)
+
+package() {
+  install -d "$pkgdir/opt"
+  cp -a browser-wip "$pkgdir/opt/browser-wip"
+  install -d "$pkgdir/usr/bin"
+  printf '#!/bin/sh\nexec /opt/browser-wip/browser-wip "$@"\n' > "$pkgdir/usr/bin/browser-wip"
+  chmod 755 "$pkgdir/usr/bin/browser-wip"
+  install -Dm644 browser-wip.desktop "$pkgdir/usr/share/applications/browser-wip.desktop"
+  install -Dm644 browser-wip.metainfo.xml "$pkgdir/usr/share/metainfo/browser-wip.metainfo.xml"
+  local size
+  for size in 16 32 48 64 128; do
+    install -Dm644 "browser-wip/chrome/icons/default/default$size.png" \
+      "$pkgdir/usr/share/icons/hicolor/${size}x$size/apps/browser-wip.png"
+  done
+  install -Dm644 browser-wip-256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/browser-wip.png"
+  install -Dm644 browser-wip.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/browser-wip.svg"
+}

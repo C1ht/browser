@@ -1,5 +1,5 @@
-# Release build for Linux x86_64 in CI (GitHub Actions), with Mozilla's own
-# toolchains fetched by --enable-bootstrap.
+# Release build for Linux x86_64, with Mozilla's own toolchains fetched by
+# --enable-bootstrap: for dev builds (tools/release/dev-release.sh) and CI.
 ac_add_options --enable-project=browser-wip
 export MOZ_BUILD_HOOK="$topsrcdir/browser-wip/build/hook.mozbuild"
 ac_add_options --enable-bootstrap
@@ -8,6 +8,6 @@ ac_add_options --disable-debug
 ac_add_options --disable-tests
 ac_add_options --enable-release
 # Debug info is large and CI runners have little disk; symbols are not
-# published for this release.
+# published.
 ac_add_options --disable-debug-symbols
 mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-release
