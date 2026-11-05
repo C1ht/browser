@@ -23,6 +23,7 @@ if CONFIG["OS_ARCH"] == "WINNT":
 
 JS_PREFERENCE_FILES += [
     "profile/browser-wip.js",
+    "profile/devtools.js",
 ]
 
 DEFINES["APP_VERSION"] = CONFIG["MOZ_APP_VERSION"]

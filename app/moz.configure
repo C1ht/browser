@@ -20,6 +20,9 @@ imply_option("MOZ_APP_UA_NAME", "Firefox")
 
 # Toolkit features the app is built on.
 imply_option("MOZ_PLACES", True)
+# Developer tools: the whole client (toolbox, inspector, console, network,
+# debugger...), not just the remote-debugging server.
+imply_option("MOZ_DEVTOOLS", "all")
 imply_option("MOZ_DEDICATED_PROFILES", True)
 imply_option("MOZ_BLOCK_PROFILE_DOWNGRADE", True)
 

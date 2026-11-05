@@ -50,6 +50,7 @@ var BrowserWip = {
       once: true,
     });
     this._wireTabContextMenu();
+    this._wireDeveloperMenus();
     gBrowser.tabContainer.addEventListener("TabSelect", () => this._onTabSelect());
     gBrowser.tabContainer.addEventListener("TabAttrModified", e => {
       if (e.target == gBrowser.selectedTab) {
@@ -58,8 +59,8 @@ var BrowserWip = {
     });
     window.addEventListener("sizemodechange", () => {
       // Pages in a minimized window stop rendering and timers slow down.
-      if (gBrowser.selectedBrowser) {
-        gBrowser.selectedBrowser.docShellIsActive = window.windowState != window.STATE_MINIMIZED;
+      for (let browser of gBrowser.shownBrowsers) {
+        browser.docShellIsActive = window.windowState != window.STATE_MINIMIZED;
       }
     });
     window.addEventListener("close", e => {
@@ -69,7 +70,16 @@ var BrowserWip = {
     });
 
     // Session restore keeps track of the tabs.
-    for (let type of ["TabOpen", "TabClose", "TabSelect", "TabMove", "TabLocationChange", "TabAttrModified"]) {
+    for (let type of [
+      "TabOpen",
+      "TabClose",
+      "TabSelect",
+      "TabMove",
+      "TabLocationChange",
+      "TabAttrModified",
+      "TabSplit",
+      "TabUnsplit",
+    ]) {
       gBrowser.tabContainer.addEventListener(type, () => SessionStore.saveSoon());
     }
     window.addEventListener("unload", () => SessionStore.windowClosing(window));
@@ -77,9 +87,12 @@ var BrowserWip = {
     this._openInitialTabs().finally(() => {
       // Toolkit and the remote agent treat this as "the browser window is
       // ready", as Firefox's window sends it.
-      Services.tm.idleDispatchToMainThread(() =>
-        Services.obs.notifyObservers(window, "browser-delayed-startup-finished")
-      );
+      // DevTools also reads Firefox's gBrowserInit.delayedStartupFinished
+      // to set up windows that were ready before it started.
+      Services.tm.idleDispatchToMainThread(() => {
+        window.gBrowserInit = { delayedStartupFinished: true };
+        Services.obs.notifyObservers(window, "browser-delayed-startup-finished");
+      });
     });
   },
 
@@ -146,6 +159,12 @@ var BrowserWip = {
         select: false,
       })
     );
+    // A split view is saved on its first tab, with its first page's share.
+    state.tabs.forEach((saved, i) => {
+      if (saved.split && tabs[i + 1]) {
+        gBrowser.splitTabs(tabs[i], tabs[i + 1], { ratio: saved.split, select: false });
+      }
+    });
     gBrowser.selectTab(tabs[state.selected] ?? tabs[0]);
     if (blank) {
       gBrowser.removeTab(blank, { skipPermitUnload: true });
@@ -212,6 +231,9 @@ var BrowserWip = {
     cmd_toggleBookmarksBar: () => BookmarksUI.toggleBar(),
     cmd_bookmarks: () => BookmarksUI.openManager("bookmarks"),
     cmd_history: () => BookmarksUI.openManager("history"),
+    cmd_viewSource: () => BrowserWip.viewSource(),
+    cmd_taskManager: () => BrowserWip.openTab("about:processes"),
+    cmd_emptyCacheReload: () => BrowserWip.emptyCacheAndReload(),
   },
 
   // Find in page: one toolkit findbar per window, bound to the selected tab.
@@ -247,9 +269,11 @@ var BrowserWip = {
     for (let [id, handler] of Object.entries(this.COMMANDS)) {
       document.getElementById(id).addEventListener("command", handler);
     }
+    // Left button only: a chrome document also hears other buttons' clicks
+    // (middle-click on Reload opens a tab instead, and must not reload).
     document.addEventListener("click", e => {
       let button = e.target.closest("button[data-command]");
-      if (button && !button.disabled) {
+      if (button && !button.disabled && e.button == 0) {
         document.getElementById(button.dataset.command).doCommand();
       }
     });
@@ -354,14 +378,88 @@ var BrowserWip = {
   },
 
   reloadOrStop() {
-    if (gBrowser.selectedTab.hasAttribute("busy")) {
+    if (gBrowser.selectedTab.hasAttribute("crashed")) {
+      gBrowser.reviveTab(gBrowser.selectedTab);
+    } else if (gBrowser.selectedTab.hasAttribute("busy")) {
       gBrowser.selectedBrowser.stop();
     } else {
       this.reload(false);
     }
   },
 
+  // -----------------------------------------------------------------------
+  // Developer tools (devtools/, started by DevToolsStartup: its shortcuts and
+  // the app menu's Developer tools submenu)
+
+  viewSource() {
+    let uri = gBrowser.currentURI;
+    if (uri && /^(https?|file|ftp)$/.test(uri.scheme)) {
+      gBrowser.addTab("view-source:" + uri.spec, {
+        index: gBrowser.tabs.indexOf(gBrowser.selectedTab) + 1,
+        triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+      });
+    }
+  },
+
+  openTab(url) {
+    gBrowser.addTrustedTab(url);
+  },
+
+  /**
+   * Empties every cache (network, images, stylesheets, scripts, in every
+   * process) and reloads the page from the network. Cookies, storage and
+   * history stay.
+   */
+  async emptyCacheAndReload() {
+    await new Promise(resolve => Services.clearData.deleteData(Ci.nsIClearDataService.CLEAR_ALL_CACHES, resolve));
+    this.reload(true);
+  },
+
+  // Whether DevTools is open for the selected tab (docked or in its own
+  // window), without starting DevTools to find out.
+  devToolsOpen() {
+    let { DevToolsShim } = ChromeUtils.importESModule("chrome://devtools-startup/content/DevToolsShim.sys.mjs");
+    return DevToolsShim.isInitialized() && DevToolsShim.hasToolboxForTab(gBrowser.selectedTab);
+  },
+
+  _wireDeveloperMenus() {
+    // DevTools adds its items to the Developer tools submenu; emptying the
+    // cache stays last.
+    let popup = document.getElementById("menuWebDeveloperPopup");
+    let separator = document.getElementById("menu_emptyCacheSeparator");
+    let emptyCache = document.getElementById("menu_emptyCacheReload");
+    new MutationObserver(() => {
+      if (popup.lastElementChild != emptyCache) {
+        popup.append(separator, emptyCache);
+      }
+    }).observe(popup, { childList: true });
+    let reload = document.getElementById("reload-button");
+    // Middle-click opens the page again, freshly loaded, in a tab beside it.
+    reload.addEventListener("auxclick", e => {
+      if (e.button == 1) {
+        e.preventDefault();
+        this.duplicateTab(gBrowser.selectedTab, { select: false });
+      }
+    });
+    reload.addEventListener("contextmenu", e => {
+      if (this.devToolsOpen()) {
+        e.preventDefault();
+        document.getElementById("reload-menu").openPopup(reload, "after_start", 0, 4, false, false, e);
+      }
+    });
+  },
+
+  /** Opens tab's page again (a fresh load, not a copy of its history) next to it. */
+  duplicateTab(tab, { select = true } = {}) {
+    let url = tab.pendingLoad?.url ?? tab.linkedBrowser.currentURI.spec;
+    return gBrowser.addTab(url, { index: gBrowser.tabs.indexOf(tab) + 1, select });
+  },
+
   reload(skipCache) {
+    if (gBrowser.selectedTab.hasAttribute("crashed")) {
+      gBrowser.reviveTab(gBrowser.selectedTab);
+      return;
+    }
     let flags = skipCache
       ? Ci.nsIWebNavigation.LOAD_FLAGS_BYPASS_PROXY | Ci.nsIWebNavigation.LOAD_FLAGS_BYPASS_CACHE
       : Ci.nsIWebNavigation.LOAD_FLAGS_NONE;
@@ -370,8 +468,7 @@ var BrowserWip = {
 
   async closeWindow() {
     for (let tab of gBrowser.tabs) {
-      let { permitUnload } = await tab.linkedBrowser.asyncPermitUnload();
-      if (!permitUnload) {
+      if (!tab.hasAttribute("crashed") && !(await gBrowser.permitUnload(tab.linkedBrowser))) {
         gBrowser.selectTab(tab);
         return;
       }
@@ -404,16 +501,16 @@ var BrowserWip = {
       document.getElementById("tab-ctx-mute").hidden = !target.hasAttribute("soundplaying") && !muted;
       document.getElementById("tab-ctx-close-others").disabled = gBrowser.tabs.length < 2;
       document.getElementById("tab-ctx-move-window").disabled = gBrowser.tabs.length < 2;
+      document.getElementById("tab-ctx-unsplit").hidden = !target.split;
       document.getElementById("tab-ctx-reopen").disabled = !gBrowser._closedTabs.length;
       menu.openPopupAtScreen(e.screenX, e.screenY, true, e);
     });
     let on = (id, fn) => document.getElementById(id).addEventListener("command", () => target && fn(target));
     on("tab-ctx-reload", tab => tab.linkedBrowser.reload());
-    on("tab-ctx-duplicate", tab =>
-      gBrowser.addTab(tab.linkedBrowser.currentURI.spec, { index: gBrowser.tabs.indexOf(tab) + 1 })
-    );
+    on("tab-ctx-duplicate", tab => this.duplicateTab(tab));
     on("tab-ctx-pin", tab => gBrowser.setPinned(tab, !tab.hasAttribute("pinned")));
     on("tab-ctx-move-window", tab => gBrowser.tearOffTab(tab));
+    on("tab-ctx-unsplit", tab => gBrowser.unsplitTab(tab));
     on("tab-ctx-mute", tab => {
       let controller = tab.linkedBrowser.browsingContext?.mediaController;
       if (controller?.muted) {

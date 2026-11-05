@@ -15,6 +15,7 @@
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  ContentDOMReference: "resource://gre/modules/ContentDOMReference.sys.mjs",
   E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
 });
 
@@ -58,6 +59,8 @@ export class ContextMenuChild extends JSWindowActorChild {
       screenY: event.screenY * win.devicePixelRatio,
       referrerInfo: referrerInfo(info => info.initWithDocument(doc)),
       cookieJarSettings: lazy.E10SUtils.serializeCookieJarSettings(doc.cookieJarSettings),
+      // For Inspect: which element, for DevTools' inspector.
+      targetIdentifier: lazy.ContentDOMReference.get(target),
     };
 
     let link = target.closest("a[href], area[href], a");

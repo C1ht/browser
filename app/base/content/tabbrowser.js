@@ -15,7 +15,13 @@
  * move. The strip lives below the address bar; see browser.css.
  *
  * Tab events, dispatched on the tab element and bubbling to #tabs:
- *   TabSelect, TabOpen, TabClose, TabAttrModified, TabMove
+ *   TabSelect, TabOpen, TabClose, TabAttrModified, TabMove, TabSplit,
+ *   TabUnsplit
+ *
+ * Split view: two neighboring tabs can show their pages side by side
+ * (splitTabs). Both tabs then share tab.split, { tabs, ratio }; selecting
+ * either shows both, and the selected one is the one the address bar and
+ * the keyboard act on. Clicking into the other page selects it.
  */
 
 const BLOCKED_TRACKER_STATES =
@@ -26,6 +32,10 @@ const BLOCKED_TRACKER_STATES =
   Ci.nsIWebProgressListener.STATE_BLOCKED_EMAILTRACKING_CONTENT;
 
 const MAX_CLOSED_TABS = 25;
+// The narrowest a page in split view gets, as a share of the window.
+const MIN_SPLIT_RATIO = 0.15;
+// What a dragged tab carries, so another window of the browser can take it.
+const TAB_DROP_TYPE = "application/x-browserwip-tab";
 
 // Letter tiles for sites without a favicon yet: a stable color per host.
 const TILE_COLORS = ["#3B6EA8", "#4E7A3A", "#B4452F", "#6B4C9A", "#2F7D74", "#8C6A1E", "#A0436E", "#4A6475"];
@@ -115,14 +125,21 @@ class TabBrowser {
     this.tabContainer = this.document.getElementById("tabs");
     this.browserContainer = this.document.getElementById("browsers");
     this.tabs = [];
-    this.selectedTab = null;
+    this._selectedTab = null;
+    this._panelCount = 0;
     this._closedTabs = [];
     // The last tab opened next to its opener: { opener, tab }.
     this._lastRelatedTab = null;
     this._filters = new WeakMap();
     this._listeners = new WeakMap();
 
-    this.tabContainer.addEventListener("pointerdown", this);
+    this.tabContainer.addEventListener("dragstart", this);
+    this.tabContainer.addEventListener("dragend", this);
+    // A tab may be dropped anywhere in the window: on the strip to place it,
+    // elsewhere to take it from another window (and not tear it off).
+    for (let type of ["dragover", "dragleave", "drop"]) {
+      this.window.addEventListener(type, this, true);
+    }
     this.tabContainer.addEventListener("click", this);
     // On the whole strip: its empty space (beside the tabs, around the
     // new-tab button) opens a tab on double- or middle-click.
@@ -134,6 +151,25 @@ class TabBrowser {
     // A page's window.close(), and a tab Gecko opened only for a link that
     // turned out to be a download (toolkit's BrowserElementParent sends it).
     this.browserContainer.addEventListener("DOMWindowClose", this);
+    // A page's content process died, or can't start because the browser's
+    // files changed on disk since it started.
+    this.browserContainer.addEventListener("oop-browser-crashed", this);
+    this.browserContainer.addEventListener("oop-browser-buildid-mismatch", this);
+    // DevTools closing (or moving) gives the page its space back.
+    new this.window.MutationObserver(records => this._onToolboxRemoved(records)).observe(this.browserContainer, {
+      childList: true,
+      subtree: true,
+    });
+    // Split view: the bar between the two pages, which resizes them; and
+    // clicking into the page that isn't selected selects it.
+    this._splitter = this.document.createElement("div");
+    this._splitter.id = "split-view-splitter";
+    this._splitter.hidden = true;
+    this._splitter.addEventListener("pointerdown", e => this._onSplitterPointerDown(e));
+    this._splitter.addEventListener("dblclick", () => this._setSplitRatio(this.selectedTab?.split, 0.5));
+    this.browserContainer.append(this._splitter);
+    this._splitShown = [];
+    this.browserContainer.addEventListener("focus", this, true);
     this.window.addEventListener(
       "unload",
       () => this.tabs.forEach(t => this._unregisterAudible(t)),
@@ -142,8 +178,38 @@ class TabBrowser {
     this._initScrolling();
   }
 
+  get selectedTab() {
+    return this._selectedTab;
+  }
+
+  // Assigning selects, as in Firefox (DevTools does it).
+  set selectedTab(tab) {
+    this.selectTab(tab);
+  }
+
   get selectedBrowser() {
     return this.selectedTab?.linkedBrowser ?? null;
+  }
+
+  get currentURI() {
+    return this.selectedBrowser?.currentURI ?? null;
+  }
+
+  /**
+   * The element around a tab's page that DevTools docks its toolbox into,
+   * with Firefox's structure and class names: .browserSidebarContainer >
+   * .browserContainer > .browserStack > <browser>.
+   */
+  getBrowserContainer(browser = this.selectedBrowser) {
+    return browser?.closest(".browserContainer") ?? null;
+  }
+
+  /** A tab for one of the browser's own pages (DevTools opens about:debugging). */
+  addTrustedTab(url, options = {}) {
+    return this.addTab(url, {
+      ...options,
+      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+    });
   }
 
   get browsers() {
@@ -200,6 +266,9 @@ class TabBrowser {
     index = options.pinned
       ? Math.min(index, boundary)
       : Math.max(boundary, Math.min(index, this.tabs.length));
+    if (this._isSplitInterior(this.tabs, index)) {
+      index++;
+    }
     this.tabs.splice(index, 0, tab);
     this.tabContainer.insertBefore(tab, this.tabContainer.children[index] ?? null);
     if (opener && options.index == null) {
@@ -210,7 +279,7 @@ class TabBrowser {
     }
 
     // Inserting the browser creates its frame loader and browsing context.
-    this.browserContainer.appendChild(browser);
+    this.browserContainer.appendChild(this._createBrowserPanel(browser));
     this._addProgressListener(tab);
     this._registerAudible(tab);
     if (url && options.lazy) {
@@ -229,12 +298,18 @@ class TabBrowser {
     // selects the right tab next, and only that one should load.
     if (select || (!this.selectedTab && !options.lazy)) {
       this.selectTab(tab);
+    } else if (!options.lazy) {
+      // A tab opened in the background (a middle-clicked link): the strip
+      // scrolls to show where it went, and the current tab stays selected.
+      this.scrollTabIntoView(tab);
     }
     return tab;
   }
 
   _createTabElement() {
-    let tab = this.document.createElement("div");
+    // A <tab> (an unknown element in the XHTML namespace, nothing more), as
+    // Firefox's tabs are: DevTools only treats a tab as one by its tag name.
+    let tab = this.document.createElement("tab");
     tab.className = "tab";
     tab.setAttribute("role", "tab");
     tab.setAttribute("tabindex", "-1");
@@ -258,9 +333,24 @@ class TabBrowser {
     closeIcon.setAttribute("alt", "");
     close.append(closeIcon);
     tab.querySelector(".tab-shoulder.end").before(close);
+    tab.draggable = true;
     tab.blockedTrackers = 0;
     tab.securityState = 0;
     return tab;
+  }
+
+  _createBrowserPanel(browser) {
+    let panel = this.document.createElement("div");
+    panel.className = "browserSidebarContainer";
+    panel.id = `panel-${++this._panelCount}`;
+    let container = this.document.createElement("div");
+    container.className = "browserContainer";
+    let stack = this.document.createElement("div");
+    stack.className = "browserStack";
+    stack.append(browser);
+    container.append(stack);
+    panel.append(container);
+    return panel;
   }
 
   _createBrowser({ remoteType, openWindowInfo, name }) {
@@ -349,18 +439,15 @@ class TabBrowser {
    * Closes a tab. adopted: it moved to another window (adoptTab), so it
    * isn't offered by "Reopen closed tab".
    */
-  async removeTab(tab, { skipPermitUnload = false, adopted = false } = {}) {
+  async removeTab(tab, { skipPermitUnload = false, adopted = false, remember = true } = {}) {
     if (!tab || tab.closing) {
       return;
     }
     tab.closing = true;
     let browser = tab.linkedBrowser;
-    if (!skipPermitUnload) {
-      let { permitUnload } = await browser.asyncPermitUnload();
-      if (!permitUnload) {
-        tab.closing = false;
-        return;
-      }
+    if (!skipPermitUnload && !tab.hasAttribute("crashed") && !(await this.permitUnload(browser))) {
+      tab.closing = false;
+      return;
     }
 
     // Closing the last tab closes the window.
@@ -369,8 +456,16 @@ class TabBrowser {
       return;
     }
 
+    // The other half of a split view takes the whole window (selected
+    // first, so its page stays active throughout).
+    let partner = this.splitPartner(tab);
+    if (partner && tab == this.selectedTab) {
+      this.selectTab(partner);
+    }
+    this.unsplitTab(tab);
+
     let url = tab.pendingLoad?.url ?? browser.currentURI?.spec;
-    if (url && url != "about:blank" && !adopted) {
+    if (url && url != "about:blank" && !adopted && remember) {
       this._closedTabs.push({ url, index: this.tabs.indexOf(tab) });
       this._closedTabs.splice(0, this._closedTabs.length - MAX_CLOSED_TABS);
     }
@@ -381,12 +476,99 @@ class TabBrowser {
       let next = this.tabs[index + 1] ?? this.tabs[index - 1];
       this.selectTab(next);
     }
-    this._notify(tab, "TabClose");
+    // A tab adopted by another window announced its TabClose already.
+    if (!adopted) {
+      this._notify(tab, "TabClose");
+    }
     this._removeProgressListener(tab);
     this._unregisterAudible(tab);
     this.tabs.splice(index, 1);
     tab.remove();
-    browser.remove();
+    (browser.closest(".browserSidebarContainer") ?? browser).remove();
+  }
+
+  /**
+   * Whether a page lets itself be closed. As in Firefox, only a page with a
+   * beforeunload handler is asked; a page whose process is gone can't
+   * answer, and doesn't stop anything.
+   */
+  async permitUnload(browser) {
+    try {
+      if (!browser.hasBeforeUnload) {
+        return true;
+      }
+      let { permitUnload } = await browser.asyncPermitUnload();
+      return permitUnload;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  // When a docked toolbox goes, the page grows back into its space. Its
+  // process is told the new size and repaints, as switching tabs does;
+  // otherwise the space could stay blank until then.
+  _onToolboxRemoved(records) {
+    for (let record of records) {
+      if (![...record.removedNodes].some(n => n.classList?.contains("devtools-toolbox-iframe"))) {
+        continue;
+      }
+      let browser = record.target.querySelector?.(".browserStack > browser");
+      if (!browser?.isRemoteBrowser) {
+        continue;
+      }
+      this.window.requestAnimationFrame(() => {
+        browser.frameLoader?.requestUpdatePosition();
+        if (this.shownBrowsers.includes(browser) && this.window.windowState != this.window.STATE_MINIMIZED) {
+          browser.docShellIsActive = false;
+          browser.docShellIsActive = true;
+        }
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Crashed tabs
+
+  _onBrowserCrashed(event) {
+    let browser = event.originalTarget;
+    let tab = this.getTabForBrowser(browser);
+    // A crashed frame inside a page shows as an empty frame; only a whole
+    // page needs this.
+    if (!tab || !event.isTopFrame) {
+      return;
+    }
+    let restart = event.type == "oop-browser-buildid-mismatch";
+    tab.setAttribute("crashed", restart ? "restart" : "crash");
+    tab.removeAttribute("busy");
+    tab.removeAttribute("soundplaying");
+    let page = this.document.createElement("div");
+    page.className = "tab-crashed-page";
+    page.setAttribute("role", "alert");
+    let heading = this.document.createElement("h1");
+    let text = this.document.createElement("p");
+    let button = this.document.createElement("button");
+    button.className = "tab-crashed-button";
+    this.document.l10n.setAttributes(heading, restart ? "tab-restart-title" : "tab-crashed-title");
+    this.document.l10n.setAttributes(text, restart ? "tab-restart-text" : "tab-crashed-text");
+    this.document.l10n.setAttributes(button, restart ? "tab-restart-button" : "tab-crashed-button");
+    button.addEventListener("click", () => (restart ? SessionStore.restart() : this.reviveTab(tab)));
+    page.append(heading, text, button);
+    browser.closest(".browserStack").querySelector(".tab-crashed-page")?.remove();
+    browser.closest(".browserStack").append(page);
+    this._notify(tab, "TabAttrModified");
+  }
+
+  /** A crashed tab again, in a new process: a fresh tab in its place. */
+  reviveTab(tab) {
+    let url = tab.linkedBrowser.currentURI?.spec;
+    let fresh = this.addTab(url && url != "about:blank" ? url : NEW_TAB_URL, {
+      index: this.tabs.indexOf(tab),
+      pinned: tab.hasAttribute("pinned"),
+      select: tab == this.selectedTab,
+      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+    });
+    this.removeTab(tab, { skipPermitUnload: true, remember: false });
+    return fresh;
   }
 
   reopenClosedTab() {
@@ -415,6 +597,11 @@ class TabBrowser {
       tab = this.addTab(url, { index, pinned, lazy: true, title, icon: otherTab.favicon, select: false });
     } else {
       tab = this.addTab(null, { index, pinned, select: false, remoteType: otherTab.linkedBrowser.remoteType || null });
+    }
+    // Before the swap, as Firefox does: an open DevTools toolbox moves along
+    // with its tab when it hears this.
+    other._notify(otherTab, "TabClose", { adoptedBy: tab });
+    if (!otherTab.pendingLoad) {
       this._swapBrowsers(tab, otherTab);
     }
     other.removeTab(otherTab, { skipPermitUnload: true, adopted: true });
@@ -482,76 +669,6 @@ class TabBrowser {
     }
   }
 
-  // The other browser windows a tab from this one may move to.
-  _otherWindows() {
-    let isPrivate = PrivateBrowsingUtils.isWindowPrivate(this.window);
-    return [...Services.wm.getEnumerator("navigator:browser")].filter(
-      win =>
-        win != this.window &&
-        !win.closed &&
-        win.gBrowser &&
-        win.windowState != win.STATE_MINIMIZED &&
-        PrivateBrowsingUtils.isWindowPrivate(win) == isPrivate
-    );
-  }
-
-  // The window whose tab strip is at this point of the screen, or null.
-  _windowWithStripAt(screenX, screenY) {
-    if (!this._hasScreenCoordinates) {
-      return null;
-    }
-    // A little above and below the strip still counts.
-    let SLACK = 12;
-    for (let win of this._otherWindows()) {
-      let box = win.gBrowser.tabContainer.getBoundingClientRect();
-      let x = screenX - win.mozInnerScreenX;
-      let y = screenY - win.mozInnerScreenY;
-      if (x >= box.left && x <= box.right && y >= box.top - SLACK && y <= box.bottom + SLACK) {
-        return win;
-      }
-    }
-    return null;
-  }
-
-  // Where a tab dropped at screenX goes in this strip: before the first tab
-  // whose middle is past it.
-  _indexAtScreenX(screenX) {
-    let x = screenX - this.window.mozInnerScreenX;
-    let index = this.tabs.findIndex(t => {
-      let r = t.getBoundingClientRect();
-      return r.left + r.width / 2 > x;
-    });
-    return index < 0 ? this.tabs.length : index;
-  }
-
-  // A tab dragged off the strip and let go: onto another window's strip,
-  // or into a new window of its own.
-  _dropDetachedTab(tab, event) {
-    let target = this._windowWithStripAt(event.screenX, event.screenY);
-    if (target) {
-      target.gBrowser.adoptTab(tab, { index: target.gBrowser._indexAtScreenX(event.screenX) });
-      target.focus();
-      return;
-    }
-    this.tearOffTab(tab, { screenX: event.screenX, screenY: event.screenY });
-  }
-
-  // What follows the pointer once a tab is off the strip: a copy of it.
-  _createDragGhost(tab) {
-    let ghost = tab.cloneNode(true);
-    for (let attr of ["dragging", "detaching", "id", "tabindex"]) {
-      ghost.removeAttribute(attr);
-    }
-    ghost.setAttribute("selected", "true");
-    ghost.setAttribute("aria-hidden", "true");
-    ghost.querySelector(".tab-close")?.remove();
-    ghost.classList.add("tab-drag-ghost");
-    ghost.style.transform = "";
-    ghost.style.width = `${tab.getBoundingClientRect().width}px`;
-    (this.document.body ?? this.document.documentElement).append(ghost);
-    return ghost;
-  }
-
   // ---------------------------------------------------------------------
   // Selection
 
@@ -566,22 +683,39 @@ class TabBrowser {
       previous.setAttribute("aria-selected", "false");
       previous.setAttribute("tabindex", "-1");
       previous.linkedBrowser.removeAttribute("selected");
-      previous.linkedBrowser.docShellIsActive = false;
+      previous.linkedBrowser.closest(".browserSidebarContainer")?.removeAttribute("selected");
+      // The other half of the same split view stays on screen.
+      if (!previous.split || previous.split != tab.split) {
+        previous.linkedBrowser.docShellIsActive = false;
+      }
     }
-    this.selectedTab = tab;
+    this._selectedTab = tab;
     tab.setAttribute("selected", "true");
     tab.setAttribute("aria-selected", "true");
     tab.setAttribute("tabindex", "0");
     let browser = tab.linkedBrowser;
     browser.setAttribute("selected", "true");
+    browser.closest(".browserSidebarContainer")?.setAttribute("selected", "true");
     browser.docShellIsActive = this.window.windowState != this.window.STATE_MINIMIZED;
+    this._loadPending(tab);
+    this._updateSplitView();
+    this.scrollTabIntoView(tab);
+    this._notify(tab, "TabSelect", { previous });
+  }
+
+  // A restored tab loads when it is first shown.
+  _loadPending(tab) {
     if (tab.pendingLoad) {
       let { url } = tab.pendingLoad;
       delete tab.pendingLoad;
-      this.loadURL(browser, url);
+      this.loadURL(tab.linkedBrowser, url);
     }
-    this.scrollTabIntoView(tab);
-    this._notify(tab, "TabSelect", { previous });
+  }
+
+  /** The pages on screen: the selected tab's, and its split partner's. */
+  get shownBrowsers() {
+    let tab = this.selectedTab;
+    return tab ? (tab.split ? this._splitPair(tab.split) : [tab]).map(t => t.linkedBrowser) : [];
   }
 
   advanceSelectedTab(direction) {
@@ -708,13 +842,31 @@ class TabBrowser {
       ? Math.max(0, Math.min(newIndex, boundary))
       : Math.max(boundary, Math.min(newIndex, this.tabs.length - 1));
     let oldIndex = this.tabs.indexOf(tab);
+    let rest = this.tabs.filter(t => t != tab);
+    if (this._isSplitInterior(rest, newIndex)) {
+      newIndex += newIndex > oldIndex ? 1 : -1;
+    }
     if (newIndex == oldIndex) {
       return;
     }
     this.tabs.splice(oldIndex, 1);
     this.tabs.splice(newIndex, 0, tab);
     this.tabContainer.insertBefore(tab, this.tabs[newIndex + 1] ?? null);
+    // Moved away from its other half, a tab leaves split view.
+    let partner = this.splitPartner(tab);
+    if (partner && Math.abs(this.tabs.indexOf(partner) - newIndex) != 1) {
+      this.unsplitTab(tab);
+    } else if (partner) {
+      this._updateSplitAttributes();
+      this._updateSplitView();
+    }
     this._notify(tab, "TabMove", { oldIndex, newIndex });
+  }
+
+  // Whether index, in tabs, falls between the two halves of a split view.
+  _isSplitInterior(tabs, index) {
+    let before = tabs[index - 1];
+    return !!before?.split && before.split == tabs[index]?.split;
   }
 
   moveSelectedTab(direction) {
@@ -725,10 +877,169 @@ class TabBrowser {
     if (pinned == tab.hasAttribute("pinned")) {
       return;
     }
+    // Pinned tabs don't split.
+    this.unsplitTab(tab);
     // Move first so the tab lands at the edge of the pinned group.
     this.moveTab(tab, this._firstUnpinnedIndex() - (pinned ? 0 : 1));
     tab.toggleAttribute("pinned", pinned);
     this._notify(tab, "TabAttrModified");
+  }
+
+  // ---------------------------------------------------------------------
+  // Split view
+
+  /**
+   * Shows two tabs' pages side by side: tab (from this window or another,
+   * as dragged onto target) goes next to target, after it. Either may have
+   * been in another split view; it leaves that one.
+   * ratio: the first page's share of the width. select: select tab.
+   */
+  splitTabs(target, tab, { ratio = 0.5, select = true } = {}) {
+    if (!this.canSplit(target, tab)) {
+      return null;
+    }
+    if (tab.ownerDocument != this.document) {
+      tab = this.adoptTab(tab, { index: this.tabs.indexOf(target) + 1, select: false });
+    }
+    this.unsplitTab(target);
+    this.unsplitTab(tab);
+    let at = this.tabs.indexOf(target);
+    this.moveTab(tab, this.tabs.indexOf(tab) < at ? at : at + 1);
+    let split = { tabs: [target, tab], ratio };
+    target.split = tab.split = split;
+    this._updateSplitAttributes();
+    if (select && this.selectedTab != tab) {
+      this.selectTab(tab);
+    } else {
+      this._updateSplitView();
+    }
+    this._notify(tab, "TabSplit", { partner: target });
+    return split;
+  }
+
+  // Two different tabs, neither pinned, not already split together.
+  canSplit(target, tab) {
+    return (
+      !!target &&
+      !!tab &&
+      target != tab &&
+      !target.closing &&
+      !tab.closing &&
+      !target.hasAttribute("pinned") &&
+      !tab.hasAttribute("pinned") &&
+      (!tab.split || tab.split != target.split)
+    );
+  }
+
+  /** Ends the split view tab is in; both tabs stay, as ordinary tabs. */
+  unsplitTab(tab) {
+    let split = tab?.split;
+    if (!split) {
+      return;
+    }
+    for (let t of split.tabs) {
+      delete t.split;
+    }
+    this._updateSplitAttributes();
+    this._updateSplitView();
+    this._notify(tab, "TabUnsplit");
+  }
+
+  splitPartner(tab) {
+    return tab?.split?.tabs.find(t => t != tab) ?? null;
+  }
+
+  // A split view's two tabs in strip order.
+  _splitPair(split) {
+    return [...split.tabs].sort((a, b) => this.tabs.indexOf(a) - this.tabs.indexOf(b));
+  }
+
+  // In the strip, a split view's tabs read as one: split="start"/"end".
+  _updateSplitAttributes() {
+    for (let t of this.tabs) {
+      if (t.split) {
+        t.setAttribute("split", this._splitPair(t.split)[0] == t ? "start" : "end");
+      } else {
+        t.removeAttribute("split");
+      }
+    }
+  }
+
+  // Lays out the pages on screen: the selected tab's alone, or both halves
+  // of its split view, which are both active (rendering, at full speed).
+  _updateSplitView() {
+    let tab = this.selectedTab;
+    let shown = tab?.split ? this._splitPair(tab.split) : [];
+    let active = this.window.windowState != this.window.STATE_MINIMIZED;
+    for (let t of this._splitShown) {
+      if (!shown.includes(t)) {
+        t.removeAttribute("split-shown");
+        t.linkedBrowser.closest(".browserSidebarContainer")?.removeAttribute("split-side");
+        if (t != tab && this.tabs.includes(t)) {
+          t.linkedBrowser.docShellIsActive = false;
+        }
+      }
+    }
+    shown.forEach((t, i) => {
+      t.setAttribute("split-shown", "true");
+      t.linkedBrowser.closest(".browserSidebarContainer").setAttribute("split-side", i ? "end" : "start");
+      if (t != tab) {
+        t.linkedBrowser.docShellIsActive = active;
+        this._loadPending(t);
+      }
+    });
+    this._splitShown = shown;
+    this.browserContainer.toggleAttribute("split", !!shown.length);
+    this._splitter.hidden = !shown.length;
+    this._applySplitRatio();
+  }
+
+  _applySplitRatio() {
+    let split = this.selectedTab?.split;
+    this.browserContainer.style.gridTemplateColumns = split
+      ? `minmax(0, ${split.ratio}fr) auto minmax(0, ${1 - split.ratio}fr)`
+      : "";
+  }
+
+  _setSplitRatio(split, ratio) {
+    if (!split) {
+      return;
+    }
+    split.ratio = Math.min(1 - MIN_SPLIT_RATIO, Math.max(MIN_SPLIT_RATIO, ratio));
+    this._applySplitRatio();
+    // Session restore keeps the sizes.
+    this._notify(split.tabs[0], "TabAttrModified");
+  }
+
+  // Dragging the bar between the pages resizes them; a double-click evens
+  // them out.
+  _onSplitterPointerDown(event) {
+    let split = this.selectedTab?.split;
+    if (event.button != 0 || !split) {
+      return;
+    }
+    event.preventDefault();
+    let box = this.browserContainer.getBoundingClientRect();
+    let rtl = this.window.getComputedStyle(this.browserContainer).direction == "rtl";
+    let splitter = this._splitter;
+    try {
+      // Over the pages, the pointer would otherwise go to them.
+      splitter.setPointerCapture(event.pointerId);
+    } catch (e) {}
+    splitter.setAttribute("dragging", "true");
+    let move = e => {
+      let x = rtl ? box.right - e.clientX : e.clientX - box.left;
+      this._setSplitRatio(split, x / box.width);
+    };
+    let up = () => {
+      splitter.removeAttribute("dragging");
+      this.window.removeEventListener("pointermove", move, true);
+      this.window.removeEventListener("pointerup", up, true);
+      this.window.removeEventListener("pointercancel", up, true);
+    };
+    this.window.addEventListener("pointermove", move, true);
+    this.window.addEventListener("pointerup", up, true);
+    this.window.addEventListener("pointercancel", up, true);
   }
 
   // ---------------------------------------------------------------------
@@ -837,8 +1148,20 @@ class TabBrowser {
 
   handleEvent(event) {
     switch (event.type) {
-      case "pointerdown":
-        this._onPointerDown(event);
+      case "dragstart":
+        this._onDragStart(event);
+        break;
+      case "dragend":
+        this._onDragEnd(event);
+        break;
+      case "dragover":
+        this._onDragOver(event);
+        break;
+      case "dragleave":
+        this._onDragLeave(event);
+        break;
+      case "drop":
+        this._onDrop(event);
         break;
       case "click": {
         let tab = event.target.closest(".tab");
@@ -884,6 +1207,18 @@ class TabBrowser {
         }
         break;
       }
+      case "focus": {
+        // Clicking into the other page of a split view selects its tab.
+        let tab = event.target.localName == "browser" ? this.getTabForBrowser(event.target) : null;
+        if (tab?.split && tab != this.selectedTab && tab.split == this.selectedTab?.split) {
+          this.selectTab(tab);
+        }
+        break;
+      }
+      case "oop-browser-crashed":
+      case "oop-browser-buildid-mismatch":
+        this._onBrowserCrashed(event);
+        break;
       case "WillChangeBrowserRemoteness":
         this._onWillChangeRemoteness(event.target);
         break;
@@ -908,6 +1243,8 @@ class TabBrowser {
         // eslint-disable-next-line no-self-assign
         browser.docShellIsActive = browser.docShellIsActive;
         this._updateBlockedCount(tab);
+        // DevTools follows the page into its new process.
+        this._notify(tab, "TabRemotenessChange");
       },
       { once: true }
     );
@@ -931,193 +1268,235 @@ class TabBrowser {
   }
 
   // ---------------------------------------------------------------------
-  // Drag to reorder (pointer events: smooth, and works the same with touch)
+  // Dragging tabs: native drag and drop, as in Firefox, so the desktop
+  // carries a tab between windows (Wayland tells a window nothing about the
+  // pointer outside it otherwise). Along the strip a tab reorders; on
+  // another window's strip it joins that window there, elsewhere in a
+  // browser window at the end; let go outside every window, it opens in a
+  // window of its own. Other apps get its address. Let go over the middle
+  // of another tab, the two tabs split the window (a preview shows them
+  // side by side in the tab first).
 
-  _onPointerDown(event) {
-    let tab = event.target.closest(".tab");
-    if (!tab || event.button != 0 || event.target.closest(".tab-close")) {
+  _onDragStart(event) {
+    let tab = event.target.closest?.(".tab");
+    if (!tab || tab.closing || event.target.closest(".tab-close")) {
       return;
     }
+    let dt = event.dataTransfer;
+    dt.mozSetDataAt(TAB_DROP_TYPE, tab, 0);
+    let url = tab.pendingLoad?.url ?? tab.linkedBrowser.currentURI?.spec;
+    if (url && url != "about:blank") {
+      let title = tab.querySelector(".tab-label").textContent;
+      dt.mozSetDataAt("text/x-moz-url", `${url}\n${title}`, 0);
+      dt.mozSetDataAt("text/uri-list", url, 0);
+      dt.mozSetDataAt("text/plain", url, 0);
+    }
+    dt.effectAllowed = "copyMove";
+    let r = tab.getBoundingClientRect();
+    dt.setDragImage(tab, event.clientX - r.left, event.clientY - r.top);
+    this.selectTab(tab);
+    tab.setAttribute("dragging", "true");
+  }
+
+  _onDragEnd(event) {
+    let tab = event.target.closest?.(".tab");
+    if (!tab) {
+      return;
+    }
+    tab.removeAttribute("dragging");
+    this._clearDropGap();
+    this._clearSplitPreview();
+    let dt = event.dataTransfer;
+    // Taken by a strip or a window (dropEffect set), or cancelled (Escape).
+    if (dt.dropEffect != "none" || dt.mozUserCancelled || tab.closing || !this.tabs.includes(tab)) {
+      return;
+    }
+    // Let go outside every browser window.
+    this.tearOffTab(tab, { screenX: event.screenX, screenY: event.screenY });
+  }
+
+  // The tab being dragged, if it is one of this browser's (from any window).
+  _draggedTab(event) {
+    let dt = event.dataTransfer;
+    if (!dt?.types.includes(TAB_DROP_TYPE)) {
+      return null;
+    }
+    let tab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
+    let win = tab?.ownerDocument?.defaultView;
+    if (!win?.gBrowser || tab.closing || PrivateBrowsingUtils.isWindowPrivate(win) != PrivateBrowsingUtils.isWindowPrivate(this.window)) {
+      return null;
+    }
+    return tab;
+  }
+
+  // Where a tab dropped at clientX goes in this strip, among the tabs of its
+  // kind (pinned or not): an index into the strip without that tab. Tabs
+  // count by where they are laid out, not where they slid to make room.
+  _dropIndex(clientX, tab) {
+    let pinned = tab.hasAttribute("pinned");
+    let others = this.tabs.filter(t => t != tab);
+    let group = others.filter(t => t.hasAttribute("pinned") == pinned);
+    let laidOut = t => {
+      let r = t.getBoundingClientRect();
+      // Where it is right now, sliding included.
+      let slid = new this.window.DOMMatrix(this.window.getComputedStyle(t).transform).m41;
+      return { left: r.left - slid, width: r.width };
+    };
+    let before = group.filter(t => {
+      let r = laidOut(t);
+      return r.left + r.width / 2 < clientX;
+    }).length;
+    let index = (pinned ? 0 : others.filter(t => t.hasAttribute("pinned")).length) + before;
+    // Not between a split view's tabs: beside them, on the nearer side.
+    if (this._isSplitInterior(others, index)) {
+      index += clientX < laidOut(others[index]).left ? -1 : 1;
+    }
+    return index;
+  }
+
+  // The tab a dragged tab would split the window with: the one whose middle
+  // half it is over (the outer quarters reorder).
+  _splitTarget(event, tab) {
+    let target = event.target.closest?.(".tab");
+    if (!target || target.ownerDocument != this.document || !this.canSplit(target, tab)) {
+      return null;
+    }
+    let r = target.getBoundingClientRect();
+    let x = event.clientX - r.left;
+    return x > r.width / 4 && x < (r.width * 3) / 4 ? target : null;
+  }
+
+  // The preview: the target tab shows both tabs side by side, as they would
+  // sit once split.
+  _showSplitPreview(target, tab) {
+    if (this._splitPreview?.target == target) {
+      return;
+    }
+    this._clearSplitPreview();
+    let preview = this.document.createElement("span");
+    preview.className = "tab-split-preview";
+    for (let t of [target, tab]) {
+      let half = this.document.createElement("span");
+      half.className = "tab-split-preview-half";
+      half.append(t.querySelector(".tab-icon").cloneNode(true), t.querySelector(".tab-label").cloneNode(true));
+      preview.append(half);
+    }
+    preview.lastChild.setAttribute("dragged", "true");
+    target.append(preview);
+    target.setAttribute("split-target", "true");
+    this._splitPreview = { target, preview };
+  }
+
+  _clearSplitPreview() {
+    if (this._splitPreview) {
+      this._splitPreview.preview.remove();
+      this._splitPreview.target.removeAttribute("split-target");
+      this._splitPreview = null;
+    }
+  }
+
+  // Shows where the tab would land: the tabs slide to make room for it,
+  // and a tab of this window slides there itself.
+  _showDropGap(tab, index) {
+    let own = tab.ownerDocument == this.document;
+    let width = tab.getBoundingClientRect().width;
+    let shift = (t, px) => {
+      t.dropShift = px;
+      t.style.transform = px ? `translateX(${px}px)` : "";
+    };
+    this.tabContainer.setAttribute("reordering", "true");
+    let rest = this.tabs.filter(t => t != tab);
+    rest.forEach((t, i) => {
+      let slot = i < index ? i : i + 1;
+      let current = own ? this.tabs.indexOf(t) : i;
+      shift(t, (slot - current) * width);
+    });
+    if (own) {
+      shift(tab, (index - this.tabs.indexOf(tab)) * width);
+    }
+  }
+
+  _clearDropGap() {
+    for (let t of this.tabs) {
+      t.dropShift = 0;
+      t.style.transform = "";
+    }
+    this.tabContainer.removeAttribute("reordering");
+  }
+
+  // Near either end of a strip that scrolls, it scrolls along.
+  _autoScrollForDrag(clientX) {
     let strip = this.tabContainer;
-    let startX = event.clientX;
-    let dragging = false;
-    let rects;
-    let originIndex;
-    // Positions are measured when the drag starts; if the strip scrolls
-    // meanwhile, every tab has moved by as much.
-    let scrollStart = strip.scrollLeft;
-    let pointerX = startX;
-    let autoScroll = 0;
-    // Dragged well above or below the strip, the tab comes off it: let go
-    // there, it opens in a window of its own, or joins another window's
-    // strip it's dropped on.
-    let DETACH = 30;
-    let detached = false;
-    let ghost = null;
-    let grabOffset = 0;
-
-    let update = () => {
-      let dx = pointerX - startX + (strip.scrollLeft - scrollStart);
-      // Keep pinned and unpinned tabs within their own groups.
-      let pinned = tab.hasAttribute("pinned");
-      let group = this.tabs.map((t, i) => [t, i]).filter(([t]) => t.hasAttribute("pinned") == pinned);
-      let first = rects[group[0][1]];
-      let last = rects[group[group.length - 1][1]];
-      let own = rects[originIndex];
-      dx = Math.max(first.left - own.left, Math.min(dx, last.right - own.right));
-      tab.style.transform = `translateX(${dx}px)`;
-
-      // Shift the tabs the dragged one has passed over.
-      let center = own.left + own.width / 2 + dx;
-      for (let [t, i] of group) {
-        if (t == tab) {
-          continue;
-        }
-        let r = rects[i];
-        let mid = r.left + r.width / 2;
-        let shift = 0;
-        if (i > originIndex && center > mid) {
-          shift = -own.width;
-        } else if (i < originIndex && center < mid) {
-          shift = own.width;
-        }
-        t.style.transform = shift ? `translateX(${shift}px)` : "";
-      }
-      tab.dropCenter = center;
-      tab.groupIndices = group;
-    };
-
-    // Near an edge of a strip that scrolls, it scrolls along, faster the
-    // closer the pointer is. Pinned tabs never scroll out of view.
+    let box = strip.getBoundingClientRect();
     let EDGE = 40;
-    let scrollStep = () => {
-      autoScroll = 0;
-      let box = strip.getBoundingClientRect();
-      let start = box.left + (parseFloat(strip.style.getPropertyValue("--pinned-width")) || 0);
-      let speed = 0;
-      if (pointerX < start + EDGE) {
-        speed = -Math.min(1, (start + EDGE - pointerX) / EDGE);
-      } else if (pointerX > box.right - EDGE) {
-        speed = Math.min(1, (pointerX - (box.right - EDGE)) / EDGE);
-      }
-      if (!speed || tab.hasAttribute("pinned") || strip.scrollWidth <= strip.clientWidth) {
-        return;
-      }
-      let before = strip.scrollLeft;
-      strip.scrollLeft += speed * 14;
-      if (strip.scrollLeft != before) {
-        update();
-        autoScroll = this.window.requestAnimationFrame(scrollStep);
-      }
-    };
+    if (strip.scrollWidth <= strip.clientWidth) {
+      return;
+    }
+    if (clientX < box.left + EDGE) {
+      strip.scrollLeft -= 14;
+    } else if (clientX > box.right - EDGE) {
+      strip.scrollLeft += 14;
+    }
+  }
 
-    let canDetach = () => this.tabs.length > 1 || this._otherWindows().length > 0;
-    let setDetached = on => {
-      if (on == detached) {
-        return;
-      }
-      detached = on;
-      tab.toggleAttribute("detaching", on);
-      strip.toggleAttribute("detaching", on);
-      if (on) {
-        this.window.cancelAnimationFrame(autoScroll);
-        autoScroll = 0;
-        for (let t of this.tabs) {
-          t.style.transform = "";
-        }
-        ghost = this._createDragGhost(tab);
+  _onDragOver(event) {
+    let tab = this._draggedTab(event);
+    if (!tab) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (event.target.closest?.("#tab-strip")) {
+      this._autoScrollForDrag(event.clientX);
+      let target = this._splitTarget(event, tab);
+      if (target) {
+        // The other tabs stay where they are meanwhile.
+        this._showSplitPreview(target, tab);
       } else {
-        ghost?.remove();
-        ghost = null;
-        update();
+        this._clearSplitPreview();
+        this._showDropGap(tab, this._dropIndex(event.clientX, tab));
       }
-    };
-    let moveGhost = e => {
-      // It stays inside the window; let go outside, the tab still comes off.
-      let width = ghost.getBoundingClientRect().width;
-      let x = Math.max(0, Math.min(e.clientX - grabOffset, this.window.innerWidth - width));
-      let y = Math.max(0, Math.min(e.clientY - 14, this.window.innerHeight - 30));
-      ghost.style.transform = `translate(${x}px, ${y}px)`;
-    };
+    } else {
+      this._clearDropGap();
+      this._clearSplitPreview();
+    }
+  }
 
-    let onMove = e => {
-      pointerX = e.clientX;
-      if (!dragging) {
-        if (Math.abs(pointerX - startX) < 6) {
-          return;
-        }
-        dragging = true;
-        this.selectTab(tab);
-        try {
-          // Keeps the drag when the pointer leaves the strip. Not essential:
-          // the move/up listeners are on the window.
-          tab.setPointerCapture(event.pointerId);
-        } catch (e) {}
-        tab.setAttribute("dragging", "true");
-        strip.setAttribute("reordering", "true");
-        rects = this.tabs.map(t => t.getBoundingClientRect());
-        originIndex = this.tabs.indexOf(tab);
-        grabOffset = startX - rects[originIndex].left;
-        scrollStart = strip.scrollLeft;
-        strip.addEventListener("scroll", update);
-      }
-      let box = strip.getBoundingClientRect();
-      setDetached((e.clientY < box.top - DETACH || e.clientY > box.bottom + DETACH) && canDetach());
-      if (detached) {
-        moveGhost(e);
-        return;
-      }
-      update();
-      if (!autoScroll) {
-        scrollStep();
-      }
-    };
+  _onDragLeave(event) {
+    // Off the strip (not just from one tab to the next).
+    if (!event.relatedTarget?.closest?.("#tab-strip")) {
+      this._clearDropGap();
+      this._clearSplitPreview();
+    }
+  }
 
-    let onUp = e => {
-      this.window.removeEventListener("pointermove", onMove);
-      this.window.removeEventListener("pointerup", onUp);
-      this.window.removeEventListener("pointercancel", onUp);
-      if (!dragging) {
-        return;
+  _onDrop(event) {
+    let tab = this._draggedTab(event);
+    if (!tab) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    let onStrip = !!event.target.closest?.("#tab-strip");
+    let target = onStrip ? this._splitTarget(event, tab) : null;
+    let index = onStrip ? this._dropIndex(event.clientX, tab) : this.tabs.length;
+    this._clearDropGap();
+    this._clearSplitPreview();
+    if (target) {
+      this.splitTabs(target, tab);
+      this.window.focus();
+      return;
+    }
+    if (tab.ownerDocument == this.document) {
+      // On its own window's page: nothing to do.
+      if (onStrip) {
+        this.moveTab(tab, index);
+        this.scrollTabIntoView(tab);
       }
-      this.window.cancelAnimationFrame(autoScroll);
-      strip.removeEventListener("scroll", update);
-      if (detached) {
-        ghost?.remove();
-        for (let t of this.tabs) {
-          t.style.transform = "";
-        }
-        tab.removeAttribute("dragging");
-        tab.removeAttribute("detaching");
-        strip.removeAttribute("reordering");
-        strip.removeAttribute("detaching");
-        if (e.type == "pointerup") {
-          this._dropDetachedTab(tab, e);
-        }
-        return;
-      }
-      let center = tab.dropCenter;
-      let target = originIndex;
-      for (let [t, i] of tab.groupIndices) {
-        let r = rects[i];
-        if (t != tab && i > originIndex && center > r.left + r.width / 2) {
-          target = Math.max(target, i);
-        } else if (t != tab && i < originIndex && center < r.left + r.width / 2) {
-          target = Math.min(target, i);
-        }
-      }
-      for (let t of this.tabs) {
-        t.style.transform = "";
-      }
-      tab.removeAttribute("dragging");
-      strip.removeAttribute("reordering");
-      this.moveTab(tab, target);
-      this.scrollTabIntoView(tab);
-    };
-
-    this.window.addEventListener("pointermove", onMove);
-    this.window.addEventListener("pointerup", onUp);
-    this.window.addEventListener("pointercancel", onUp);
+      return;
+    }
+    this.adoptTab(tab, { index });
+    this.window.focus();
   }
 
   // ---------------------------------------------------------------------

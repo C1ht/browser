@@ -271,6 +271,12 @@ var BrowserContextMenu = {
       case "context-viewsource":
         gBrowser.addTab("view-source:" + browser.currentURI.spec, { opener: gBrowser.selectedTab });
         break;
+      // DevTools' inspector, on the element that was right-clicked.
+      case "context-inspect": {
+        let { DevToolsShim } = ChromeUtils.importESModule("chrome://devtools-startup/content/DevToolsShim.sys.mjs");
+        DevToolsShim.inspectNode(gBrowser.getTabForBrowser(browser), data.targetIdentifier);
+        break;
+      }
     }
   },
 };

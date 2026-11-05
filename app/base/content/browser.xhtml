@@ -60,10 +60,15 @@
     <xul:command id="cmd_toggleBookmarksBar"/>
     <xul:command id="cmd_bookmarks"/>
     <xul:command id="cmd_history"/>
+    <xul:command id="cmd_viewSource"/>
+    <xul:command id="cmd_taskManager"/>
+    <xul:command id="cmd_emptyCacheReload"/>
   </xul:commandset>
 
-  <!-- reserved="true": handled by the browser even when a page has focus. -->
-  <xul:keyset id="main-keys">
+  <!-- reserved="true": handled by the browser even when a page has focus.
+       DevTools adds its own shortcuts (F12, Ctrl+Shift+I, ...) in a keyset
+       next to this one, which it finds by this id. -->
+  <xul:keyset id="mainKeyset">
     <xul:key id="key_newTab" key="t" modifiers="accel" command="cmd_newTab" reserved="true"/>
     <xul:key id="key_closeTab" key="w" modifiers="accel" command="cmd_closeTab" reserved="true"/>
     <xul:key id="key_reopenTab" key="t" modifiers="accel,shift" command="cmd_reopenTab" reserved="true"/>
@@ -93,6 +98,7 @@
     <xul:key id="key_toggleBookmarksBar" key="b" modifiers="accel,shift" command="cmd_toggleBookmarksBar"/>
     <xul:key id="key_bookmarks" key="o" modifiers="accel,shift" command="cmd_bookmarks"/>
     <xul:key id="key_history" key="h" modifiers="accel" command="cmd_history"/>
+    <xul:key id="key_viewSource" key="u" modifiers="accel" command="cmd_viewSource"/>
   </xul:keyset>
 
   <xul:popupset id="main-popupset">
@@ -107,8 +113,26 @@
       <xul:menuitem data-l10n-id="app-menu-bookmarks-bar" type="checkbox" key="key_toggleBookmarksBar"
                     command="cmd_toggleBookmarksBar"/>
       <xul:menuitem data-l10n-id="app-menu-settings" command="cmd_settings"/>
+      <!-- DevTools fills this (devtools/client/framework/browser-menus.js),
+           by these ids, the first time it opens or DevTools starts. -->
+      <xul:menu id="browserToolsMenu" data-l10n-id="app-menu-developer">
+        <xul:menupopup id="menuWebDeveloperPopup" class="wip-menu">
+          <xul:menuitem id="menu_pageSource" data-l10n-id="app-menu-page-source" key="key_viewSource" command="cmd_viewSource"/>
+          <xul:menuitem id="menu_taskManager" data-l10n-id="app-menu-task-manager" command="cmd_taskManager"/>
+          <xul:menuseparator id="menu_emptyCacheSeparator"/>
+          <xul:menuitem id="menu_emptyCacheReload" data-l10n-id="app-menu-empty-cache-reload" command="cmd_emptyCacheReload"/>
+        </xul:menupopup>
+      </xul:menu>
       <xul:menuseparator/>
       <xul:menuitem data-l10n-id="app-menu-quit" command="cmd_quit"/>
+    </xul:menupopup>
+
+    <!-- Right-click on the reload button while DevTools is open for the tab,
+         as in other browsers. -->
+    <xul:menupopup id="reload-menu" class="wip-menu">
+      <xul:menuitem data-l10n-id="reload-menu-normal" key="key_reload" command="cmd_reload"/>
+      <xul:menuitem data-l10n-id="reload-menu-hard" key="key_reloadSkipCache" command="cmd_reloadSkipCache"/>
+      <xul:menuitem id="reload-menu-empty-cache" data-l10n-id="reload-menu-empty-cache" command="cmd_emptyCacheReload"/>
     </xul:menupopup>
 
     <!-- The right-click menu on pages (contextmenu.js). data-show lists the
@@ -146,6 +170,8 @@
       <xul:menuseparator/>
       <xul:menuitem id="context-savepage" data-show="page" data-l10n-id="context-savepage"/>
       <xul:menuitem id="context-viewsource" data-show="page" data-l10n-id="context-viewsource"/>
+      <xul:menuseparator/>
+      <xul:menuitem id="context-inspect" data-l10n-id="context-inspect"/>
     </xul:menupopup>
 
     <xul:menupopup id="tab-context-menu" class="wip-menu">
@@ -154,6 +180,7 @@
       <xul:menuitem id="tab-ctx-pin" data-l10n-id="tab-context-pin"/>
       <xul:menuitem id="tab-ctx-mute" data-l10n-id="tab-context-mute"/>
       <xul:menuitem id="tab-ctx-move-window" data-l10n-id="tab-context-move-window"/>
+      <xul:menuitem id="tab-ctx-unsplit" data-l10n-id="tab-context-unsplit"/>
       <xul:menuseparator/>
       <xul:menuitem id="tab-ctx-close" data-l10n-id="tab-context-close"/>
       <xul:menuitem id="tab-ctx-close-others" data-l10n-id="tab-context-close-others"/>
@@ -479,7 +506,10 @@
     </button>
   </div>
 
-  <div id="browsers"></div>
+  <!-- Firefox's id, which DevTools uses for a side-docked toolbox's width. -->
+  <div id="tabbrowser-tabbox">
+    <div id="browsers"></div>
+  </div>
   <xul:findbar id="findbar" hidden="true"/>
 
   <!-- Tab overview (taboverview.js), over the page area. -->

@@ -103,6 +103,8 @@ tab-context-unmute =
     .label = Unmute tab
 tab-context-move-window =
     .label = Move to new window
+tab-context-unsplit =
+    .label = Separate split view
 tab-context-close =
     .label = Close tab
 tab-context-close-others =
@@ -124,6 +126,33 @@ app-menu-settings =
     .label = Settings
 app-menu-quit =
     .label = Quit
+app-menu-developer =
+    .label = Developer tools
+app-menu-page-source =
+    .label = View page source
+app-menu-task-manager =
+    .label = Task manager
+app-menu-empty-cache-reload =
+    .label = Empty cache and hard reload
+
+## A tab whose page stopped: its content process crashed, or couldn't
+## start because the browser's files were replaced while it was running
+
+tab-crashed-title = This tab crashed
+tab-crashed-text = The page stopped working. Your other tabs are fine.
+tab-crashed-button = Reload tab
+tab-restart-title = Restart { -brand-short-name } to keep browsing
+tab-restart-text = { -brand-short-name } was updated while it was running, so new pages can’t open until it restarts. Your windows and tabs come back.
+tab-restart-button = Restart { -brand-short-name }
+
+## The reload button's menu, while DevTools is open
+
+reload-menu-normal =
+    .label = Normal reload
+reload-menu-hard =
+    .label = Hard reload
+reload-menu-empty-cache =
+    .label = Empty cache and hard reload
 
 ## Page context menu
 
@@ -184,6 +213,8 @@ context-savepage =
     .label = Save page as…
 context-viewsource =
     .label = View page source
+context-inspect =
+    .label = Inspect
 
 ## Permission prompts. $host (String) - the site asking, e.g. "meet.example.com"
 

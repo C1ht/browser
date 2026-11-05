@@ -19,6 +19,7 @@ import http.server
 import json
 import os
 import shutil
+import signal
 import socket
 import ssl
 import struct
@@ -38,7 +39,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PAGES = ROOT / "tests/runtime/pages"
 
 RESULTS = []
-ALL_PARTS = list(range(1, 13))
+ALL_PARTS = list(range(1, 14))
 # Headless Gecko (every check runs headless) can't do some things a real
 # window can; those checks are skipped there and listed in
 # docs/MANUAL-CHECKS.md for a headed run.
@@ -477,59 +478,76 @@ def part4(bindir, base, shots):
                            " return t.startsWith('target') && t;", opened)
             record(4, "opened tab keeps its opener", title == "target page, opener kept", title)
 
-        # Reorder by dragging the first tab two places to the right.
-        order = b.js("""
-          while (gBrowser.tabs.length < 4) gBrowser.addTab("about:blank", { select: false });
-          let tab = gBrowser.tabs[0]; gBrowser.selectTab(tab);
-          let r = tab.getBoundingClientRect(), w = r.width, y = r.top + r.height / 2, x = r.left + w / 2;
-          let fire = (target, type, cx) => target.dispatchEvent(new PointerEvent(type,
-            { bubbles: true, clientX: cx, clientY: y, button: 0, buttons: type == "pointerup" ? 0 : 1,
-              pointerId: 1, isPrimary: true, pointerType: "mouse" }));
-          fire(tab.querySelector(".tab-label"), "pointerdown", x);
-          for (let i = 1; i <= 10; i++) fire(window, "pointermove", x + (w * 2.2 * i) / 10);
-          fire(window, "pointerup", x + w * 2.2);
-          return gBrowser.tabs.indexOf(tab);""")
-        record(4, "dragging a tab reorders it", order == 2, f"dragged tab now at {order}")
-
-        # Dragging a tab well below the strip and letting go opens it in a
-        # window of its own; the page moves as it is (no reload).
-        DRAG_OFF = """let [tab, clientY, screenX, screenY] = arguments;
-          let r = tab.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-          let fire = (target, type, cx, cy, sx, sy) => target.dispatchEvent(new PointerEvent(type,
-            { bubbles: true, clientX: cx, clientY: cy, screenX: sx, screenY: sy, button: 0,
-              buttons: type == "pointerup" ? 0 : 1, pointerId: 1, isPrimary: true, pointerType: "mouse" }));
-          fire(tab.querySelector(".tab-label"), "pointerdown", x, y, x, y);
-          for (let i = 1; i <= 8; i++) fire(window, "pointermove", x + 4 * i, y + ((clientY - y) * i) / 8, screenX, screenY);
-          let detaching = tab.hasAttribute("detaching") && !!document.querySelector(".tab-drag-ghost");
-          fire(window, "pointerup", x + 32, clientY, screenX, screenY);
-          return detaching;"""
+        # Tabs are dragged with native drag and drop: the desktop delivers
+        # dragstart to the tab, dragover/drop to whatever window is under the
+        # pointer, then dragend to the tab. DRAG_TAB plays that sequence.
+        DRAG_TAB = """let [tab, target, clientX, drop] = arguments;
+          let dt = new DataTransfer();
+          let r = tab.getBoundingClientRect();
+          let fire = (el, type, x) => el.dispatchEvent(new (el.ownerDocument.defaultView.DragEvent)(type, { bubbles: true, cancelable: true,
+            dataTransfer: dt, clientX: x, clientY: r.top + r.height / 2 }));
+          fire(tab.querySelector(".tab-label"), "dragstart", r.left + r.width / 2);
+          let carried = [...dt.types];
+          let over = null;
+          if (target) {
+            for (let i = 1; i <= 6; i++) fire(target, "dragover", clientX * i / 6 + (r.left + r.width / 2) * (6 - i) / 6);
+            over = target.ownerDocument.defaultView.gBrowser.tabs.map(t => t.dropShift || 0);
+            if (drop) fire(target, "drop", clientX);
+          }
+          fire(tab, "dragend", clientX);
+          return { carried, over, dropEffect: dt.dropEffect };"""
         OTHER = "[...Services.wm.getEnumerator('navigator:browser')].find(w => w != window)"
+
+        # Along the strip: the first tab two places to the right.
+        r = b.js("""while (gBrowser.tabs.length < 4) gBrowser.addTab("about:blank", { select: false });
+          let tab = gBrowser.tabs[0], w = tab.getBoundingClientRect().width;
+          let x = gBrowser.tabs[2].getBoundingClientRect().left + w * 0.85;
+          let result = (function() {""" + DRAG_TAB + """}).apply(null, [tab, gBrowser.tabs[2], x, true]);
+          return { index: gBrowser.tabs.indexOf(tab), result, cleared: gBrowser.tabs.every(t => !t.style.transform) };""")
+        record(4, "dragging a tab along the strip reorders it, the others making room",
+               r["index"] == 2 and r["result"]["over"][1] < 0 and r["result"]["over"][2] < 0 and r["cleared"]
+               and "application/x-browserwip-tab" in r["result"]["carried"], r)
+
+        # Let go outside every window: a window of its own; the page moves
+        # as it is (no reload).
         b.js("for (let t of gBrowser.tabs.slice(1)) gBrowser.removeTab(t, { skipPermitUnload: true });"
              "gBrowser.selectTab(gBrowser.addTab(arguments[0]));", f"{base}/state.html")
         state = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith('state ') && t;", timeout=15)
-        detaching = b.js("let tab = gBrowser.selectedTab; let s = gBrowser.tabContainer.getBoundingClientRect();"
-                         "return (function() {" + DRAG_OFF + "}).apply(null, [tab, s.bottom + 200, 400, 500]);")
+        r = b.js("return (function() {" + DRAG_TAB + "}).apply(null, [gBrowser.selectedTab, null, 0, false]);")
         moved = b.wait("let w = " + OTHER + """;
           return w?.gBrowser?.selectedBrowser?.contentTitle && {
-            title: w.gBrowser.selectedBrowser.contentTitle, theirTabs: w.gBrowser.tabs.length, ourTabs: gBrowser.tabs.length,
-            leftovers: !!document.querySelector(".tab-drag-ghost, .tab[detaching]") };""", timeout=15)
-        record(4, "dragging a tab off the strip opens it in a new window, page not reloaded",
-               detaching and moved and moved["title"] == state and moved["theirTabs"] == 1 and moved["ourTabs"] == 1
-               and not moved["leftovers"], [state, detaching, moved])
+            title: w.gBrowser.selectedBrowser.contentTitle, theirTabs: w.gBrowser.tabs.length, ourTabs: gBrowser.tabs.length };""",
+                       timeout=15)
+        record(4, "dragging a tab out of every window opens it in a new window, page not reloaded",
+               bool(moved) and moved["title"] == state and moved["theirTabs"] == 1 and moved["ourTabs"] == 1
+               and "text/uri-list" in r["carried"], [state, r, moved])
 
         # Dropped onto another window's strip, it joins that window there.
         b.js("gBrowser.addTab(arguments[0], { select: false });", f"{base}/target.html")
         b.wait("return gBrowser.tabs[1].linkedBrowser.contentTitle.startsWith('target');", timeout=15)
         joined = b.js("let w = " + OTHER + """;
-          let s = w.gBrowser.tabContainer.getBoundingClientRect(), first = w.gBrowser.tabs[0].getBoundingClientRect();
-          let screenX = w.mozInnerScreenX + first.left + 2, screenY = w.mozInnerScreenY + s.top + s.height / 2;
-          let tab = gBrowser.tabs[1], own = gBrowser.tabContainer.getBoundingClientRect();
-          (function() {""" + DRAG_OFF + """}).apply(null, [tab, own.bottom + 200, screenX, screenY]);
-          return new Promise(r => setTimeout(() => r({ ourTabs: gBrowser.tabs.length,
+          let first = w.gBrowser.tabs[0].getBoundingClientRect();
+          let r = (function() {""" + DRAG_TAB + """}).apply(null, [gBrowser.tabs[1], w.gBrowser.tabs[0], first.left + 4, true]);
+          return new Promise(done => setTimeout(() => done({ ourTabs: gBrowser.tabs.length, gap: r.over,
             theirs: w.gBrowser.tabs.map(t => t.linkedBrowser.contentTitle) }), 1000));""")
         record(4, "dropped onto another window's tab strip, it joins that window where it lands",
                joined["ourTabs"] == 1 and len(joined["theirs"]) == 2 and joined["theirs"][0].startswith("target")
-               and joined["theirs"][1] == state, joined)
+               and joined["theirs"][1] == state and joined["gap"] and joined["gap"][0] > 0, joined)
+
+        # Dropped on another window's page, it joins at the end; on its own
+        # window's page, nothing happens (it isn't torn off).
+        b.js("gBrowser.addTab(arguments[0], { select: false });", f"{base}/target.html")
+        b.wait("return gBrowser.tabs[1].linkedBrowser.contentTitle.startsWith('target');", timeout=15)
+        r = b.js("""let ours = (function() {""" + DRAG_TAB + """}).apply(null,
+            [gBrowser.tabs[1], document.getElementById("browsers"), 300, true]);
+          let windows = [...Services.wm.getEnumerator('navigator:browser')].length;
+          let w = """ + OTHER + """;
+          (function() {""" + DRAG_TAB + """}).apply(null, [gBrowser.tabs[1], w.document.getElementById("browsers"), 300, true]);
+          return new Promise(done => setTimeout(() => done({ ownDrop: ours.dropEffect, windowsAfterOwnDrop: windows,
+            ourTabs: gBrowser.tabs.length, theirs: w.gBrowser.tabs.map(t => t.linkedBrowser.contentTitle) }), 1000));""")
+        record(4, "dropped on another window's page it joins at the end; on its own page nothing happens",
+               r["ownDrop"] == "move" and r["windowsAfterOwnDrop"] == 2 and r["ourTabs"] == 1 and len(r["theirs"]) == 3
+               and r["theirs"][2].startswith("target"), r)
 
         # "Move to new window" (the tab's menu); and taking a window's last
         # tab closes that window.
@@ -537,14 +555,242 @@ def part4(bindir, base, shots):
           w.gBrowser.tearOffTab(w.gBrowser.tabs[0]);
           return new Promise(r => setTimeout(() => r([...Services.wm.getEnumerator('navigator:browser')].length), 3000));""")
         windows = b.wait("let ws = [...Services.wm.getEnumerator('navigator:browser')];"
-                         "return ws.length == 3 && ws.every(w => w.gBrowser?.tabs.length == 1) && ws.length;", timeout=15)
+                         "return ws.length == 3 && ws.every(w => w.gBrowser?.tabs.length) && ws.length;", timeout=15)
         record(4, "Move to new window opens the tab in a window of its own", windows == 3, [r, windows])
         r = b.js("""let others = [...Services.wm.getEnumerator('navigator:browser')].filter(w => w != window);
-          for (let w of others) gBrowser.adoptTab(w.gBrowser.tabs[0]);
+          for (let w of others) for (let t of [...w.gBrowser.tabs]) gBrowser.adoptTab(t);
           return new Promise(r => setTimeout(() => r({ windows: [...Services.wm.getEnumerator('navigator:browser')].length,
             titles: gBrowser.tabs.map(t => t.linkedBrowser.contentTitle) }), 3000));""")
-        record(4, "taking a window's last tab closes that window", r["windows"] == 1 and len(r["titles"]) == 3
+        record(4, "taking a window's last tab closes that window", r["windows"] == 1 and len(r["titles"]) == 4
                and state in r["titles"], r)
+
+        # Split view: let go over the middle of another tab, the dragged tab
+        # first previews the split there (both tabs side by side in that
+        # tab), then the two pages share the window.
+        SPLIT_LAYOUT = """let box = document.getElementById("browsers").getBoundingClientRect();
+          let panel = t => t.linkedBrowser.closest(".browserSidebarContainer");
+          let shown = gBrowser.tabs.filter(t => getComputedStyle(panel(t)).visibility == "visible");
+          return { split: document.getElementById("browsers").hasAttribute("split"),
+            shown: shown.map(t => gBrowser.tabs.indexOf(t)),
+            active: gBrowser.tabs.filter(t => t.linkedBrowser.docShellIsActive).map(t => gBrowser.tabs.indexOf(t)),
+            selected: gBrowser.tabs.indexOf(gBrowser.selectedTab),
+            left: shown.map(t => Math.round(panel(t).getBoundingClientRect().left - box.left)),
+            widths: shown.map(t => Math.round(panel(t).getBoundingClientRect().width)), full: Math.round(box.width),
+            attrs: gBrowser.tabs.map(t => t.getAttribute("split")) };"""
+        def split_layout():
+            return b.js("return new Promise(done => requestAnimationFrame(() => setTimeout(() => done((function() {"
+                        + SPLIT_LAYOUT + "})()), 200)));")
+        def halves(l, ratio=0.5):
+            # Two columns either side of the 6px bar, in the given shares.
+            return (len(l["widths"]) == 2 and l["left"][0] == 0 and l["left"][1] >= l["widths"][0]
+                    and abs(l["widths"][0] - (l["full"] - 6) * ratio) <= 2
+                    and abs(sum(l["widths"]) - (l["full"] - 6)) <= 2)
+        r = b.js("""window.splitKeep = [...gBrowser.tabs];
+          let tab = gBrowser.tabs[3], target = gBrowser.tabs[1];
+          let t = target.getBoundingClientRect(), s = tab.getBoundingClientRect();
+          let dt = new DataTransfer();
+          let fire = (el, type, x) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true,
+            dataTransfer: dt, clientX: x, clientY: t.top + t.height / 2 }));
+          fire(tab.querySelector(".tab-label"), "dragstart", s.left + s.width / 2);
+          fire(target, "dragover", t.left + t.width / 2);
+          let preview = [...target.querySelectorAll(".tab-split-preview-half .tab-label")].map(l => l.textContent);
+          let labels = [target, tab].map(x => x.querySelector(".tab-label").textContent);
+          let slid = gBrowser.tabs.filter(x => x != tab && x.dropShift).length;
+          fire(target, "drop", t.left + t.width / 2);
+          fire(tab, "dragend", t.left + t.width / 2);
+          return { preview, labels, slid, previewGone: !document.querySelector(".tab-split-preview, [split-target]"),
+            order: [gBrowser.tabs.indexOf(target), gBrowser.tabs.indexOf(tab)] };""")
+        record(4, "dragged over the middle of a tab, a tab previews the split there, both tabs side by side",
+               r["preview"] == r["labels"] and len(r["preview"]) == 2 and r["slid"] == 0, r)
+        layout = split_layout()
+        record(4, "let go there, the two tabs sit together and their pages share the window, both active",
+               r["previewGone"] and r["order"] == [1, 2] and layout["split"] and layout["shown"] == [1, 2]
+               and layout["selected"] == 2 and layout["active"] == [1, 2] and layout["attrs"][1:3] == ["start", "end"]
+               and halves(layout), [r, layout])
+
+        if shots:
+            b.m.screenshot(str(Path(shots) / "split-view.png"))
+            b.js("gBrowser._showSplitPreview(gBrowser.tabs[0], gBrowser.tabs[3]);"
+                 "return new Promise(r => setTimeout(r, 400));")
+            b.m.screenshot(str(Path(shots) / "split-preview.png"))
+            b.js("gBrowser._clearSplitPreview();")
+        r = b.js("""gBrowser.tabs[1].linkedBrowser.focus();
+          return new Promise(done => setTimeout(() => done({ selected: gBrowser.tabs.indexOf(gBrowser.selectedTab),
+            split: document.getElementById("browsers").hasAttribute("split") }), 300));""")
+        record(4, "clicking into the other page of a split view selects its tab", r == {"selected": 1, "split": True}, r)
+
+        b.js("gBrowser.selectTab(gBrowser.tabs[0]);")
+        away = split_layout()
+        b.js("gBrowser.selectTab(gBrowser.tabs[2]);")
+        back = split_layout()
+        record(4, "another tab takes the whole window; selecting either half brings both back",
+               not away["split"] and away["shown"] == [0] and away["active"] == [0]
+               and back["shown"] == [1, 2] and back["active"] == [1, 2] and halves(back), [away, back])
+
+        r = b.js("""let splitter = document.getElementById("split-view-splitter");
+          let box = document.getElementById("browsers").getBoundingClientRect(), s = splitter.getBoundingClientRect();
+          let fire = (el, type, x) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true,
+            button: 0, pointerId: 1, clientX: x, clientY: s.top + s.height / 2 }));
+          fire(splitter, "pointerdown", s.left + 3);
+          fire(splitter, "pointermove", box.left + (box.width - 6) * 0.3 + 3);
+          fire(splitter, "pointerup", box.left + (box.width - 6) * 0.3 + 3);
+          return gBrowser.selectedTab.split.ratio;""")
+        dragged = split_layout()
+        b.js("""document.getElementById("split-view-splitter").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));""")
+        even = split_layout()
+        record(4, "dragging the bar between the pages resizes them; a double-click evens them out",
+               abs(r - 0.3) < 0.01 and halves(dragged, 0.3) and halves(even), [r, dragged, even])
+
+        r = b.js("""let target = gBrowser.addTab("about:blank", { index: 2, select: false });
+          let index = gBrowser.tabs.indexOf(target);
+          gBrowser.removeTab(target, { skipPermitUnload: true });
+          gBrowser.moveTab(gBrowser.tabs[2], 1);
+          return { index, attrs: gBrowser.tabs.map(t => t.getAttribute("split")) };""")
+        swapped = split_layout()
+        record(4, "a tab doesn't go between a split view's tabs; swapping them swaps the pages' sides",
+               r["index"] == 3 and r["attrs"][1:3] == ["start", "end"] and swapped["selected"] == 1
+               and swapped["shown"] == [1, 2] and halves(swapped), [r, swapped])
+
+        saved = b.js("""const { SessionStore } = ChromeUtils.importESModule("resource://gre/modules/browserwip/SessionStore.sys.mjs");
+          gBrowser.selectedTab.split.ratio = 0.4;
+          SessionStore.saveSoon();
+          let deadline = Date.now() + 10000;
+          return (async function poll() {
+            let data = await IOUtils.readJSON(SessionStore._path).catch(() => null);
+            let tabs = data?.windows?.[0]?.tabs ?? [];
+            if (tabs.some(t => t.split == 0.4) || Date.now() > deadline) return tabs.map(t => t.split ?? null);
+            await new Promise(r => setTimeout(r, 250));
+            return poll();
+          })();""")
+        b.js("gBrowser.selectedTab.split.ratio = 0.5;")
+        restored = b.js("""BrowserWip.restoreWindow({ tabs: [{ url: arguments[0], title: "a", split: 0.4 },
+            { url: arguments[1], title: "b" }], selected: 1 });
+          return new Promise(done => setTimeout(() => done({ split: gBrowser.tabs[4].split?.ratio,
+            partner: gBrowser.splitPartner(gBrowser.tabs[4]) == gBrowser.tabs[5],
+            loaded: [4, 5].map(i => !gBrowser.tabs[i].pendingLoad) }), 500));""",
+                        f"{base}/state.html", f"{base}/target.html")
+        record(4, "a split view is saved with the session and restored, both pages loading",
+               saved[1] == 0.4 and saved.count(None) == len(saved) - 1
+               and restored == {"split": 0.4, "partner": True, "loaded": [True, True]}, [saved, restored])
+
+        r = b.js("""let tab = gBrowser.tabs[5], partner = gBrowser.tabs[4];
+          return gBrowser.removeTab(tab).then(() => ({ selected: gBrowser.selectedTab == partner,
+            split: partner.split ?? null, attr: partner.getAttribute("split") }));""")
+        alone = split_layout()
+        record(4, "closing one half of a split view gives the other the whole window",
+               r == {"selected": True, "split": None, "attr": None} and not alone["split"]
+               and alone["widths"] == [alone["full"]] and alone["active"] == [4], [r, alone])
+
+        # From another window: it joins this one, split with the tab it was
+        # dropped on.
+        b.js("BrowserWip.openNewWindow(arguments[0]);", f"{base}/target.html")
+        b.wait("let w = " + OTHER + "; return w?.gBrowser?.selectedBrowser?.contentTitle?.startsWith('target');", timeout=15)
+        r = b.js("let w = " + OTHER + """;
+          let target = gBrowser.tabs[0], t = target.getBoundingClientRect();
+          (function() {""" + DRAG_TAB + """}).apply(null, [w.gBrowser.tabs[0], target, t.left + t.width / 2, true]);
+          return new Promise(done => setTimeout(() => done({ windows: [...Services.wm.getEnumerator('navigator:browser')].length,
+            partner: gBrowser.splitPartner(target) && gBrowser.splitPartner(target).linkedBrowser.contentTitle,
+            index: gBrowser.tabs.indexOf(gBrowser.splitPartner(target)) }), 2000));""")
+        record(4, "a tab dropped on the middle of another window's tab joins that window, split with it",
+               r["windows"] == 1 and (r["partner"] or "").startswith("target") and r["index"] == 1, r)
+        # Back to four ordinary tabs for what follows.
+        b.js("""for (let t of gBrowser.tabs) gBrowser.unsplitTab(t);
+          gBrowser.selectTab(splitKeep[0]);
+          for (let t of gBrowser.tabs.filter(t => !splitKeep.includes(t))) gBrowser.removeTab(t, { skipPermitUnload: true });""")
+
+        # Middle-click on Reload: the page again, freshly loaded, in a tab
+        # beside it, in the background.
+        b.js("gBrowser.selectTab(gBrowser.tabs.find(t => t.linkedBrowser.contentTitle.startsWith('state ')));")
+        r = b.js("""let tab = gBrowser.selectedTab, title = tab.linkedBrowser.contentTitle, count = gBrowser.tabs.length;
+          let rect = document.getElementById("reload-button").getBoundingClientRect();
+          for (let type of ["mousedown", "mouseup"]) {
+            window.synthesizeMouseEvent(type, rect.left + rect.width / 2, rect.top + rect.height / 2, { button: 1, clickCount: 1 });
+          }
+          let copy = gBrowser.tabs[gBrowser.tabs.indexOf(tab) + 1];
+          return new Promise(done => {
+            let poll = () => {
+              let t = copy?.linkedBrowser.contentTitle ?? "";
+              if (t.startsWith("state ") || gBrowser.tabs.length == count) {
+                // The current page isn't reloaded (its title changes on every load).
+                setTimeout(() => done({ title, copy: t, added: gBrowser.tabs.length - count, selected: gBrowser.selectedTab == tab,
+                  kept: tab.linkedBrowser.contentTitle == title,
+                  url: copy?.linkedBrowser.currentURI.spec == tab.linkedBrowser.currentURI.spec }), 1000);
+              } else setTimeout(poll, 100);
+            };
+            setTimeout(poll, 100);
+          });""")
+        record(4, "middle-click on Reload opens the page again, freshly loaded, in a background tab beside it, "
+               "and doesn't reload the current one",
+               r["added"] == 1 and r["selected"] and r["kept"] and r["url"] and r["copy"].startswith("state ")
+               and r["copy"] != r["title"], r)
+        b.js("let tab = gBrowser.tabs[gBrowser.tabs.indexOf(gBrowser.selectedTab) + 1];"
+             "gBrowser.removeTab(tab, { skipPermitUnload: true }); gBrowser.selectTab(gBrowser.tabs[0]);")
+        # A tab whose content process dies shows that it crashed, can be
+        # closed (and so can its window), and Reload brings the page back.
+        def kill_tab_process(js_tab):
+            pid = b.js(f"return {js_tab}.linkedBrowser.frameLoader.remoteTab.osPid;")
+            os.kill(pid, signal.SIGTERM if sys.platform == "win32" else signal.SIGKILL)
+        b.js("gBrowser.addTab(arguments[0], { select: false });", f"{base}/state.html")
+        b.wait("return gBrowser.tabs.at(-1).linkedBrowser.contentTitle.startsWith('state ');", timeout=15)
+        kill_tab_process("gBrowser.tabs.at(-1)")
+        b.wait("return gBrowser.tabs.at(-1).getAttribute('crashed') == 'crash';", timeout=15)
+        b.js("gBrowser.selectTab(gBrowser.tabs.at(-1));")
+        b.wait("return !!gBrowser.selectedBrowser.closest('.browserStack').querySelector('.tab-crashed-page h1')?.textContent;", timeout=5)
+        crashed = b.js("""let stack = gBrowser.selectedBrowser.closest(".browserStack");
+          return { heading: stack.querySelector(".tab-crashed-page h1").textContent,
+                   button: stack.querySelector(".tab-crashed-button").textContent };""")
+        record(4, "a tab whose content process crashed says so, with Reload",
+               crashed == {"heading": "This tab crashed", "button": "Reload tab"}, crashed)
+        revived = b.js("""let before = gBrowser.tabs.length;
+          BrowserWip.reloadOrStop();
+          return new Promise(r => setTimeout(() => r({ same: gBrowser.tabs.length == before,
+            title: gBrowser.selectedBrowser.contentTitle, crashed: gBrowser.selectedTab.hasAttribute("crashed") }), 4000));""")
+        record(4, "Reload brings a crashed tab's page back in a new process",
+               revived["same"] and revived["title"].startswith("state ") and not revived["crashed"], revived)
+        b.js("gBrowser.addTab(arguments[0], { select: false });", f"{base}/state.html")
+        b.wait("return gBrowser.tabs.at(-1).linkedBrowser.contentTitle.startsWith('state ');", timeout=15)
+        kill_tab_process("gBrowser.tabs.at(-1)")
+        b.wait("return gBrowser.tabs.at(-1).hasAttribute('crashed');", timeout=15)
+        closed = b.js("""let before = gBrowser.tabs.length;
+          return gBrowser.removeTab(gBrowser.tabs.at(-1)).then(() => [before, gBrowser.tabs.length]);""")
+        record(4, "a crashed tab can be closed", closed[1] == closed[0] - 1, closed)
+        b.js("BrowserWip.openNewWindow(arguments[0]);", f"{base}/state.html")
+        b.wait("let w = [...Services.wm.getEnumerator('navigator:browser')].find(w => w != window);"
+               "return w?.gBrowser?.selectedBrowser?.contentTitle?.startsWith('state ');", timeout=15)
+        kill_tab_process("[...Services.wm.getEnumerator('navigator:browser')].find(w => w != window).gBrowser.selectedTab")
+        b.wait("let w = [...Services.wm.getEnumerator('navigator:browser')].find(w => w != window);"
+               "return w.gBrowser.selectedTab.hasAttribute('crashed');", timeout=15)
+        windows = b.js("""let w = [...Services.wm.getEnumerator('navigator:browser')].find(w => w != window);
+          w.BrowserWip.closeWindow();
+          return new Promise(r => setTimeout(() => r([...Services.wm.getEnumerator('navigator:browser')].length), 3000));""")
+        record(4, "a window with a crashed tab still closes (the window manager's close)", windows == 1, windows)
+        # The browser's files replaced while it runs: new tabs can't start.
+        restart = b.js("""gBrowser.addTab("about:blank", { select: true });
+          gBrowser.selectedBrowser.dispatchEvent(new FrameCrashedEvent("oop-browser-buildid-mismatch",
+            { bubbles: true, isTopFrame: true }));
+          let stack = gBrowser.selectedBrowser.closest(".browserStack");
+          return new Promise(r => setTimeout(() => r({ crashed: gBrowser.selectedTab.getAttribute("crashed"),
+            heading: stack.querySelector(".tab-crashed-page h1")?.textContent,
+            button: stack.querySelector(".tab-crashed-button")?.textContent }), 1000));""")
+        record(4, "after the browser's files change under it, a tab that can't start offers a restart",
+               restart["crashed"] == "restart" and restart["heading"] == "Restart browser-wip to keep browsing"
+               and restart["button"] == "Restart browser-wip", restart)
+        b.js("gBrowser.removeTab(gBrowser.selectedTab, { skipPermitUnload: true });")
+        r = b.js("""const { SessionStore } = ChromeUtils.importESModule("resource://gre/modules/browserwip/SessionStore.sys.mjs");
+          let windows = [{ tabs: [{ url: "https://example.com/", title: "x", pinned: false }], selected: 0 }];
+          return SessionStore._write(windows, { cleanExit: true, restoreNext: true }).then(async () => {
+            let data = await IOUtils.readJSON(SessionStore._path);
+            let saved = [SessionStore._previous, SessionStore._startupHandled];
+            SessionStore._previous = data; SessionStore._startupHandled = false;
+            let restored = await SessionStore.startupSession();
+            [SessionStore._previous, SessionStore._startupHandled] = saved;
+            return [data.restoreNext, restored?.[0]?.tabs?.[0]?.url];
+          });""")
+        record(4, "restarting for it brings the windows and tabs back", r == [True, "https://example.com/"], r)
+        # Pages from one site share a process: tabs it took down with it come back too.
+        b.js("for (let t of gBrowser.tabs.filter(t => t.hasAttribute('crashed'))) gBrowser.reviveTab(t);")
+        b.wait("return !gBrowser.tabs.some(t => t.hasAttribute('crashed') || t.hasAttribute('busy'));", timeout=15)
+
         # Back to what the reorder check left: four tabs, the third selected.
         b.js("""for (let t of gBrowser.tabs.slice(4)) gBrowser.removeTab(t, { skipPermitUnload: true });
           while (gBrowser.tabs.length < 4) gBrowser.addTab("about:blank", { select: false });
@@ -622,12 +868,14 @@ def part4(bindir, base, shots):
         menus = {name: context_menu(x, y) for name, (x, y) in
                  {"link": (25, 28), "image": (40, 90), "field": (30, 160), "page": (60, 350)}.items()}
         expected = {
-            "link": ["context-openlink-tab", "context-openlink-window", "context-copylink", "context-savelink"],
-            "image": ["context-openimage", "context-copyimage", "context-copyimage-link", "context-saveimage"],
+            "link": ["context-openlink-tab", "context-openlink-window", "context-copylink", "context-savelink",
+                     "context-inspect"],
+            "image": ["context-openimage", "context-copyimage", "context-copyimage-link", "context-saveimage",
+                      "context-inspect"],
             "field": ["context-undo", "context-cut", "context-copy-edit", "context-paste", "context-delete",
-                      "context-selectall"],
+                      "context-selectall", "context-inspect"],
             "page": ["context-back", "context-forward", "context-reload", "context-selectall",
-                     "context-savepage", "context-viewsource"],
+                     "context-savepage", "context-viewsource", "context-inspect"],
         }
         record(4, "right-click menus fit what was clicked (link, image, field, page)", menus == expected, menus)
 
@@ -696,7 +944,8 @@ def part4(bindir, base, shots):
               cards: cards.length, tabs: gBrowser.tabs.length,
               selected: tabCards.find(c => c.hasAttribute("selected"))?.tab == gBrowser.selectedTab };""", timeout=15)
         record(4, "the tab overview shows every tab with a snapshot, and the current one marked",
-               bool(overview) and overview["cards"] == overview["tabs"] + 1 and overview["selected"], overview)
+               bool(overview) and overview["cards"] == overview["tabs"] + 1 and overview["selected"],
+               overview)
         chosen = b.js("""let search = document.getElementById("tab-overview-search");
           search.value = "contextmenu.html"; search.dispatchEvent(new Event("input"));
           let shown = [...document.querySelectorAll("#tab-overview-grid .overview-card:not([hidden])")].filter(c => c.tab).length;
@@ -767,6 +1016,14 @@ def part4(bindir, base, shots):
             __extraTabs.push(gBrowser.addTab("about:blank", { select: false,
               triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));
           }""")
+        # Opened in the background, a tab is scrolled into view, and the
+        # selected tab stays selected.
+        r = b.wait("""let s = gBrowser.tabContainer.getBoundingClientRect(), t = __extraTabs.at(-1).getBoundingClientRect();
+          return t.right <= s.right + 1 && t.left >= s.left && gBrowser.tabContainer.scrollLeft > 0 && {
+            selected: gBrowser.selectedTab != __extraTabs.at(-1), left: gBrowser.tabContainer.scrollLeft };""", timeout=5)
+        record(4, "a tab opened in the background scrolls the strip to it, without selecting it",
+               bool(r) and r["selected"], r)
+        b.js("gBrowser.tabContainer.scrollTo({ left: 0, behavior: 'instant' });")
         r = b.wait("let s = gBrowser.tabContainer; return s.hasAttribute('overflowing') && s.hasAttribute('more-after') && "
                    "!s.hasAttribute('more-before') && s.scrollLeft == 0;", timeout=5)
         record(4, "with more tabs than fit, the tab strip scrolls, and its end fades", bool(r), r)
@@ -3421,6 +3678,180 @@ def part12_no_automation(bindir, port):
         b.quit()
 
 
+# -- Part 13: developer tools (Firefox's DevTools in this window) -------------
+
+
+class CacheHandler(http.server.BaseHTTPRequestHandler):
+    """A page with one script the browser may cache for an hour; counts how
+    often the script is fetched."""
+
+    fetched = 0
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        if self.path.startswith("/cached.js"):
+            CacheHandler.fetched += 1
+            body, kind, extra = b"window.cachedRan = (window.cachedRan || 0) + 1;", "text/javascript", {
+                "Cache-Control": "max-age=3600"}
+        else:
+            body = (b'<!doctype html><meta charset=utf-8><title>devtools page</title>'
+                    b'<h1 id="greeting" class="hello">Hello</h1><script src="/cached.js"></script>')
+            kind, extra = "text/html; charset=utf-8", {"Cache-Control": "no-store"}
+        self.send_response(200)
+        self.send_header("Content-Type", kind)
+        self.send_header("Content-Length", str(len(body)))
+        for k, v in extra.items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+
+DT = """const { require } = ChromeUtils.importESModule("resource://devtools/shared/loader/Loader.sys.mjs");
+const { gDevTools } = require("devtools/client/framework/devtools");"""
+
+
+def part13(bindir, base, shots):
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), CacheHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    site = f"http://127.0.0.1:{server.server_address[1]}"
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True})
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js("window.resizeTo(1280, 860);")
+
+        def visit():
+            b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0]);", site + "/")
+            return b.wait("return gBrowser.selectedBrowser.contentTitle == 'devtools page';", timeout=15)
+
+        visit()
+        # -- F12: the toolbox, docked under the page.
+        b.js("document.getElementById('key_toggleToolbox')?.doCommand();")
+        r = b.wait(DT + """let tab = gBrowser.selectedTab, toolbox = gDevTools.getToolboxForTab(tab);
+          let frame = gBrowser.getBrowserContainer(tab.linkedBrowser).querySelector(".devtools-toolbox-iframe");
+          return toolbox?.isReady && frame && { host: toolbox.hostType, frameHeight: frame.getBoundingClientRect().height,
+            pageHeight: tab.linkedBrowser.getBoundingClientRect().height };""", timeout=60)
+        record(13, "F12 opens DevTools, docked under the page", bool(r) and r["host"] == "bottom"
+               and r["frameHeight"] > 100 and r["pageHeight"] > 100, r)
+
+        # -- The console runs code in the page.
+        r = b.js(DT + """let toolbox = gDevTools.getToolboxForTab(gBrowser.selectedTab);
+          return toolbox.selectTool("webconsole")
+            .then(() => toolbox.commands.scriptCommand.execute("document.title + ' / ' + window.cachedRan"))
+            .then(res => res.result);""")
+        record(13, "the console evaluates code in the page", r == "devtools page / 1", r)
+
+        # -- The inspector sees the page's elements.
+        r = b.js(DT + """let toolbox = gDevTools.getToolboxForTab(gBrowser.selectedTab);
+          return toolbox.selectTool("inspector").then(async inspector => {
+            let node = await inspector.walker.querySelector(inspector.walker.rootNode, "#greeting");
+            await inspector.selection.setNodeFront(node);
+            return [node.tagName, node.getAttribute("class")];
+          });""")
+        record(13, "the inspector finds the page's elements", r == ["H1", "hello"], r)
+        if shots:
+            time.sleep(1)
+            b.m.screenshot(str(Path(shots) / "devtools-inspector.png"))
+
+        # -- Docked to the side, and back.
+        r = b.js(DT + """let toolbox = gDevTools.getToolboxForTab(gBrowser.selectedTab);
+          return toolbox.switchHost("right").then(() => {
+            let panel = gBrowser.selectedBrowser.closest(".browserSidebarContainer");
+            let frame = panel.querySelector(".devtools-toolbox-iframe").getBoundingClientRect();
+            let page = gBrowser.selectedBrowser.getBoundingClientRect();
+            return [toolbox.hostType, panel.getAttribute("devtools-host-type"), frame.left >= page.right - 2, frame.width > 100];
+          }).then(r => toolbox.switchHost("bottom").then(() => r));""")
+        record(13, "it docks beside the page too", r == ["right", "right", True, True], r)
+        r = b.js(DT + """return gDevTools.closeToolboxForTab(gBrowser.selectedTab).then(() => new Promise(done =>
+            setTimeout(() => {
+              let container = gBrowser.getBrowserContainer(), page = gBrowser.selectedBrowser.getBoundingClientRect();
+              done({ left: [...container.children].map(c => c.className),
+                     fills: Math.abs(page.height - container.getBoundingClientRect().height) < 1,
+                     hostAttr: gBrowser.selectedBrowser.closest(".browserSidebarContainer").getAttribute("devtools-host-type") });
+            }, 500)));""")
+        record(13, "closing DevTools gives the page its whole space back, nothing left behind",
+               r == {"left": ["browserStack"], "fills": True, "hostAttr": None}, r)
+        b.js(DT + "return gDevTools.showToolboxForTab(gBrowser.selectedTab).then(() => true);")
+
+        # -- The Developer tools submenu, filled by DevTools.
+        r = b.js("""let popup = document.getElementById("menuWebDeveloperPopup");
+          return [...popup.children].filter(c => !c.hidden && c.localName == "menuitem").map(c => c.id);""")
+        record(13, "the app menu's Developer tools submenu lists DevTools' commands, cache reset last",
+               r and "menu_devToolbox" in r and "menu_browserConsole" in r and "menu_pageSource" in r
+               and r[-1] == "menu_emptyCacheReload", r)
+
+        # -- The reload button's menu, while DevTools is open.
+        r = b.js("""let menu = document.getElementById("reload-menu");
+          return new Promise(done => {
+            menu.addEventListener("popupshown", () => { let items = [...menu.children].map(c => c.label);
+              menu.hidePopup(); done(items); }, { once: true });
+            document.getElementById("reload-button").dispatchEvent(new MouseEvent("contextmenu",
+              { bubbles: true, cancelable: true, button: 2 }));
+            setTimeout(() => done(null), 3000);
+          });""")
+        record(13, "with DevTools open, right-clicking reload offers Empty cache and hard reload",
+               r == ["Normal reload", "Hard reload", "Empty cache and hard reload"], r)
+
+        # -- Emptying the cache: the cached script is fetched again. (Without
+        # the toolbox, which may fetch the script again for its own display.)
+        b.js(DT + "return gDevTools.closeToolboxForTab(gBrowser.selectedTab);")
+        visit()
+        # A second visit comes from the cache.
+        before = CacheHandler.fetched
+        visit()
+        time.sleep(1)
+        record(13, "a page's cached script isn't fetched again on the next visit", CacheHandler.fetched == before,
+               [before, CacheHandler.fetched])
+        cached = CacheHandler.fetched
+        b.js("return BrowserWip.emptyCacheAndReload();")
+        b.wait("return !gBrowser.selectedTab.hasAttribute('busy') && gBrowser.selectedBrowser.contentTitle == 'devtools page';",
+               timeout=15)
+        time.sleep(1)
+        after_reload = CacheHandler.fetched
+        b.js("return new Promise(r => Services.clearData.deleteData(Ci.nsIClearDataService.CLEAR_ALL_CACHES, r));")
+        visit()
+        time.sleep(1)
+        record(13, "Empty cache and hard reload fetches what was cached; afterwards the cache is empty",
+               cached >= 1 and after_reload > cached and CacheHandler.fetched > after_reload,
+               [cached, after_reload, CacheHandler.fetched])
+
+        # -- A tab moved to another window keeps its toolbox.
+        b.js(DT + "return gDevTools.showToolboxForTab(gBrowser.selectedTab).then(() => true);")
+        b.js("gBrowser.addTab('about:blank', { select: false });")
+        b.js("gBrowser.tearOffTab(gBrowser.selectedTab);")
+        r = b.wait(DT + """let w = [...Services.wm.getEnumerator("navigator:browser")].find(w => w != window);
+          let tab = w?.gBrowser?.selectedTab, toolbox = tab && gDevTools.getToolboxForTab(tab);
+          return toolbox?.isReady && tab.linkedBrowser.contentTitle == "devtools page" &&
+            !!w.gBrowser.getBrowserContainer(tab.linkedBrowser).querySelector(".devtools-toolbox-iframe");""", timeout=30)
+        record(13, "a tab moved to another window keeps its open toolbox", bool(r), r)
+        b.js("""for (let w of [...Services.wm.getEnumerator("navigator:browser")]) if (w != window) w.close();""")
+
+        # -- Inspect (the page's right-click menu): the clicked element, in the
+        # inspector.
+        visit()
+        b.js(DT + "return gDevTools.closeToolboxForTab(gBrowser.selectedTab);")
+        b.m.right_click(40, 30)
+        b.wait("return document.getElementById('content-context-menu').state == 'open';", timeout=10)
+        b.js("document.getElementById('context-inspect').doCommand(); document.getElementById('content-context-menu').hidePopup();")
+        r = b.wait(DT + """let toolbox = gDevTools.getToolboxForTab(gBrowser.selectedTab);
+          let node = toolbox?.getPanel("inspector")?.selection?.nodeFront;
+          return toolbox?.currentToolId == "inspector" && node?.id == "greeting" && [toolbox.currentToolId, node.tagName, node.id];""",
+                   timeout=60)
+        record(13, "Inspect in the page's right-click menu opens the inspector on that element",
+               r == ["inspector", "H1", "greeting"], r)
+
+        # -- View page source.
+        visit()
+        b.js("BrowserWip.viewSource();")
+        r = b.wait("return gBrowser.tabs.some(t => t.linkedBrowser.currentURI.spec.startsWith('view-source:'))"
+                   " && gBrowser.selectedBrowser.currentURI.spec;", timeout=15)
+        record(13, "View page source (Ctrl+U) opens the page's source", bool(r) and r.startswith("view-source:"), r)
+    finally:
+        b.quit()
+        server.shutdown()
+
+
 def set_path():
     """The runner's own PATH: fetch-test-deps.sh's cache first, then the
     caller's."""
@@ -3483,7 +3914,8 @@ def main():
              5: lambda: part5(args.bindir, base), 6: lambda: part6(args.bindir, base),
              7: lambda: part7(args.bindir, base), 8: lambda: part8(args.bindir, base, args.shots),
              9: lambda: part9(args.bindir, base), 10: lambda: part10(args.bindir, base),
-             11: lambda: part11(args.bindir, base), 12: lambda: part12(args.bindir, base, args.shots)}
+             11: lambda: part11(args.bindir, base), 12: lambda: part12(args.bindir, base, args.shots),
+             13: lambda: part13(args.bindir, base, args.shots)}
     for p in args.part:
         try:
             parts[p]()

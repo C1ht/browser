@@ -11,8 +11,8 @@
  * exit). Otherwise it stays available from the menu ("Restore previous
  * session") for as long as this run lasts.
  *
- * Saved per tab: address, title, pinned state and site icon (if small); per
- * window, the selected tab. Restored tabs load when first selected.
+ * Saved per tab: address, title, pinned state, site icon (if small) and
+ * split view (on its first tab); per window, the selected tab. Restored tabs load when first selected.
  * Back/forward history is not kept.
  */
 
@@ -41,6 +41,8 @@ function windowState(win) {
       title: tab.pendingLoad?.title ?? browser.contentTitle ?? "",
       pinned: tab.hasAttribute("pinned"),
       icon,
+      // On a split view's first tab: its page's share of the width.
+      split: tab.getAttribute("split") == "start" ? tab.split.ratio : undefined,
     };
   });
   return { tabs, selected: gBrowser.tabs.indexOf(gBrowser.selectedTab) };
@@ -74,8 +76,17 @@ export const SessionStore = {
   observe(subject, topic) {
     if (topic == "quit-application-granted" && !this._frozen) {
       this._frozen = true;
-      this._write(browserWindows().map(windowState), { cleanExit: true });
+      this._write(browserWindows().map(windowState), { cleanExit: true, restoreNext: this._restoreNext });
     }
+  },
+
+  /**
+   * Restarts the browser with the same windows and tabs (after its files
+   * changed on disk, new tabs can't start until it does).
+   */
+  restart() {
+    this._restoreNext = true;
+    Services.startup.quit(Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart);
   },
 
   /**
@@ -93,7 +104,7 @@ export const SessionStore = {
       return null;
     }
     let crashed = !previous.cleanExit;
-    if (!crashed && !Services.prefs.getBoolPref(RESTORE_PREF, false)) {
+    if (!crashed && !previous.restoreNext && !Services.prefs.getBoolPref(RESTORE_PREF, false)) {
       return null;
     }
     this._restoredPrevious = true;
@@ -164,10 +175,13 @@ export const SessionStore = {
     this._write([windowState(win)], { cleanExit: true });
   },
 
-  _write(windows, { cleanExit }) {
+  _write(windows, { cleanExit, restoreNext = false }) {
     clearTimeout(this._saveTimer);
     this._saveTimer = null;
     let data = { version: 1, cleanExit, windows: windows.filter(w => w.tabs.length) };
+    if (restoreNext) {
+      data.restoreNext = true;
+    }
     // IOUtils finishes pending writes before the profile closes.
     return IOUtils.writeJSON(this._path, data, { tmpPath: this._path + ".tmp" }).catch(e =>
       console.error("browser-wip: could not save the session", e)

@@ -1,0 +1,13 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# DevToolsStartup (devtools/startup) imports Firefox's toolbar framework from
+# browser/, which this app doesn't build. These stand in for it at the same
+# moz-src: addresses, doing nothing: DevTools' toolbar button isn't offered;
+# the app menu's Developer tools submenu and the keyboard shortcuts are.
+FINAL_TARGET_FILES["moz-src"].browser.components.customizableui += [
+    "customizableui/CustomizableUI.sys.mjs",
+    "customizableui/CustomizableWidgets.sys.mjs",
+    "customizableui/PanelMultiView.sys.mjs",
+]

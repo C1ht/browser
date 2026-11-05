@@ -102,7 +102,7 @@ browser/                        ← this repo
 - `MOZ_APP_NAME=browser-wip`, `MOZ_APP_VENDOR`, `MOZ_APP_ID`, `MOZ_APP_REMOTINGNAME`, `MOZ_APP_PROFILE`
 - `MOZ_PLACES` (history and bookmarks storage), `MOZ_DEDICATED_PROFILES`, `MOZ_BLOCK_PROFILE_DOWNGRADE`
 - `BROWSER_CHROME_URL=chrome://browser-wip/content/browser.xhtml`
-- `MOZ_DEVTOOLS=server` initially (see Q4)
+- `MOZ_DEVTOOLS=all`: Firefox's whole DevTools (section 8); it was `server` at first (see Q4)
 
 It deliberately does **not** imply `MOZ_NORMANDY`, `MOZ_SERVICES_SYNC`, `MOZ_SERVICES_HEALTHREPORT`, or `MOZ_PROFILE_MIGRATOR`.
 
@@ -205,7 +205,13 @@ The interactive mock is in the design page.
 - **Why the inversion works:** the address field always describes the active tab, and the active tab now sits directly on the page. The active tab is drawn in the page's background color, with curved shoulders that merge into the page.
 - **New-tab flow:** Ctrl+T or `+` opens the tab next to the current one, at the end of the strip, and **moves focus up to the address field**. That's a short eye movement, because the field is directly above. Suggestions drop down from the field over the strip and page. The new-tab page is local only: pinned sites and recent history, no remote content. Middle-click or double-click on empty strip space also opens a tab.
 - **Window dragging (Wayland CSD):** empty toolbar space is the drag region, and double-click there maximizes. Empty strip space is for tab actions, never window moves, so the two rows have distinct jobs.
-- **Drag to reorder:** horizontal drag with live displacement of neighbors. Pinned tabs reorder only among themselves. Dragging more than about 24px vertically detaches the tab into a new window. Under Wayland the app can't place the new window at the cursor; the compositor decides. Your DE could do better here (Q7). Dropping a link on the strip opens it at that position.
+- **Dragging tabs:** tabs drag with the desktop's own drag and drop, which on Wayland is the only way a drag can reach other windows.
+  - **Along the strip:** a tab reorders, and its neighbors slide aside. Pinned tabs reorder only among themselves.
+  - **Over the middle half of another tab:** split view (§9).
+  - **Onto another browser window:** on its strip, the tab joins that window where it lands; on the page, it joins at the end.
+  - **Outside every window:** the tab opens in a window of its own. Under Wayland the app can't place that window at the cursor; the compositor decides (Q7).
+  - **Onto another app:** the app gets the page's address.
+  - Dropping a link on the strip opens it at that position.
 - **Overflow:** tabs shrink to about 96px, then the strip scrolls horizontally with faded edges and a "list all tabs" button at the end.
 - **Loading:** the active tab's progress is a thin accent line along the bottom of the address field. Every loading tab's icon becomes a spinner, which is the only state visible across background tabs.
 - **Security and privacy indicators** live **in the address field**, because they describe the current page:
@@ -335,6 +341,58 @@ My suggestion: allow CRLite only, as one documented exception, and keep Safe Bro
 - The runtime checks reach their 127.0.0.1 test sites through `browserwip.newtab.siteIcons.testHosts`. That pref is read only when `BWV_AUTOMATION=1` is set and Marionette is running.
 
 **Private browsing.** This browser has no private-window command. Gecko's permanent private browsing pref (`browser.privatebrowsing.autostart`) makes every window private, and in that case nothing is fetched and no icon is kept, neither here nor in history.
+
+## 8. Developer tools
+
+Firefox's DevTools, built with `MOZ_DEVTOOLS=all`, run in this window unchanged; nothing in `devtools/` is patched. The app supplies what DevTools expects from Firefox's window:
+
+- **Tabs:** `<tab>` elements (DevTools recognizes a tab by its tag name). Each page sits in Firefox's structure, `.browserSidebarContainer > .browserContainer > .browserStack > <browser>`, inside `#tabbrowser-tabbox`. The toolbox docks below the page or beside it.
+- **`gBrowser`:** `selectedTab` as a setter, `getBrowserContainer()`, `addTrustedTab()` and `currentURI`. Tabs dispatch `TabRemotenessChange`, and a tab moved to another window first dispatches `TabClose` with `detail.adoptedBy`, so an open toolbox moves with it.
+- **Startup:** DevToolsStartup adds its shortcuts (F12, Ctrl+Shift+I, J, K, C, E, M, Z) next to `#mainKeyset`. It fills the app menu's Developer tools submenu (`#browserToolsMenu`, `#menuWebDeveloperPopup`), where the app adds `#menu_pageSource` (Ctrl+U) and `#menu_taskManager` (about:processes). It finds windows that started before it through `gBrowserInit.delayedStartupFinished`.
+- **Firefox's toolbar framework:** DevToolsStartup imports `CustomizableUI`, `CustomizableWidgets` and `PanelMultiView` from `browser/`, which isn't built. `app/components/devtools/customizableui/` puts do-nothing stand-ins at the same `moz-src:` addresses, so DevTools' toolbar button isn't offered.
+- **Default prefs:** DevTools' prefs live in Firefox's `firefox.js`, so `app/profile/devtools.js` carries a copy of that block. Copy it again when Gecko is updated.
+
+**Inspect.** The page's right-click menu ends with Inspect. ContextMenuChild sends a `ContentDOMReference` for the clicked element, and `DevToolsShim.inspectNode` selects it in the inspector, as Firefox does.
+
+**Closing the toolbox.** When a docked toolbox is removed, the tab browser tells the page's frame loader its size (`requestUpdatePosition`) and toggles its activeness, as switching tabs does. On a real display the space could otherwise stay blank until a tab switch. Headless rendering didn't show this, so it is untested there.
+
+**Emptying the cache.** "Empty cache and hard reload" is the last item in the Developer tools submenu. While DevTools is open for the tab, it is also on the reload button's right-click menu, as in other browsers. It clears every cache (`CLEAR_ALL_CACHES`: network, images, stylesheets, scripts, in every process), then reloads bypassing the cache. Cookies, storage and history stay.
+
+**What isn't there.** These come from Firefox's `browser/` and aren't built:
+
+- The screenshot command (`:screenshot`, `ScreenshotsUtils`).
+- The `utilityOverlay.js` helpers that the Style Editor and Browser Toolbox windows load.
+- Two icons from Firefox's theme.
+
+Runtime part 13 covers F12 docking under and beside the page, the console, the inspector, the menu, the reload menu, emptying the cache, a tab moving windows with its toolbox, and view source.
+
+## 9. Split view
+
+Two tabs can show their pages side by side in one window.
+
+**Making one.** Drag a tab over the middle half of another tab; the outer quarters still reorder. While the tab is there, the tab under it previews the split: both tabs' icons and titles side by side in its place, outlined in the accent color. The other tabs hold still meanwhile. Let go, and the dragged tab moves next to the other one and the window splits, the dragged tab's page on the right. A tab dragged from another window works the same way. Pinned tabs don't split.
+
+**While split.**
+
+- **In the strip:** the two tabs sit together as one, with square inner corners and a divider. While their pages are on screen, both are drawn like the selected tab.
+- **The selected page:** one of the two pages is the selected tab. The address bar, the keyboard and the toolbar act on it, and a line in the accent color runs along its top. Clicking into the other page, or on its tab, selects that one instead.
+- **Both pages run:** both are active, rendering at full speed. Selecting any other tab gives that tab the whole window; selecting either half brings both back.
+- **Resizing:** the bar between the pages resizes them, down to 15% of the window. A double-click on the bar evens them out.
+- **Fullscreen:** a page in fullscreen takes the whole screen.
+
+**Ending one.**
+
+- "Separate split view" on either tab's right-click menu.
+- Closing one tab gives the other the whole window.
+- Dragging one tab away from the other, pinning it, or moving it to another window.
+
+New tabs never land between a split view's two tabs; they go just after them.
+
+**Session restore.** A split view is saved on its first tab, with its page's share of the width, and restored with the session.
+
+**How it works.** `tabbrowser.js` gives both tabs the same `tab.split` object, `{ tabs, ratio }`. `#browsers` becomes a three-column grid: the two pages either side of `#split-view-splitter`. Every other page stays in the grid's single cell, hidden only visually, so background pages keep their frames.
+
+Runtime part 4 covers the preview, the side-by-side layout, both pages being active, clicking into the other page, switching away and back, resizing, tab placement, swapping the halves, session restore, closing one half, and a tab from another window.
 
 ## Stage 3 order (after approval)
 
