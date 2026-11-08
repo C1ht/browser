@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>storage</title>
+<p>Keeps a cookie and local storage (?set), and says in its title what it finds.</p>
+<script>
+  if (location.search == "?set") {
+    document.cookie = "kept=1; max-age=3600";
+    localStorage.setItem("kept", "1");
+  }
+  document.title = "storage: cookie=" + (document.cookie.includes("kept=1") ? "1" : "0") +
+    " local=" + (localStorage.getItem("kept") || "0");
+</script>

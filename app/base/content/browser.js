@@ -14,6 +14,7 @@ ChromeUtils.defineESModuleGetters(this, {
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+  SiteData: "resource://gre/modules/browserwip/SiteData.sys.mjs",
   ProtectionStats: "resource://gre/modules/browserwip/ProtectionStats.sys.mjs",
   SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
 });
@@ -35,6 +36,7 @@ var BrowserWip = {
     DownloadsUI.init(window).catch(console.error);
     BrowserContextMenu.init(window);
     PermissionPrompts.init(window);
+    DrmNotices.init();
     TabOverview.init(window);
     FullScreen.init(window);
     PasswordsUI.init(window);
@@ -276,7 +278,12 @@ var BrowserWip = {
     // (middle-click on Reload opens a tab instead, and must not reload).
     document.addEventListener("click", e => {
       let button = e.target.closest("button[data-command]");
-      if (button && !button.disabled && e.button == 0) {
+      if (!button || button.disabled || e.button != 0) {
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && button.id in this.IN_NEW_TAB) {
+        this.IN_NEW_TAB[button.id]();
+      } else {
         document.getElementById(button.dataset.command).doCommand();
       }
     });
@@ -440,19 +447,48 @@ var BrowserWip = {
       }
     }).observe(popup, { childList: true });
     let reload = document.getElementById("reload-button");
-    // Middle-click opens the page again, freshly loaded, in a tab beside it.
-    reload.addEventListener("auxclick", e => {
-      if (e.button == 1) {
-        e.preventDefault();
-        this.duplicateTab(gBrowser.selectedTab, { select: false });
-      }
-    });
+    // Middle-click (Ctrl+click: the click handler in _wireButtons) does it
+    // in a new tab instead.
+    for (let id of Object.keys(this.IN_NEW_TAB)) {
+      let button = document.getElementById(id);
+      button.addEventListener("auxclick", e => {
+        if (e.button == 1 && !button.disabled) {
+          e.preventDefault();
+          this.IN_NEW_TAB[id]();
+        }
+      });
+    }
     reload.addEventListener("contextmenu", e => {
       if (this.devToolsOpen()) {
         e.preventDefault();
         document.getElementById("reload-menu").openPopup(reload, "after_start", 0, 4, false, false, e);
       }
     });
+  },
+
+  // Back, Forward and Reload, middle- or Ctrl+clicked: the same in a new tab
+  // beside the selected one, in the background, which leaves the selected
+  // tab as it is.
+  IN_NEW_TAB: {
+    "back-button": () => BrowserWip.openHistoryInNewTab(-1),
+    "forward-button": () => BrowserWip.openHistoryInNewTab(1),
+    "reload-button": () => BrowserWip.duplicateTab(gBrowser.selectedTab, { select: false }),
+  },
+
+  /**
+   * Opens the page delta steps back (-1) or forward (1) in the selected
+   * tab's history in a new background tab beside it. The new tab has that
+   * page only, not the history around it.
+   */
+  openHistoryInNewTab(delta) {
+    let tab = gBrowser.selectedTab;
+    let history = tab.linkedBrowser.browsingContext?.sessionHistory;
+    let index = (history?.index ?? -1) + delta;
+    if (!history || index < 0 || index >= history.count) {
+      return null;
+    }
+    let url = history.getEntryAtIndex(index).URI.spec;
+    return gBrowser.addTab(url, { index: gBrowser.tabs.indexOf(tab) + 1, select: false });
   },
 
   /** Opens tab's page again (a fresh load, not a copy of its history) next to it. */
@@ -606,6 +642,27 @@ var BrowserWip = {
       this._fillIdentityPanel();
       idPanel.openPopup(idButton, "bottomleft topleft", 0, 4);
     });
+    let clearButton = document.getElementById("identity-clear-data");
+    let clearConfirm = document.getElementById("identity-clear-confirm");
+    clearButton.addEventListener("click", () => {
+      clearButton.hidden = true;
+      clearConfirm.hidden = false;
+      document.getElementById("identity-clear-ok").focus();
+    });
+    document.getElementById("identity-clear-cancel").addEventListener("click", () => {
+      clearConfirm.hidden = true;
+      clearButton.hidden = false;
+    });
+    document.getElementById("identity-clear-ok").addEventListener("click", async () => {
+      let browser = gBrowser.selectedBrowser;
+      let site = SiteData.siteFor(browser.currentURI);
+      idPanel.hidePopup();
+      if (site) {
+        await SiteData.clearSite(site);
+        // The page still holds what it read; it loads again without it.
+        browser.reload();
+      }
+    });
   },
 
   _host() {
@@ -645,6 +702,14 @@ var BrowserWip = {
       document.getElementById("identity-summary"),
       state == "insecure" ? "identity-summary-insecure" : "identity-summary-secure"
     );
+    // Clear site data, for pages of a site (not the browser's own pages).
+    let site = SiteData.siteFor(gBrowser.selectedBrowser.currentURI);
+    document.getElementById("identity-clear").hidden = !site;
+    document.getElementById("identity-clear-data").hidden = false;
+    document.getElementById("identity-clear-confirm").hidden = true;
+    if (site) {
+      document.l10n.setAttributes(document.getElementById("identity-clear-text"), "identity-clear-text", { site });
+    }
   },
 };
 

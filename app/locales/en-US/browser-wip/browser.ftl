@@ -344,6 +344,24 @@ protections-open-settings = Privacy settings
 identity-title = { $host }
 identity-summary-secure = Your connection to this site is encrypted.
 identity-summary-insecure = Your connection to this site is not encrypted. Don’t enter passwords or card numbers here.
+identity-clear-data = Clear cookies and site data…
+# $site: the site, e.g. example.com (its subdomains are cleared too).
+identity-clear-text = Remove everything { $site } keeps on this computer: cookies, stored data, cached files and the permissions you gave it. You’ll be signed out of it. History and saved passwords stay.
+identity-clear-cancel = Cancel
+identity-clear-ok = Clear
+
+## DRM (drm.js)
+
+drm-installing = Installing Google’s Widevine component to play this page’s video or music…
+# $received, $total: megabytes downloaded so far, and in all.
+drm-downloading = Downloading Google’s Widevine component to play this page’s video or music… { $received } of { $total } MB
+drm-unpacking = Installing Google’s Widevine component…
+drm-failed = Couldn’t install Widevine, which this page needs to play. Check your connection and try again.
+drm-try-again = Try again
+drm-disabled = This page wants to play DRM-controlled video or music. DRM is off in your privacy settings.
+drm-turn-on = Turn on DRM
+drm-not-now = Not now
+drm-ok = OK
 
 ## Fullscreen pages
 

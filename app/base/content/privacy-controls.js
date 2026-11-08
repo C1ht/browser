@@ -33,6 +33,7 @@ const TOGGLE_UI = {
   spoofEnglish: { l10n: "privacy-toggle-english", on: strict => strict },
   letterboxing: { l10n: "privacy-toggle-letterboxing", on: strict => strict },
   hideReferrer: { l10n: "privacy-toggle-referrer", on: strict => strict },
+  noDrm: { l10n: "privacy-toggle-drm", on: strict => !strict },
 };
 
 class PrivacyControls {

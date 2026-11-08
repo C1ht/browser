@@ -23,10 +23,13 @@ for (const [k, v] of Object.entries({
   "privacy.trackingprotection.socialtracking.enabled": false, "browserwip.privacy.mode": "standard",
   "privacy.resistFingerprinting": false, "privacy.resistFingerprinting.pbmode": false, "privacy.spoof_english": 0,
   "privacy.resistFingerprinting.letterboxing": false, "network.http.referer.XOriginPolicy": 0,
-  "places.history.enabled": true })) defaults.set(k, v);
+  "places.history.enabled": true, "media.eme.enabled": true, "media.gmp-widevinecdm.enabled": true })) defaults.set(k, v);
 
 const { PrivacyModes } = await import("../../app/components/privacy/PrivacyModes.sys.mjs");
 const assert = (c, m) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else console.log("ok  ", m); };
+// The user prefs that set protections (not the record of which toggles a
+// profile has been given since it was created).
+const protectionPrefs = () => [...user.keys()].filter(k => !k.startsWith("browserwip.privacy.added."));
 assert(PrivacyModes.mode == "standard", "fresh profile is standard");
 assert(user.size == 0, "fresh profile has no user prefs");
 PrivacyModes.setMode("strict");
@@ -63,7 +66,7 @@ assert(PrivacyModes.mode == "strict" && get("privacy.resistFingerprinting") === 
   "anonymous -> strict undoes the anonymous-only prefs");
 PrivacyModes.setMode("standard");
 assert(PrivacyModes.mode == "standard", "setMode(standard) -> standard");
-assert([...user.keys()].length == 0, "back to standard leaves no user prefs: " + [...user.keys()]);
+assert(protectionPrefs().length == 0, "back to standard leaves no user prefs: " + protectionPrefs());
 PrivacyModes.init(); PrivacyModes.setStrict("jit", true);
 assert(PrivacyModes.pendingRestart.includes("jit"), "JIT change reports pending restart");
 PrivacyModes.setStrict("jit", false);
@@ -88,7 +91,7 @@ assert(PrivacyModes.modeFor({ ...strictState, jit: false }) == "custom", "modeFo
 PrivacyModes.applyState({ ...strictState, utcTimezone: true });
 assert(PrivacyModes.mode == "custom" && PrivacyModes.isStrict("utcTimezone") && PrivacyModes.isStrict("jit"), "applyState writes a previewed custom state");
 PrivacyModes.applyState(PrivacyModes.stateForMode("standard"));
-assert(user.size == 0, "applyState(standard) leaves no protection prefs: " + [...user.keys()]);
+assert(protectionPrefs().length == 0, "applyState(standard) leaves no protection prefs: " + protectionPrefs());
 
 // History: off in Strict and Anonymous, on in Standard; turning it back on clears the user pref.
 PrivacyModes.setMode("anonymous");
@@ -98,3 +101,27 @@ assert(get("places.history.enabled") === true && !user.has("places.history.enabl
 PrivacyModes.setStrict("noHistory", true);
 assert(PrivacyModes.mode == "custom", "standard without history -> custom");
 PrivacyModes.setStrict("noHistory", false);
+
+// DRM: off in Strict and Anonymous, on in Standard.
+PrivacyModes.setMode("strict");
+assert(get("media.eme.enabled") === false && get("media.gmp-widevinecdm.enabled") === false, "strict turns DRM off");
+PrivacyModes.setMode("standard");
+assert(get("media.eme.enabled") === true && !user.has("media.eme.enabled"), "standard turns DRM back on");
+
+// A profile that chose Strict before the DRM switch existed gets DRM off at
+// its next start, and stays in Strict; once only.
+user.clear();
+PrivacyModes.setMode("strict");
+user.delete("media.eme.enabled");
+user.delete("media.gmp-widevinecdm.enabled");
+user.delete("browserwip.privacy.added.noDrm");
+assert(PrivacyModes.mode == "custom", "an old Strict profile reads as custom before the migration");
+PrivacyModes.init();
+assert(PrivacyModes.mode == "strict" && get("media.eme.enabled") === false, "the migration keeps it in Strict, DRM off");
+PrivacyModes.setStrict("noDrm", false);
+PrivacyModes.init();
+assert(get("media.eme.enabled") === true, "the migration runs once: DRM turned back on stays on");
+// A Standard profile keeps DRM on.
+user.clear();
+PrivacyModes.init();
+assert(PrivacyModes.mode == "standard" && get("media.eme.enabled") === true, "a Standard profile keeps DRM on");

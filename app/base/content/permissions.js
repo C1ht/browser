@@ -20,6 +20,10 @@
  * panel under the site information button.
  */
 
+ChromeUtils.defineESModuleGetters(this, {
+  setScreenSharing: "resource://gre/modules/browserwip/EncryptedMediaParent.sys.mjs",
+});
+
 var PermissionPrompts = {
   init(window) {
     this.window = window;
@@ -57,6 +61,7 @@ var PermissionPrompts = {
       }
     });
     gBrowser.tabContainer.addEventListener("TabClose", e => this._drop(e.target.linkedBrowser));
+    window.addEventListener("unload", () => setScreenSharing(window, false), { once: true });
   },
 
   request(request) {
@@ -196,6 +201,9 @@ var PermissionPrompts = {
       tab.querySelector(".tab-state.sharing").src = this._icon(summary);
     }
     this._updateSharingButton();
+    // Widevine is told whether the screen may be captured (DRM).
+    let screen = [...this._sharing.values()].some(windows => [...windows.values()].some(s => s.screen));
+    setScreenSharing(window, screen);
   },
 
   _summary(browser) {

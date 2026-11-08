@@ -29,7 +29,8 @@ Both use the vendored EasyList, EasyPrivacy and Fanboy Social lists (`app/compon
 - **What a block does.** It is reported exactly as Gecko's tracking protection reports one:
   - `requestBlockingReason` is 2004 ("Tracking" in devtools), or 2009 for the social list.
   - The matched list is recorded as `browserwip-ads-trackers` or `browserwip-social`.
-  - An entry goes into the content-blocking log, which the shield counts.
+  - An entry goes into the content-blocking log, which the shield counts: one per tracker site (origin), not per request.
+  - A `browserwip:request-blocked` notification, with the channel, tells the tab to recount. Gecko's own progress event fires only for a page's first block of each kind, so without it the count would stop after the first tracker or two.
 
   The channel is then cancelled with `NS_ERROR_TRACKING_URI` or `NS_ERROR_SOCIALTRACKING_URI`. Gecko's URL classifier gets no tables at all, so nothing is blocked or counted twice.
 - **Switches.** The blocker follows the existing prefs; nothing new was added:

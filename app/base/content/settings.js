@@ -10,6 +10,7 @@ const { AppConstants } = ChromeUtils.importESModule("resource://gre/modules/AppC
 const { ContentBlockingLists } = ChromeUtils.importESModule(
   "resource://gre/modules/browserwip/ContentBlockingLists.sys.mjs"
 );
+const { SiteData } = ChromeUtils.importESModule("resource://gre/modules/browserwip/SiteData.sys.mjs");
 const { DevBuilds, CHECK_PREF: DEV_BUILDS_PREF } = ChromeUtils.importESModule(
   "resource://gre/modules/browserwip/DevBuilds.sys.mjs"
 );
@@ -27,7 +28,7 @@ window.addEventListener("DOMContentLoaded", () => {
         element: group("fingerprinting"),
         ids: ["resistFingerprinting", "utcTimezone", "spoofEnglish", "letterboxing"],
       },
-      { element: group("security"), ids: ["jit"] },
+      { element: group("security"), ids: ["jit", "noDrm"] },
     ],
     live: true,
     onChange(mode, pendingRestart) {
@@ -163,6 +164,30 @@ window.addEventListener("DOMContentLoaded", () => {
   };
   document.getElementById("history-clear").addEventListener("click", () => openHistory("#clear"));
   document.getElementById("history-open").addEventListener("click", () => openHistory(""));
+
+  // Clear site data, for every site, after a confirmation in place.
+  let siteDataClear = document.getElementById("site-data-clear");
+  let siteDataConfirm = document.getElementById("site-data-confirm");
+  siteDataClear.addEventListener("click", () => {
+    siteDataConfirm.hidden = false;
+    siteDataClear.disabled = true;
+    document.getElementById("site-data-ok").focus();
+  });
+  let closeSiteData = () => {
+    siteDataConfirm.hidden = true;
+    siteDataClear.disabled = false;
+  };
+  document.getElementById("site-data-cancel").addEventListener("click", () => {
+    closeSiteData();
+    siteDataClear.focus();
+  });
+  document.getElementById("site-data-ok").addEventListener("click", async () => {
+    closeSiteData();
+    siteDataClear.disabled = true;
+    document.l10n.setAttributes(siteDataClear, "settings-site-data-clearing");
+    await SiteData.clearAll();
+    document.l10n.setAttributes(siteDataClear, "settings-site-data-cleared");
+  });
   Services.prefs.addObserver("places.history.enabled", syncHistory);
   window.addEventListener("unload", () => Services.prefs.removeObserver("places.history.enabled", syncHistory));
   syncHistory();

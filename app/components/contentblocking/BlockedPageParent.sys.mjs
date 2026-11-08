@@ -24,7 +24,7 @@ export class BlockedPageParent extends JSWindowActorParent {
         if (browser?.canGoBack) {
           browser.goBack();
         } else {
-          browser?.ownerGlobal.gBrowser?.loadURL(browser, "about:newtab");
+          browser?.ownerDocument.defaultView.gBrowser?.loadURL(browser, "about:newtab");
         }
         break;
       case "BlockedPage:continue": {

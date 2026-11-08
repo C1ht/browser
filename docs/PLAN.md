@@ -8,7 +8,7 @@ Design mockups: `design/mockups/chrome-directions.html` (also published as an ar
 | Question | Decision | What it means in the build |
 |---|---|---|
 | Design direction | **Folio** | `app/themes/shared/browser.css` |
-| Q1 DRM | **None at first, addable later** | Built with `--enable-eme` off. Adding it later means rebuilding with `--enable-eme=widevine` and adding an on-demand install prompt; nothing else depends on its absence. Paid streaming (Netflix, Disney+, Spotify Web) won't play until then. |
+| Q1 DRM | **Widevine, on demand; on in Standard, off in Strict and Anonymous** (decided 2026-11-05) | Built with `--enable-eme=widevine`. Google's component is downloaded the first time a site asks for it, never at startup and never through Mozilla's servers (§13). |
 | Q2 Ad blocking | **On by default, our own built-in tool** | EasyList, EasyPrivacy and Fanboy Social are vendored. Network blocking: adblock-rust, already in every libxul, checks every request in the parent (`docs/CONTENT-BLOCKING.md`). Element hiding: stylesheets compiled at build time. Never fetched. No extension needed. |
 | Q3 Mozilla downloads | **None**, so no CRLite. Safe Browsing excluded. | OCSP is also off: it reports every site you visit to the certificate authority. Revocation relies on the OneCRL list bundled with each release. A bundled enterprise policy disables Remote Settings entirely. |
 | Q4 Extensions | **v2** | Not supported in v1; AMO and update calls are off. |
@@ -417,6 +417,30 @@ A published dev build (`tools/release/dev-release.sh`) carries `dev-build.json` 
 - **A local build** (no `dev-build.json`) has nothing to compare, never checks, and Settings says so.
 
 Runtime part 15 covers all of this against a local stand-in for the API, including that the request carries no cookies or Referer.
+
+## 12. Clear site data
+
+What sites keep on this computer, cleared for one site or for all of them (`components/library/SiteData.sys.mjs`).
+
+- **One site:** the site information panel (the button at the left of the address bar) has **Clear cookies and site data…**, which asks first, naming the site. It clears the registrable domain with its subdomains, since they share cookies, then reloads the page.
+- **All sites:** Settings → Search and history → **Clear site data…**, with a confirmation in place.
+- **What goes:** cookies, storage (local storage, IndexedDB, service worker caches, push subscriptions), cached files, the site's permissions (camera, location, notifications, protections turned off), and the icons the new tab page keeps for favorites on the site.
+- **What stays:** history, bookmarks and saved passwords.
+- **Not offered** on the browser's own pages.
+
+Runtime part 16 covers both, including that another site's data stays when one site is cleared.
+
+## 13. DRM (Widevine)
+
+DRM-controlled video and music (Netflix, Disney+, Spotify) plays through Google's Widevine component, a closed-source library.
+
+- **The switch:** "Play DRM-controlled content", under Settings → Privacy → Security and in the first-run Advanced options. It's on in Standard, and Strict Privacy and Anonymous turn it off (PrivacyModes `noDrm`: `media.eme.enabled` and `media.gmp-widevinecdm.enabled`). A profile already in Strict or Anonymous when the switch was added gets it off, so it stays in its mode.
+- **Getting Widevine:** it isn't bundled. The first time a page asks for it with the switch on, Gecko tells the page to wait (up to a minute) and tells the browser (`mediakeys-request`, the EncryptedMedia actors). `Widevine.sys.mjs` downloads the release that toolkit's `gmp-sources/widevinecdm.json` names, from Google's servers. The download is anonymous (no cookies, no Referer) and is installed only if its SHA-512 matches. Toolkit's GMPExtractor unpacks it into the profile, the `media.gmp-widevinecdm.*` prefs record it as Firefox records it, and Gecko's media plugin service is told where it is. The waiting page then plays. Firefox asks Mozilla's update server first; this browser doesn't, and Gecko's own updater stays off, so nothing is downloaded until a page needs it.
+- **Updates:** when a new browser release names a newer Widevine than the installed one and DRM is on, the new one is downloaded two minutes after startup and replaces the old (streaming services stop accepting old versions). A profile that never needed Widevine downloads nothing.
+- **Notices:** under the site information button. "Installing Google's Widevine component…" while it downloads, a message if that fails, and when DRM is off: "This page wants to play DRM-controlled video or music", with **Turn on DRM**, which turns the switch on and reloads the page. A dismissed notice doesn't come back for that page.
+- **Screen capture:** Widevine asks whether the screen may be captured. The browser answers from whether any window shares a screen with a page, as Firefox does.
+
+Runtime part 17 covers the switch per mode, the install (from a local stand-in for Google's download), that the download is anonymous and happens once, the notice when DRM is off, and Turn on DRM. Real playback needs a real display and a real service; see `docs/MANUAL-CHECKS.md`.
 
 ## Stage 3 order (after approval)
 

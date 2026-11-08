@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- A first-party page that embeds a known tracker and ad network, plus an
      element matching a generic element-hiding rule. The title reports the
-     element's computed display once the page has loaded. -->
+     element's computed display once the page has loaded. With ?late, three
+     more ad networks are requested after the page has loaded. -->
 <meta charset="utf-8">
 <title>loading</title>
 <div id="AD_160">advertisement</div>
@@ -13,5 +14,12 @@
     let ad = getComputedStyle(document.getElementById("AD_160")).display;
     let text = getComputedStyle(document.getElementById("content")).display;
     document.title = `ad:${ad} content:${text}`;
+    if (location.search == "?late") {
+      setTimeout(() => {
+        for (let host of ["c.amazon-adsystem.com", "pagead2.googlesyndication.com", "pub.doubleverify.com"]) {
+          document.body.append(Object.assign(new Image(), { src: `https://${host}/pixel.gif`, alt: "" }));
+        }
+      }, 1000);
+    }
   });
 </script>

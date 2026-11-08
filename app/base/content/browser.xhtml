@@ -33,6 +33,7 @@
   <script src="chrome://browser-wip/content/urlbar.js"/>
   <script src="chrome://browser-wip/content/bookmarks.js"/>
   <script src="chrome://browser-wip/content/printing.js"/>
+  <script src="chrome://browser-wip/content/drm.js"/>
   <script src="chrome://browser-wip/content/browser.js"/>
 </head>
 <body>
@@ -316,6 +317,29 @@
       <div class="panel-body">
         <h2 id="identity-title" class="panel-title"></h2>
         <p id="identity-summary" class="panel-text"></p>
+        <!-- Clear site data for this site (SiteData.sys.mjs), after a
+             confirmation in place. -->
+        <div id="identity-clear" class="identity-clear">
+          <button id="identity-clear-data" class="panel-button" data-l10n-id="identity-clear-data"/>
+          <div id="identity-clear-confirm" hidden="true">
+            <p id="identity-clear-text" class="panel-text"></p>
+            <div class="permission-buttons">
+              <button id="identity-clear-cancel" class="panel-button" data-l10n-id="identity-clear-cancel"/>
+              <button id="identity-clear-ok" class="panel-button primary" data-l10n-id="identity-clear-ok"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </xul:panel>
+    <!-- DRM notices (drm.js): Widevine being installed for the page, or DRM
+         off when the page wants it. -->
+    <xul:panel id="drm-panel" class="wip-panel" type="arrow" role="alertdialog" aria-labelledby="drm-text">
+      <div class="panel-body">
+        <p id="drm-text" class="panel-title"></p>
+        <div class="permission-buttons">
+          <button id="drm-dismiss" class="panel-button" data-l10n-id="drm-not-now"/>
+          <button id="drm-turn-on" class="panel-button primary" data-l10n-id="drm-turn-on"/>
+        </div>
       </div>
     </xul:panel>
     <!-- Passwords (passwords.js): save or update a login, unlock, set up,

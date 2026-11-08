@@ -22,12 +22,25 @@
  * show their site's tile instead. While it is open, cards follow the tabs:
  * they come and go and slide to their new places rather than the grid being
  * redrawn.
+ *
+ * Opening zooms out of the page: a snapshot of it shrinks from the page
+ * into its card as the overview fades in around it. Choosing a tab (or
+ * closing the overview, back to the current one) zooms into its card's
+ * snapshot until it is the page, as the overview fades out. The snapshot
+ * flies above the overview (.overview-flyer). With reduced motion, or when
+ * there's no snapshot to fly (a tab not loaded yet, a card filtered out of
+ * view), the overview fades instead.
  */
 
 // How long cards take to slide, appear and leave (ms).
 const OVERVIEW_MOVE_MS = 220;
 const OVERVIEW_FADE_MS = 160;
 const OVERVIEW_EASING = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+const OVERVIEW_ZOOM_MS = 320;
+// Even, without the slow tail of OVERVIEW_EASING, so the zoom reads as one move.
+const OVERVIEW_ZOOM_EASING = "cubic-bezier(0.4, 0, 0.2, 1)";
+// How long opening waits for the page's snapshot before fading instead.
+const OVERVIEW_SNAPSHOT_WAIT_MS = 150;
 
 var TabOverview = {
   init(window) {
@@ -85,8 +98,9 @@ var TabOverview = {
     window.addEventListener("resize", () => this.isOpen && this._place());
   },
 
+  // Closed as soon as it starts zooming into a tab.
   get isOpen() {
-    return !this.overlay.hidden;
+    return !this.overlay.hidden && !this._closing;
   },
 
   get _reducedMotion() {
@@ -102,25 +116,211 @@ var TabOverview = {
   },
 
   open() {
+    if (this.isOpen) {
+      return;
+    }
+    // A close still zooming ends at once.
+    this._hide();
+    let tab = gBrowser.selectedTab;
+    let shot = this._reducedMotion ? null : this._pageSnapshot(tab);
     this._place();
     this.overlay.hidden = false;
-    this.overlay.setAttribute("opening", "true");
     this.button.setAttribute("open", "true");
     this.search.value = "";
     this._render();
-    this.grid.querySelector(".overview-card[selected]")?.scrollIntoView({ block: "center" });
+    let card = this._cardFor(tab);
+    card?.scrollIntoView({ block: "center" });
     this.search.focus();
+    if (!shot || !card) {
+      this.overlay.setAttribute("opening", "true");
+      return;
+    }
+    // Unseen until the page's snapshot is in, then zooms out of the page.
+    this.overlay.setAttribute("zooming", "wait");
+    let zoom = (this._zoom = {});
+    shot.then(canvas => {
+      if (this._zoom != zoom || !this.isOpen) {
+        return;
+      }
+      this.overlay.removeAttribute("zooming");
+      if (canvas) {
+        this._openShot = { tab, canvas };
+        this._zoomOut(canvas, card, zoom);
+      } else {
+        this.overlay.setAttribute("opening", "true");
+      }
+    });
   },
 
+  /** Back to the current tab, zooming into it. */
   close() {
-    if (!this.isOpen) {
+    if (this.isOpen) {
+      this._closeInto(gBrowser.selectedTab);
+    }
+  },
+
+  // The overview gone, at once (and any snapshot in flight, but `keep`).
+  _hide(keep = null) {
+    this._zoom = null;
+    this._closing = false;
+    this._openShot = null;
+    for (let flyer of this.window.document.querySelectorAll(".overview-flyer")) {
+      if (flyer != keep) {
+        flyer.remove();
+      }
+    }
+    if (this.overlay.hidden) {
       return;
     }
     this.overlay.hidden = true;
+    this.overlay.inert = false;
     this.overlay.removeAttribute("opening");
+    this.overlay.removeAttribute("zooming");
     this.button.removeAttribute("open");
     this.grid.replaceChildren();
     gBrowser.selectedBrowser.focus();
+  },
+
+  // -- Zooming ----------------------------------------------------------------
+
+  // Where a tab's page is (its half, in split view).
+  _pageRect(tab) {
+    return tab.linkedBrowser.getBoundingClientRect();
+  },
+
+  // The tab's page, full size, as a canvas; null if it has none (not loaded
+  // yet) or it takes too long.
+  _pageSnapshot(tab) {
+    let browser = tab.linkedBrowser;
+    let global = browser.browsingContext?.currentWindowGlobal;
+    if (tab.pendingLoad || !global || !browser.clientWidth || !browser.clientHeight) {
+      return null;
+    }
+    let { clientWidth: width, clientHeight: height } = browser;
+    let scale = Math.min(this.window.devicePixelRatio, 2);
+    let shot = global
+      .drawSnapshot(new DOMRect(0, 0, width, height), scale, "white")
+      .then(bitmap => {
+        let canvas = this.window.document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext("2d").drawImage(bitmap, 0, 0);
+        bitmap.close();
+        return canvas;
+      })
+      .catch(() => null);
+    let late = new Promise(resolve => this.window.setTimeout(() => resolve(null), OVERVIEW_SNAPSHOT_WAIT_MS));
+    return Promise.race([shot, late]);
+  },
+
+  // A canvas showing what another one shows.
+  _copy(canvas) {
+    let copy = this.window.document.createElement("canvas");
+    copy.width = canvas.width;
+    copy.height = canvas.height;
+    copy.getContext("2d").drawImage(canvas, 0, 0);
+    return copy;
+  },
+
+  // A snapshot flying from one rectangle to another, above the overview.
+  _fly(canvas, from, to, { radiusFrom, radiusTo }) {
+    let flyer = this.window.document.createElement("div");
+    flyer.className = "overview-flyer";
+    flyer.append(canvas);
+    let frame = (r, radius) => ({
+      left: `${r.left}px`,
+      top: `${r.top}px`,
+      width: `${r.width}px`,
+      height: `${r.height}px`,
+      borderRadius: radius,
+    });
+    Object.assign(flyer.style, frame(from, radiusFrom));
+    this.window.document.documentElement.append(flyer);
+    let flight = flyer.animate([frame(from, radiusFrom), frame(to, radiusTo)], {
+      duration: OVERVIEW_ZOOM_MS,
+      easing: OVERVIEW_ZOOM_EASING,
+      fill: "forwards",
+    });
+    return flight.finished.then(
+      () => flyer,
+      () => flyer
+    );
+  },
+
+  _thumbRadius: "14px 14px 0 0",
+
+  // Opening: the page shrinks into its card, the overview fading in.
+  async _zoomOut(canvas, card, zoom) {
+    let thumb = card.querySelector(".overview-thumb");
+    // The card shows the same picture straight away.
+    thumb.querySelector(".overview-tile")?.remove();
+    thumb.querySelector("canvas")?.remove();
+    thumb.prepend(this._copy(canvas));
+    thumb.style.visibility = "hidden";
+    this.overlay.setAttribute("zooming", "out");
+    let flyer = await this._fly(this._copy(canvas), this._pageRect(card.tab), thumb.getBoundingClientRect(), {
+      radiusFrom: "0px",
+      radiusTo: this._thumbRadius,
+    });
+    flyer.remove();
+    thumb.style.visibility = "";
+    if (this._zoom == zoom) {
+      this.overlay.removeAttribute("zooming");
+    }
+  },
+
+  // Closing into a tab: its card's snapshot grows into the page, the
+  // overview fading out, then the live page takes over.
+  _closeInto(tab) {
+    let card = this._cardFor(tab);
+    let thumb = card?.querySelector(".overview-thumb");
+    let picture = thumb?.querySelector("canvas");
+    if (tab != gBrowser.selectedTab) {
+      gBrowser.selectTab(tab);
+    }
+    let from = thumb?.getBoundingClientRect();
+    let view = this.grid.getBoundingClientRect();
+    let inView = from && !card.hidden && from.bottom > view.top && from.top < view.bottom;
+    if (this._reducedMotion || !picture || !inView) {
+      this._hide();
+      return;
+    }
+    // The sharp snapshot from opening, when it's that tab's; otherwise the
+    // card's, until a sharp one arrives mid-flight.
+    let sharp = this._openShot?.tab == tab ? this._openShot.canvas : null;
+    let canvas = sharp ?? this._copy(picture);
+    this._zoom = null;
+    this._closing = true;
+    this.overlay.inert = true;
+    this.button.removeAttribute("open");
+    for (let flyer of this.window.document.querySelectorAll(".overview-flyer")) {
+      flyer.remove();
+    }
+    thumb.style.visibility = "hidden";
+    this.overlay.removeAttribute("opening");
+    this.overlay.setAttribute("zooming", "in");
+    gBrowser.selectedBrowser.focus();
+    if (!sharp) {
+      this._pageSnapshot(tab)?.then(full => {
+        if (full && canvas.isConnected) {
+          canvas.replaceWith(full);
+        }
+      });
+    }
+    this._fly(canvas, from, this._pageRect(tab), { radiusFrom: this._thumbRadius, radiusTo: "0px" }).then(flyer => {
+      if (!this._closing) {
+        flyer.remove();
+        return;
+      }
+      this._hide(flyer);
+      // The snapshot gives way to the live page.
+      flyer
+        .animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: "ease-out", fill: "forwards" })
+        .finished.then(
+          () => flyer.remove(),
+          () => flyer.remove()
+        );
+    });
   },
 
   // Over the page area, below the toolbar and tab strip; snapshots in the
@@ -279,6 +479,7 @@ var TabOverview = {
       canvas.getContext("2d").drawImage(bitmap, 0, 0);
       bitmap.close();
       thumb.querySelector(".overview-tile")?.remove();
+      thumb.querySelector("canvas")?.remove();
       thumb.prepend(canvas);
     } catch (e) {
       // A page that is loading or gone keeps its tile.
@@ -288,8 +489,9 @@ var TabOverview = {
   },
 
   _choose(tab) {
-    this.close();
-    gBrowser.selectTab(tab);
+    if (this.isOpen) {
+      this._closeInto(tab);
+    }
   },
 
   // -- Following the tabs while open ---------------------------------------

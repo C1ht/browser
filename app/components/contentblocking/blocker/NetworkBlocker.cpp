@@ -464,6 +464,12 @@ void NetworkBlocker::Check(nsIChannel* aChannel, const TimeStamp& aStart) {
     (void)net::ChannelClassifierUtils::SetBlockedContent(aChannel, error, *list,
                                                          ""_ns, ""_ns);
     (void)aChannel->Cancel(error);
+    // Gecko tells the page's progress listeners about a block only when the
+    // page's blocking state changes (its first tracker of a kind), so the
+    // shield's count listens for each one here (tabbrowser.js).
+    if (nsCOMPtr<nsIObserverService> obs = services::GetObserverService()) {
+      obs->NotifyObservers(aChannel, "browserwip:request-blocked", nullptr);
+    }
   }
   BLOCKER_LOG(Debug,
               ("check %.2f us engine %.2f us %s %s",

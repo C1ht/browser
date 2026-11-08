@@ -117,7 +117,22 @@ export const TOGGLES = {
     modes: ["anonymous"],
     strict: { "privacy.resistFingerprinting.letterboxing": true },
   },
+  // No DRM: sites can't play DRM-controlled video and music, and Google's
+  // Widevine component is never downloaded (components/drm/).
+  noDrm: {
+    modes: ["strict", "anonymous"],
+    strict: {
+      "media.eme.enabled": false,
+      "media.gmp-widevinecdm.enabled": false,
+    },
+  },
 };
+
+// Toggles added after a profile chose its mode, with the pref recording
+// that the profile got them. A profile in a mode that turns one strict gets
+// it strict, so the mode stays what the user chose instead of turning
+// "custom".
+const ADDED_TOGGLES = { noDrm: "browserwip.privacy.added.noDrm" };
 
 export const MODES = ["standard", "strict", "anonymous"];
 
@@ -289,6 +304,15 @@ export const PrivacyModes = {
     // defaults added, and one that matches the defaults goes back to them.
     if (Services.prefs.prefHasUserValue(FPP_OVERRIDES)) {
       setFppTargets(new Set([...fppTargets(), ...defaultFppTargets()]));
+    }
+    let chosen = Services.prefs.getStringPref("browserwip.privacy.mode", "standard");
+    for (let [id, pref] of Object.entries(ADDED_TOGGLES)) {
+      if (!Services.prefs.getBoolPref(pref, false)) {
+        if (TOGGLES[id].modes.includes(chosen) && !this.isStrict(id)) {
+          this.setStrict(id, true);
+        }
+        Services.prefs.setBoolPref(pref, true);
+      }
     }
     this._startupState = Object.fromEntries(
       Object.keys(TOGGLES).map(id => [id, this.isStrict(id)])

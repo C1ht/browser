@@ -297,14 +297,19 @@ pref("network.preconnect", false);
 pref("network.predictor.enabled", false);
 pref("network.predictor.enable-prefetch", false);
 
-// Media plugins (Widevine, OpenH264) are never downloaded automatically.
+// Media plugins are never downloaded by Gecko's own updater (it asks
+// Mozilla's servers daily). OpenH264 isn't used.
 pref("media.gmp-manager.updateEnabled", false);
 pref("media.gmp-manager.url", "");
 pref("media.gmp-gmpopenh264.enabled", false);
 pref("media.gmp-gmpopenh264.autoupdate", false);
-pref("media.gmp-widevinecdm.enabled", false);
+// DRM (Widevine): on in Standard; Strict Privacy and Anonymous turn it off
+// (PrivacyModes "noDrm"). Google's component is downloaded the first time
+// a site asks for protected playback (components/drm/Widevine.sys.mjs).
+pref("media.eme.enabled", true);
+pref("media.gmp-widevinecdm.visible", true);
+pref("media.gmp-widevinecdm.enabled", true);
 pref("media.gmp-widevinecdm.autoupdate", false);
-pref("media.eme.enabled", false);
 
 // Add-ons are not supported until v2; keep the manager from calling AMO.
 pref("extensions.update.enabled", false);

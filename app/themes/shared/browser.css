@@ -1268,6 +1268,53 @@ panel.wip-panel {
   from { transform: translateY(10px) scale(0.985); }
 }
 
+/* Zooming (taboverview.js): opening waits, unseen, for the page's snapshot,
+   then the snapshot shrinks into its card while the rest of the overview
+   comes in around it. Closing into a tab, the rest fades while the card's
+   snapshot grows into the page. The overview's own background stays solid
+   throughout, so the live page never shows behind the snapshot. */
+#tab-overview[zooming="wait"] {
+  opacity: 0;
+}
+
+#tab-overview[zooming="out"] :is(.overview-header, .overview-card:not([selected]), .overview-card[selected] .overview-info) {
+  animation: overview-card-in 320ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#tab-overview[zooming="in"] {
+  pointer-events: none;
+}
+
+#tab-overview[zooming="in"] :is(.overview-header, .overview-card) {
+  animation: overview-out 240ms ease-in forwards;
+}
+
+@keyframes overview-card-in {
+  from { opacity: 0; transform: scale(0.96); }
+}
+
+@keyframes overview-out {
+  to { opacity: 0; }
+}
+
+/* The snapshot in flight, above the overview. */
+.overview-flyer {
+  position: fixed;
+  z-index: 11;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: var(--page-bg);
+  box-shadow: 0 18px 48px -20px rgba(15, 20, 25, 0.55);
+}
+
+.overview-flyer > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
 .overview-header {
   display: flex;
   align-items: center;
@@ -1568,6 +1615,7 @@ panel.wip-panel {
 @media (prefers-reduced-motion: reduce) {
   #tab-overview[opening],
   #tab-overview[opening] #tab-overview-grid,
+  #tab-overview[zooming] .overview-card,
   .overview-thumb canvas,
   .overview-thumb[loading]::after {
     animation: none;
@@ -1613,6 +1661,19 @@ panel.wip-panel {
 .permission-remember input {
   margin: 0;
   accent-color: var(--accent);
+}
+
+/* Clear site data, at the foot of the site information panel. */
+.identity-clear:not([hidden]) {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+}
+
+.identity-clear > .panel-button {
+  justify-self: start;
 }
 
 .permission-buttons {

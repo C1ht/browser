@@ -17,10 +17,25 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
   SiteIcons: "resource://gre/modules/browserwip/SiteIcons.sys.mjs",
   DevBuilds: "resource://gre/modules/browserwip/DevBuilds.sys.mjs",
+  Widevine: "resource://gre/modules/browserwip/Widevine.sys.mjs",
   YouTubeBlocking: "resource://gre/modules/browserwip/YouTubeBlocking.sys.mjs",
 });
 
 const JSWINDOWACTORS = {
+  // A page asked for DRM it can't have yet: Widevine is installed, or the
+  // window explains that DRM is off (components/drm/).
+  EncryptedMedia: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/EncryptedMediaParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/EncryptedMediaChild.sys.mjs",
+      observers: ["mediakeys-request"],
+    },
+    messageManagerGroups: ["browsers"],
+    allFrames: true,
+    safeForUntrustedWebProcess: true,
+  },
   ContentBlocking: {
     child: {
       esModuleURI: "resource://gre/modules/browserwip/ContentBlockingChild.sys.mjs",
@@ -300,5 +315,6 @@ BrowserWipGlue.prototype = {
     lazy.SessionStore.init();
     lazy.SiteIcons.init();
     lazy.DevBuilds.init();
+    lazy.Widevine.init();
   },
 };

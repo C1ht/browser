@@ -36,10 +36,11 @@ imply_option("--enable-updater", False)
 imply_option("--enable-backgroundtasks", False)
 imply_option("--enable-necko-wifi", False)
 
-# No DRM in the first release. Widevine can be added later by building with
-# --enable-eme=widevine and adding an on-demand install prompt; nothing else in
-# the app depends on EME being absent.
-imply_option("--enable-eme", False)
+# DRM: Widevine support is compiled in (toolkit enables it only for
+# Firefox). Google's Widevine component itself is never bundled: it is
+# downloaded the first time a site asks for protected playback, and only
+# while "Play DRM-controlled content" is on (components/drm/).
+imply_option("--enable-eme", ("widevine",))
 
 include("../toolkit/moz.configure")
 

@@ -226,6 +226,25 @@ export const SiteIcons = {
     }
   },
 
+  /**
+   * Clear site data for one site: the kept icons of every origin on it
+   * (site: a schemeless site, "example.com", as nsIClearDataService takes).
+   */
+  async forgetSite(site) {
+    await this._load();
+    let gone = Object.keys(this._cache).filter(origin => {
+      try {
+        return Services.eTLD.getSchemelessSite(Services.io.newURI(origin)) == site;
+      } catch (e) {
+        return new URL(origin).hostname == site;
+      }
+    });
+    if (gone.length) {
+      gone.forEach(origin => delete this._cache[origin]);
+      this._save();
+    }
+  },
+
   // -- Adding a favorite ----------------------------------------------------
 
   /**

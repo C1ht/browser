@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>drm</title>
+<p>Asks for Widevine, as a streaming site does, and says in its title what it got.</p>
+<script>
+  document.title = "drm: asking";
+  navigator.requestMediaKeySystemAccess("com.widevine.alpha", [{
+    initDataTypes: ["cenc"],
+    videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"', robustness: "SW_SECURE_CRYPTO" }],
+  }]).then(
+    access => access.createMediaKeys().then(
+      () => (document.title = "drm: keys"),
+      e => (document.title = "drm: access, no keys (" + e.name + ")")),
+    e => (document.title = "drm: " + e.name));
+</script>

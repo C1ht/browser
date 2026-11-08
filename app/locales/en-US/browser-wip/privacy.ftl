@@ -41,4 +41,6 @@ privacy-toggle-letterboxing-label = Add margins around pages
 privacy-toggle-letterboxing-help = Sizes pages in fixed steps, so sites can’t learn the size of your window.
 privacy-toggle-referrer-label = Hide where you came from
 privacy-toggle-referrer-help = Other sites aren’t told which site linked to them. Some payment and sign-in pages may not work.
+privacy-toggle-drm-label = Play DRM-controlled content
+privacy-toggle-drm-help = Lets streaming sites such as Netflix and Spotify play, using Google’s Widevine component. It’s downloaded from Google the first time a site needs it.
 privacy-toggle-restart-note = Takes effect after you restart { -brand-short-name }.

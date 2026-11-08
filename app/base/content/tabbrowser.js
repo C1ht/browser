@@ -170,6 +170,15 @@ class TabBrowser {
     this.browserContainer.append(this._splitter);
     this._splitShown = [];
     this.browserContainer.addEventListener("focus", this, true);
+    // Each request the blocker stops (NetworkBlocker.cpp): the shield's
+    // count, which Gecko's progress events alone stop updating after a
+    // page's first tracker of each kind.
+    this._blockedRecount = new Set();
+    let onBlocked = channel => this._onRequestBlocked(channel);
+    Services.obs.addObserver(onBlocked, "browserwip:request-blocked");
+    this.window.addEventListener("unload", () => Services.obs.removeObserver(onBlocked, "browserwip:request-blocked"), {
+      once: true,
+    });
     this.window.addEventListener(
       "unload",
       () => this.tabs.forEach(t => this._unregisterAudible(t)),
@@ -1123,6 +1132,28 @@ class TabBrowser {
       icon.style.removeProperty("--tab-favicon");
     }
     this._notify(tab, "TabAttrModified");
+  }
+
+  // Recounts the blocked request's tab, once for a burst of blocks: the
+  // content-blocking log gets the entry from the same block, just after.
+  _onRequestBlocked(channel) {
+    let browser;
+    try {
+      browser = channel.QueryInterface(Ci.nsIChannel).loadInfo.browsingContext?.top?.embedderElement;
+    } catch (e) {
+      return;
+    }
+    let tab = browser && this.getTabForBrowser(browser);
+    if (!tab || this._blockedRecount.has(tab)) {
+      return;
+    }
+    this._blockedRecount.add(tab);
+    this.window.setTimeout(() => {
+      this._blockedRecount.delete(tab);
+      if (tab.isConnected) {
+        this._updateBlockedCount(tab);
+      }
+    }, 100);
   }
 
   _updateBlockedCount(tab) {

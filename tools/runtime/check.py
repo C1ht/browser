@@ -39,7 +39,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PAGES = ROOT / "tests/runtime/pages"
 
 RESULTS = []
-ALL_PARTS = list(range(1, 16))
+ALL_PARTS = list(range(1, 18))
 # Headless Gecko (every check runs headless) can't do some things a real
 # window can; those checks are skipped there and listed in
 # docs/MANUAL-CHECKS.md for a headed run.
@@ -240,7 +240,10 @@ STANDARD_PREFS = {
     "network.captive-portal-service.enabled": False,
     "network.trr.mode": 5,
     "security.OCSP.enabled": 0,
-    "media.eme.enabled": False,
+    # DRM is on in Standard; Widevine comes only when a page asks (part 17),
+    # never from Gecko's own updater.
+    "media.eme.enabled": True,
+    "media.gmp-manager.updateEnabled": False,
     # The network blocker replaces the URL classifier's tables (part 7).
     "urlclassifier.trackingTable": "",
     "browserwip.search.engine": "brave",
@@ -283,6 +286,17 @@ def part2(bindir, base):
                bool(log) and any("google-analytics" in o for o in log) and any("doubleclick" in o for o in log), log)
         count = b.js("return gBrowser.selectedTab.blockedTrackers;")
         record(2, "shield shows the blocked count", count and count >= 2, count)
+        # Trackers blocked after the page has loaded count too: Gecko's
+        # progress events stop after the first tracker of each kind.
+        b.js("gBrowser.selectedBrowser.fixupAndLoadURIString(arguments[0], "
+             "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", url + "?late")
+        late = b.wait("let n = gBrowser.selectedTab.blockedTrackers; return n >= 5 && n;", timeout=15)
+        record(2, "the shield counts trackers blocked after the page has loaded",
+               late == 5, late or b.js("return gBrowser.selectedTab.blockedTrackers;"))
+        b.js("gBrowser.selectedBrowser.fixupAndLoadURIString(arguments[0], "
+             "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", url)
+        b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith('ad:') && "
+               "!gBrowser.selectedBrowser.currentURI.spec.endsWith('?late');", timeout=30)
 
         # Per-site switch turns both kinds of blocking off.
         b.js(IMPORTS + "ContentBlockingAllowList.add(gBrowser.selectedBrowser); gBrowser.selectedBrowser.reload();")
@@ -362,7 +376,7 @@ def part3(bindir, base, shots):
             advancedOpen: adv.open, toggles: d.querySelectorAll(".toggle-row").length,
             heading: d.querySelector("h1").textContent };""")
         record(3, "Standard is preselected, Advanced collapsed",
-               state and state["strict"] == "false" and state["advancedOpen"] is False and state["toggles"] == 4, state)
+               state and state["strict"] == "false" and state["advancedOpen"] is False and state["toggles"] == 5, state)
         if shots:
             b.m.screenshot(str(Path(shots) / "first-run.png"))
 
@@ -415,6 +429,17 @@ def part3(bindir, base, shots):
 
 # ---------------------------------------------------------------------------
 # Part 4: browser chrome and layout
+
+
+# Clicks a toolbar button with the given mouse button, with Ctrl or not.
+CLICK_BUTTON = """let clickButton = (id, button, ctrl) => {
+  let rect = document.getElementById(id).getBoundingClientRect();
+  let modifiers = ctrl ? Ci.nsIDOMWindowUtils.MODIFIER_CONTROL : 0;
+  for (let type of ["mousedown", "mouseup"]) {
+    window.synthesizeMouseEvent(type, rect.left + rect.width / 2, rect.top + rect.height / 2, { button, clickCount: 1, modifiers });
+  }
+};
+"""
 
 
 def part4(bindir, base, shots):
@@ -698,33 +723,67 @@ def part4(bindir, base, shots):
           gBrowser.selectTab(splitKeep[0]);
           for (let t of gBrowser.tabs.filter(t => !splitKeep.includes(t))) gBrowser.removeTab(t, { skipPermitUnload: true });""")
 
-        # Middle-click on Reload: the page again, freshly loaded, in a tab
-        # beside it, in the background.
-        b.js("gBrowser.selectTab(gBrowser.tabs.find(t => t.linkedBrowser.contentTitle.startsWith('state ')));")
-        r = b.js("""let tab = gBrowser.selectedTab, title = tab.linkedBrowser.contentTitle, count = gBrowser.tabs.length;
-          let rect = document.getElementById("reload-button").getBoundingClientRect();
-          for (let type of ["mousedown", "mouseup"]) {
-            window.synthesizeMouseEvent(type, rect.left + rect.width / 2, rect.top + rect.height / 2, { button: 1, clickCount: 1 });
-          }
-          let copy = gBrowser.tabs[gBrowser.tabs.indexOf(tab) + 1];
-          return new Promise(done => {
-            let poll = () => {
-              let t = copy?.linkedBrowser.contentTitle ?? "";
-              if (t.startsWith("state ") || gBrowser.tabs.length == count) {
-                // The current page isn't reloaded (its title changes on every load).
-                setTimeout(() => done({ title, copy: t, added: gBrowser.tabs.length - count, selected: gBrowser.selectedTab == tab,
-                  kept: tab.linkedBrowser.contentTitle == title,
-                  url: copy?.linkedBrowser.currentURI.spec == tab.linkedBrowser.currentURI.spec }), 1000);
-              } else setTimeout(poll, 100);
-            };
-            setTimeout(poll, 100);
-          });""")
-        record(4, "middle-click on Reload opens the page again, freshly loaded, in a background tab beside it, "
-               "and doesn't reload the current one",
-               r["added"] == 1 and r["selected"] and r["kept"] and r["url"] and r["copy"].startswith("state ")
-               and r["copy"] != r["title"], r)
-        b.js("let tab = gBrowser.tabs[gBrowser.tabs.indexOf(gBrowser.selectedTab) + 1];"
-             "gBrowser.removeTab(tab, { skipPermitUnload: true }); gBrowser.selectTab(gBrowser.tabs[0]);")
+        # Middle-click (or Ctrl+click) on Reload: the page again, freshly
+        # loaded, in a tab beside it, in the background.
+        for name, button, ctrl in [("middle-click", 1, False), ("Ctrl+click", 0, True)]:
+            b.js("gBrowser.selectTab(gBrowser.tabs.find(t => t.linkedBrowser.contentTitle.startsWith('state ')));")
+            r = b.js(CLICK_BUTTON + """let tab = gBrowser.selectedTab, title = tab.linkedBrowser.contentTitle, count = gBrowser.tabs.length;
+              clickButton("reload-button", arguments[0], arguments[1]);
+              let copy = gBrowser.tabs[gBrowser.tabs.indexOf(tab) + 1];
+              return new Promise(done => {
+                let poll = () => {
+                  let t = copy?.linkedBrowser.contentTitle ?? "";
+                  if (t.startsWith("state ") || gBrowser.tabs.length == count) {
+                    // The current page isn't reloaded (its title changes on every load).
+                    setTimeout(() => done({ title, copy: t, added: gBrowser.tabs.length - count, selected: gBrowser.selectedTab == tab,
+                      kept: tab.linkedBrowser.contentTitle == title,
+                      url: copy?.linkedBrowser.currentURI.spec == tab.linkedBrowser.currentURI.spec }), 1000);
+                  } else setTimeout(poll, 100);
+                };
+                setTimeout(poll, 100);
+              });""", button, ctrl)
+            record(4, f"{name} on Reload opens the page again, freshly loaded, in a background tab beside it, "
+                   "and doesn't reload the current one",
+                   r["added"] == 1 and r["selected"] and r["kept"] and r["url"] and r["copy"].startswith("state ")
+                   and r["copy"] != r["title"], r)
+            b.js("let tab = gBrowser.tabs[gBrowser.tabs.indexOf(gBrowser.selectedTab) + 1];"
+                 "gBrowser.removeTab(tab, { skipPermitUnload: true });")
+
+        # The same on Back and Forward: the page before or after, in a new
+        # background tab; the current tab stays where it is.
+        b.js("window.__history = gBrowser.addTab(arguments[0]);", f"{base}/target.html")
+        for page in ["forms.html", "storage.html"]:
+            b.wait("return !window.__history.hasAttribute('busy') && window.__history.linkedBrowser.currentURI.spec;")
+            b.js("window.__history.linkedBrowser.fixupAndLoadURIString(arguments[0], "
+                 "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", f"{base}/{page}")
+            b.wait("return window.__history.linkedBrowser.currentURI.spec == arguments[0];", f"{base}/{page}")
+        b.js("gBrowser.selectTab(window.__history); window.__history.linkedBrowser.goBack();")
+        middle = b.wait("""return window.__history.linkedBrowser.currentURI.spec == arguments[0] &&
+          !document.getElementById("back-button").disabled && !document.getElementById("forward-button").disabled;""",
+                        f"{base}/forms.html")
+        for id, expected in [("back-button", "target.html"), ("forward-button", "storage.html")]:
+            for name, button, ctrl in [("middle-click", 1, False), ("Ctrl+click", 0, True)]:
+                r = b.js(CLICK_BUTTON + """let [id, button, ctrl, expected] = arguments, tab = window.__history, count = gBrowser.tabs.length;
+                  clickButton(id, button, ctrl);
+                  let opened = gBrowser.tabs[gBrowser.tabs.indexOf(tab) + 1];
+                  return new Promise(done => {
+                    let poll = () => {
+                      if (opened?.linkedBrowser.currentURI.spec == expected || Date.now() > deadline) {
+                        setTimeout(() => done({ added: gBrowser.tabs.length - count, opened: opened?.linkedBrowser.currentURI.spec,
+                          selected: gBrowser.selectedTab == tab, kept: tab.linkedBrowser.currentURI.spec }), 500);
+                      } else setTimeout(poll, 100);
+                    };
+                    let deadline = Date.now() + 10000;
+                    setTimeout(poll, 100);
+                  });""", id, button, ctrl, f"{base}/{expected}")
+                label = "Back" if id == "back-button" else "Forward"
+                record(4, f"{name} on {label} opens the {'previous' if label == 'Back' else 'next'} page in a background "
+                       "tab beside it, and the current tab stays",
+                       bool(middle) and r["added"] == 1 and r["opened"] == f"{base}/{expected}" and r["selected"]
+                       and r["kept"] == f"{base}/forms.html", r)
+                b.js("gBrowser.removeTab(gBrowser.tabs[gBrowser.tabs.indexOf(window.__history) + 1], { skipPermitUnload: true });")
+        b.js("gBrowser.removeTab(window.__history, { skipPermitUnload: true }); gBrowser.selectTab(gBrowser.tabs[0]);")
+
         # A tab whose content process dies shows that it crashed, can be
         # closed (and so can its window), and Reload brings the page back.
         def kill_tab_process(js_tab):
@@ -950,7 +1009,7 @@ def part4(bindir, base, shots):
           search.value = "contextmenu.html"; search.dispatchEvent(new Event("input"));
           let shown = [...document.querySelectorAll("#tab-overview-grid .overview-card:not([hidden])")].filter(c => c.tab).length;
           search.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-          return { shown, closed: document.getElementById("tab-overview").hidden,
+          return { shown, closed: !TabOverview.isOpen,
                    url: gBrowser.selectedBrowser.currentURI.spec };""")
         record(4, "searching the overview and pressing Enter switches to the match",
                chosen["shown"] == 1 and chosen["closed"]
@@ -964,7 +1023,7 @@ def part4(bindir, base, shots):
             let after = gBrowser.tabs.length;
             let focusedCard = !!document.activeElement?.closest(".overview-card");
             document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-            resolve({ before, after, focusedCard, hidden: document.getElementById("tab-overview").hidden });
+            resolve({ before, after, focusedCard, hidden: !TabOverview.isOpen });
           }, 1000));""")
         record(4, "Delete closes a tab from the overview; Escape closes the overview",
                closed["after"] == closed["before"] - 1 and closed["focusedCard"] and closed["hidden"], closed)
@@ -1009,6 +1068,36 @@ def part4(bindir, base, shots):
           return { closed: !TabOverview.isOpen, selected: gBrowser.selectedTab == target };""")
         record(4, "clicking a tab in the tab strip closes the overview and goes to that tab", r["closed"] and r["selected"], r)
         b.js("TabOverview.close();")
+
+        # Zooming: opening, the page's snapshot flies from the page into its
+        # card; choosing another tab, that card's snapshot flies into the page.
+        FLIGHT = """let flyer = document.querySelector(".overview-flyer");
+          let frames = flyer?.getAnimations()[0]?.effect.getKeyframes();
+          let rect = r => [r.left, r.top, r.width, r.height].map(v => Math.round(parseFloat(v)));
+          return frames && { from: rect(frames[0]), to: rect(frames.at(-1)) };"""
+        RECT = "let r = arguments[0].getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round);"
+        b.js("gBrowser.selectTab(gBrowser.tabs.find(t => !t.pendingLoad && t.linkedBrowser.contentTitle));")
+        page = b.js(RECT.replace("arguments[0]", "gBrowser.selectedBrowser"))
+        b.js("TabOverview.open();")
+        out = b.wait("return (function() {" + FLIGHT + "})();", timeout=5)
+        thumb = b.js(RECT.replace("arguments[0]", "document.querySelector('#tab-overview-grid .overview-card[selected] .overview-thumb')"))
+        settled = b.wait("""return !document.querySelector(".overview-flyer") && !document.getElementById("tab-overview").hasAttribute("zooming") &&
+          document.querySelector("#tab-overview-grid .overview-card[selected] .overview-thumb").style.visibility == "";""", timeout=5)
+        record(4, "opening the overview zooms out of the page: its snapshot flies from the page into its card",
+               bool(out) and out["from"] == page and out["to"] == thumb and bool(settled), [out, page, thumb])
+        r = b.js("""let card = [...document.querySelectorAll("#tab-overview-grid .overview-card")]
+            .find(c => c.tab && !c.hasAttribute("selected") && c.querySelector(".overview-thumb canvas"));
+          let r = card.querySelector(".overview-thumb").getBoundingClientRect();
+          card.click();
+          return { thumb: [r.left, r.top, r.width, r.height].map(Math.round), closed: !TabOverview.isOpen,
+            shown: !document.getElementById("tab-overview").hidden, tab: gBrowser.tabs.indexOf(card.tab),
+            selected: gBrowser.selectedTab == card.tab };""")
+        into = b.js("return (function() {" + FLIGHT + "})();")
+        page = b.js(RECT.replace("arguments[0]", "gBrowser.selectedBrowser"))
+        gone = b.wait("""return document.getElementById("tab-overview").hidden && !document.querySelector(".overview-flyer");""", timeout=5)
+        record(4, "choosing a tab zooms into it: its card's snapshot flies into the page as the overview fades, then it's the page",
+               r["closed"] and r["shown"] and r["selected"] and bool(into) and into["from"] == r["thumb"]
+               and into["to"] == page and bool(gone), [r, into, page])
 
         # More tabs than fit: the strip scrolls.
         b.js("""window.__extraTabs = [];
@@ -1678,6 +1767,15 @@ def part7(bindir, base):
         go("http://elsewhere.example.org/page/bouncy.php?id=1")
         r = arrive("s.startsWith('about:blocked?')")
         record(7, "other sites still are", bool(r), b.js(here))
+        # In a tab with nothing to go back to, Go back opens the new tab page.
+        b.js("gBrowser.selectTab(gBrowser.addTab('http://elsewhere.example.org/page/bouncy.php?id=2'));")
+        arrive("s.startsWith('about:blocked?')")
+        b.js("gBrowser.selectedBrowser.focus();")
+        time.sleep(0.5)
+        b.js(press, "Enter", 13)
+        r = arrive("s == 'about:newtab' || s.endsWith('/newtab.html')")
+        record(7, "in a new tab, Go back opens the new tab page", bool(r), b.js(here))
+        b.js("gBrowser.removeTab(gBrowser.selectedTab, { skipPermitUnload: true });")
         b.js("Services.prefs.setBoolPref('browserwip.contentblocking.blockpages.enabled', false);")
         go("http://third.example.com/smartpop/")
         r = arrive("s == 'http://third.example.com/smartpop/'")
@@ -2231,7 +2329,8 @@ return data.value.QueryInterface(Ci.nsISupportsString).data;"""
         close_tabs()
         load("about:passwords#forgot", "")
         r = b.wait("let d = gBrowser.selectedBrowser.contentDocument; return d?.readyState == 'complete' && "
-                   "!d.getElementById('card-forgot').hidden && !d.getElementById('recover-form').hidden;", timeout=15)
+                   "d.getElementById('card-forgot')?.hidden === false && d.getElementById('recover-form')?.hidden === false;",
+                   timeout=15)
         record(8, "Forgot password offers the recovery key", r)
         r = b.js(PV + "return PasswordVault.recover(arguments[0], arguments[1], arguments[1]).then(() => 'ok', e => e.code);",
                  "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG-HHHH", fresh)
@@ -3961,6 +4060,246 @@ def part15(bindir, base, shots):
         server.shutdown()
 
 
+def part16(bindir, base, shots):
+    """Clear site data: one site (the site information panel), and all
+    sites (Settings)."""
+    other = base.replace("127.0.0.1", "localhost")
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True})
+    STORED = """let site = arguments[0];
+      let principal = Services.scriptSecurityManager.createContentPrincipalFromOrigin(site);
+      return { cookies: Services.cookies.getCookiesFromHost(new URL(site).hostname, {}).length,
+        permission: Services.perms.testExactPermissionFromPrincipal(principal, "desktop-notification") };"""
+
+    def visit(url):
+        # The page itself, not the one before it with the same title.
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0]);", url)
+        return b.wait("""let browser = gBrowser.selectedBrowser, title = browser.contentTitle;
+          return browser.currentURI.spec == arguments[0] && title.startsWith("storage:") && title;""", url, timeout=15)
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        # Two sites keep a cookie and local storage; both get a permission.
+        for site in (base, other):
+            visit(f"{site}/storage.html?set")
+            b.js("""Services.perms.addFromPrincipal(Services.scriptSecurityManager.createContentPrincipalFromOrigin(arguments[0]),
+              "desktop-notification", Services.perms.ALLOW_ACTION);""", site)
+        stored = visit(f"{base}/storage.html")
+        record(16, "two sites keep a cookie, local storage and a permission",
+               stored == "storage: cookie=1 local=1" and [b.js(STORED, site) for site in (base, other)]
+               == [{"cookies": 1, "permission": 1}] * 2, stored)
+
+        # -- One site, from the site information panel.
+        r = b.js("""let panel = document.getElementById("identity-panel");
+          document.getElementById("identity-button").click();
+          return new Promise(done => setTimeout(() => {
+            let before = { shown: !document.getElementById("identity-clear").hidden,
+              button: document.getElementById("identity-clear-data").checkVisibility() };
+            document.getElementById("identity-clear-data").click();
+            setTimeout(() => done({ ...before, panel: panel.state,
+              confirm: document.getElementById("identity-clear-confirm").checkVisibility(),
+              text: document.getElementById("identity-clear-text").textContent }), 300);
+          }, 500));""")
+        record(16, "the site information panel offers Clear cookies and site data, confirming first, naming the site",
+               r["shown"] and r["button"] and r["panel"] == "open" and r["confirm"] and "127.0.0.1" in r["text"], r)
+        b.js("document.getElementById('identity-clear-ok').click();")
+        title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t == 'storage: cookie=0 local=0' && t;",
+                       timeout=15)
+        cleared = b.js(STORED, base)
+        kept = b.js(STORED, other)
+        record(16, "it clears that site's cookies, storage and permissions, reloads the page, and leaves other sites",
+               title == "storage: cookie=0 local=0" and cleared == {"cookies": 0, "permission": 0}
+               and kept == {"cookies": 1, "permission": 1}, [title, cleared, kept])
+        r = b.js("""gBrowser.loadURL(gBrowser.selectedBrowser, "about:settings",
+            { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });
+          return new Promise(done => setTimeout(() => {
+            document.getElementById("identity-button").click();
+            setTimeout(() => { let shown = !document.getElementById("identity-clear").hidden;
+              document.getElementById("identity-panel").hidePopup(); done(shown); }, 500);
+          }, 2000));""")
+        record(16, "the browser's own pages don't offer it", r is False, r)
+
+        # -- Every site, from Settings.
+        visit(f"{base}/storage.html?set")
+        b.js("BrowserWip.openSettings();")
+        b.wait("return gBrowser.selectedBrowser.currentURI.spec.startsWith('about:settings') && "
+               "gBrowser.selectedBrowser.contentDocument?.getElementById('site-data-clear');", timeout=15)
+        r = b.js("""let doc = gBrowser.selectedBrowser.contentDocument;
+          doc.getElementById("site-data-clear").click();
+          let confirm = !doc.getElementById("site-data-confirm").hidden;
+          doc.getElementById("site-data-ok").click();
+          return new Promise(done => { let poll = () => {
+            let label = doc.getElementById("site-data-clear").textContent;
+            if (label == "Cleared") done({ confirm, label }); else setTimeout(poll, 200); }; poll(); });""")
+        stored = [b.js(STORED, site) for site in (base, other)]
+        record(16, "Settings clears every site's data, after a confirmation",
+               r["confirm"] and stored == [{"cookies": 0, "permission": 0}] * 2, [r, stored])
+        title = visit(f"{base}/storage.html")
+        record(16, "local storage is gone too", title == "storage: cookie=0 local=0", title)
+    finally:
+        b.quit()
+
+
+def fake_widevine(directory, version="4.10.9999.0"):
+    """A stand-in for Google's Widevine download: a sources file in toolkit's
+    format naming a zip (Widevine's manifest and a placeholder library) with
+    its real SHA-512, served from directory."""
+    import hashlib
+    import zipfile as zf
+    package = Path(directory) / f"widevine-{version}.crx3"
+    with zf.ZipFile(package, "w") as z:
+        z.writestr("manifest.json", json.dumps({
+            "name": "WidevineCdm", "version": version, "x-cdm-module-versions": "4",
+            "x-cdm-interface-versions": "10", "x-cdm-host-versions": "10", "x-cdm-codecs": "vp8,vp9.0,avc1"}))
+        z.writestr("_platform_specific/linux_x64/libwidevinecdm.so", b"not a real library")
+    data = package.read_bytes()
+    return data, hashlib.sha512(data).hexdigest()
+
+
+class WidevineHandler(http.server.BaseHTTPRequestHandler):
+    """Serves the sources file (/sources.json) and the package (/widevine.crx3),
+    and counts the package's downloads in DOWNLOADS."""
+    PACKAGE = b""
+    SOURCES = b""
+    DOWNLOADS = []
+
+    def do_GET(self):
+        if self.path == "/sources.json":
+            body, kind = WidevineHandler.SOURCES, "application/json"
+        elif self.path == "/widevine.crx3" and not WidevineHandler.PACKAGE:
+            self.send_error(404)
+            return
+        elif self.path == "/widevine.crx3":
+            WidevineHandler.DOWNLOADS.append({k.lower(): v for k, v in self.headers.items()})
+            # As long as a real download takes, give or take, so the notice
+            # shown meanwhile can be seen.
+            time.sleep(2)
+            body, kind = WidevineHandler.PACKAGE, "application/octet-stream"
+        else:
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", kind)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+def part17(bindir, base, shots):
+    """DRM: the switch per privacy mode, Widevine installed when a page first
+    asks (from a local stand-in for Google's download), and the notice when
+    DRM is off."""
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), WidevineHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    origin = f"http://127.0.0.1:{server.server_address[1]}"
+    scratch = tempfile.mkdtemp(prefix="wip-widevine-")
+    package, digest = fake_widevine(scratch)
+    # Not there at first: the install fails, then Try again installs it.
+    WidevineHandler.PACKAGE = b""
+    WidevineHandler.DOWNLOADS = []
+    def sources(version, package, digest):
+        return json.dumps({"hashFunction": "sha512", "name": "Widevine-test", "schema_version": 1000,
+            "vendors": {"gmp-widevinecdm": {"version": version, "platforms": {
+                "Linux_x86_64-gcc3": {"fileUrl": f"{origin}/widevine.crx3", "filesize": len(package),
+                                      "hashValue": digest}}}}}).encode()
+    WidevineHandler.SOURCES = sources("4.10.9999.0", package, digest)
+
+    b = Browser(bindir, env={"BWV_AUTOMATION": "1"}, prefs={
+        "browserwip.firstrun.completed": True,
+        "browserwip.drm.testSources": f"{origin}/sources.json",
+    })
+    PM = 'const { PrivacyModes } = ChromeUtils.importESModule("resource://gre/modules/browserwip/PrivacyModes.sys.mjs");'
+    DRM = "return { eme: Services.prefs.getBoolPref('media.eme.enabled'), widevine: Services.prefs.getBoolPref('media.gmp-widevinecdm.enabled') };"
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        r = b.js(DRM)
+        record(17, "Standard plays DRM-controlled content", r == {"eme": True, "widevine": True}, r)
+        modes = {}
+        for mode in ("strict", "anonymous", "standard"):
+            modes[mode] = b.js(PM + f"PrivacyModes.setMode('{mode}');" + DRM)
+        record(17, "Strict Privacy and Anonymous turn DRM off; back in Standard it's on",
+               modes == {"strict": {"eme": False, "widevine": False}, "anonymous": {"eme": False, "widevine": False},
+                         "standard": {"eme": True, "widevine": True}}, modes)
+
+        b.js("BrowserWip.openSettings();")
+        r = b.wait("""let doc = gBrowser.selectedBrowser.contentDocument;
+          let row = [...(doc?.querySelectorAll("#toggles-security .toggle-row") ?? [])]
+            .find(row => row.textContent.includes("Play DRM-controlled content"));
+          return row && { on: row.querySelector("[role=switch]").getAttribute("aria-checked") };""", timeout=15)
+        record(17, "Settings has the switch, on in Standard", r == {"on": "true"}, r)
+
+        # -- A page asks for Widevine and the download fails: the notice says
+        # so, with Try again.
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0]);", f"{base}/drm.html")
+        r = b.wait("""let panel = document.getElementById("drm-panel");
+          return panel.state == "open" && panel.getAttribute("kind") == "failed" && {
+            text: document.getElementById("drm-text").textContent,
+            button: !document.getElementById("drm-turn-on").hidden && document.getElementById("drm-turn-on").textContent };""",
+                   timeout=30)
+        record(17, "when Widevine can't be downloaded, the notice says so and offers Try again",
+               bool(r) and "Couldn’t install Widevine" in r["text"] and r["button"] == "Try again", r)
+
+        # -- Try again, with the download there: it's installed, the notice
+        # showing the download's progress meanwhile.
+        WidevineHandler.PACKAGE = package
+        b.js("""window.__drmTexts = [];
+          new MutationObserver(() => __drmTexts.push(document.getElementById("drm-text").textContent))
+            .observe(document.getElementById("drm-text"), { childList: true, characterData: true, subtree: true });
+          document.getElementById("drm-turn-on").click();""")
+        notice = b.wait("""let panel = document.getElementById("drm-panel");
+          return panel.state == "open" && panel.getAttribute("kind") == "installing" && document.getElementById("drm-text").textContent;""",
+                        timeout=20)
+        installed = b.wait("""let version = Services.prefs.getStringPref("media.gmp-widevinecdm.version", "");
+          return version && { version, abi: Services.prefs.getStringPref("media.gmp-widevinecdm.abi", ""),
+            hash: Services.prefs.getStringPref("media.gmp-widevinecdm.hashValue", ""),
+            panel: document.getElementById("drm-panel").state };""", timeout=30)
+        files = sorted(p.name for p in Path(b.js("return PathUtils.profileDir;"), "gmp-widevinecdm", "4.10.9999.0").glob("*")) \
+            if installed else []
+        texts = b.js("return __drmTexts;")
+        record(17, "Try again installs it, the notice showing the download's progress, then closing",
+               bool(notice) and "Widevine" in notice and any(" of 0 MB" in t for t in texts)
+               and bool(installed) and installed["hash"] == digest and installed["panel"] == "closed"
+               and installed["abi"] == "x86_64-gcc3" and files == ["libwidevinecdm.so", "manifest.json"],
+               [notice, texts, installed, files])
+        down = list(WidevineHandler.DOWNLOADS)
+        record(17, "the download carries no cookies and no Referer, and happens once",
+               len(down) == 1 and "cookie" not in down[0] and "referer" not in down[0], down)
+
+        # -- A newer Widevine named: it replaces the installed one.
+        newer, newer_digest = fake_widevine(scratch, "4.10.9999.1")
+        WidevineHandler.PACKAGE = newer
+        WidevineHandler.SOURCES = sources("4.10.9999.1", newer, newer_digest)
+        r = b.js("""const { Widevine } = ChromeUtils.importESModule("resource://gre/modules/browserwip/Widevine.sys.mjs");
+          return Widevine.update().then(async updated => ({ updated, version: Widevine.installedVersion,
+            old: await IOUtils.exists(PathUtils.join(PathUtils.profileDir, "gmp-widevinecdm", "4.10.9999.0")),
+            current: await IOUtils.exists(PathUtils.join(PathUtils.profileDir, "gmp-widevinecdm", "4.10.9999.1", "manifest.json")) }));""")
+        record(17, "a newer Widevine named by the browser replaces the installed one",
+               r == {"updated": True, "version": "4.10.9999.1", "old": False, "current": True}, r)
+        WidevineHandler.DOWNLOADS.clear()
+
+        # -- DRM off: the page is told no, and the window offers to turn it on.
+        b.js(PM + "PrivacyModes.setMode('strict');")
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0]);", f"{base}/drm.html?again")
+        r = b.wait("""let panel = document.getElementById("drm-panel");
+          let title = gBrowser.selectedBrowser.contentTitle;
+          return panel.state == "open" && panel.getAttribute("kind") == "disabled" && title != "drm: asking" &&
+            { title, text: document.getElementById("drm-text").textContent,
+              turnOn: !document.getElementById("drm-turn-on").hidden };""", timeout=20)
+        record(17, "with DRM off, the page is refused and the window offers to turn DRM on",
+               bool(r) and r["title"] == "drm: NotSupportedError" and r["turnOn"] and "off" in r["text"]
+               and not WidevineHandler.DOWNLOADS, r)
+        r = b.js(PM + """document.getElementById("drm-turn-on").click();
+          return new Promise(done => setTimeout(() => done({ eme: Services.prefs.getBoolPref("media.eme.enabled"),
+            mode: PrivacyModes.mode }), 1500));""")
+        record(17, "Turn on DRM turns it on (the mode becomes a custom mix) and reloads the page",
+               r == {"eme": True, "mode": "custom"}, r)
+    finally:
+        b.quit()
+        server.shutdown()
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
 def part13(bindir, base, shots):
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), CacheHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -4165,7 +4504,9 @@ def main():
              9: lambda: part9(args.bindir, base), 10: lambda: part10(args.bindir, base),
              11: lambda: part11(args.bindir, base), 12: lambda: part12(args.bindir, base, args.shots),
              13: lambda: part13(args.bindir, base, args.shots), 14: lambda: part14(args.bindir, base, args.shots),
-             15: lambda: part15(args.bindir, base, args.shots)}
+             15: lambda: part15(args.bindir, base, args.shots),
+             16: lambda: part16(args.bindir, base, args.shots),
+             17: lambda: part17(args.bindir, base, args.shots)}
     for p in args.part:
         try:
             parts[p]()
