@@ -121,6 +121,11 @@ class URLBar {
   handleEvent(event) {
     switch (event.type) {
       case "focus":
+        if (this.box.hasAttribute("focused")) {
+          // The window came back with the field still focused (see "blur"):
+          // keep what's typed and selected.
+          break;
+        }
         this.box.setAttribute("focused", "true");
         if (!this.browser?.userTypedValue) {
           // Edit the full URL, not the trimmed display form.
@@ -129,8 +134,14 @@ class URLBar {
         this.input.select();
         break;
       case "blur":
-        this.box.removeAttribute("focused");
         this.closePopup();
+        if (this.document.activeElement == this.input) {
+          // Only the window lost focus; the field gets it back with the
+          // window. It stays as it is meanwhile, rather than switching to
+          // the trimmed display over its selected full URL.
+          break;
+        }
+        this.box.removeAttribute("focused");
         if (!this.browser?.userTypedValue) {
           this.update();
         }

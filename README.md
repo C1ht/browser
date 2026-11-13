@@ -12,7 +12,7 @@ with no changes to mozilla-central. `browser-wip` is a codename;
 | Path | What it is |
 |---|---|
 | `app/` | The `--enable-project` directory, mounted into the Gecko tree as `browser-wip/` |
-| `app/moz.configure` | Product identity, and features switched off at build time (telemetry, crash reporter, updater, EME, …) |
+| `app/moz.configure` | Product identity, and features switched off at build time (telemetry, crash reporter, updater, …); EME is on, for Widevine |
 | `app/profile/browser-wip.js` | Default prefs. These are the Standard privacy mode. |
 | `app/launcher/` | The `browser-wip` executable |
 | `app/base/content/` | Browser window, tab strip, address bar, about: pages |

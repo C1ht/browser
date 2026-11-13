@@ -478,6 +478,26 @@ def part4(bindir, base, shots):
                shown["host"] == "127.0.0.1" and shown["label"] == "target page, opener none", shown)
         record(4, "plain HTTP is marked not secure", shown["state"] == "insecure", shown["state"])
 
+        # Focused, with the full URL selected, then the window loses focus:
+        # the field stays as it is (the trimmed display would show over the
+        # selected URL), and has it back with the window. Focus moving
+        # within the window shows the display again.
+        b.js("gURLBar.focusAndSelect(); window.__other = Services.ww.openWindow(null, location.href, '_blank', 'chrome,all,dialog=no', null);")
+        b.wait("return !document.hasFocus();", timeout=10)
+        away = b.js("""let box = document.getElementById("urlbar");
+          return { focused: box.hasAttribute("focused"), display: getComputedStyle(document.getElementById("urlbar-display")).display,
+                   value: gURLBar.input.value };""")
+        b.js("window.__other.close(); window.focus();")
+        b.wait("return document.hasFocus();", timeout=10)
+        back = b.js("""let input = gURLBar.input;
+          let r = { focused: document.activeElement == input, selected: input.selectionStart == 0 && input.selectionEnd == input.value.length };
+          gBrowser.selectedBrowser.focus();
+          r.display = document.getElementById("urlbar").hasAttribute("has-display") && !document.getElementById("urlbar").hasAttribute("focused");
+          return r;""")
+        record(4, "with the address field focused, the window losing focus doesn't show the host over the selected URL",
+               away["focused"] and away["display"] == "none" and away["value"] == base + "/target.html"
+               and back["focused"] and back["selected"] and back["display"], {"away": away, "back": back})
+
         # Typing words searches with the default engine.
         b.js("""gURLBar.input.focus(); gURLBar.input.value = "privacy browser";
                 gURLBar.input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));""")

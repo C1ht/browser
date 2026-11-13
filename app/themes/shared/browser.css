@@ -253,6 +253,12 @@ browser:focus-visible {
   color: transparent;
 }
 
+/* Selected text keeps its own colors; under the display, it mustn't show. */
+#urlbar:not([focused])[has-display] #urlbar-input::selection {
+  color: transparent;
+  background-color: transparent;
+}
+
 #urlbar[focused] #urlbar-display,
 #urlbar:not([has-display]) #urlbar-display {
   display: none;
