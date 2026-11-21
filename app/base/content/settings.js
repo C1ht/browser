@@ -192,6 +192,39 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("unload", () => Services.prefs.removeObserver("places.history.enabled", syncHistory));
   syncHistory();
 
+  // Page translation: on or off (off, none of it runs), and the language
+  // files it downloaded.
+  let { PageTranslations } = ChromeUtils.importESModule("resource://gre/modules/browserwip/PageTranslations.sys.mjs");
+  let translations = document.getElementById("translations-enabled");
+  let syncTranslations = async () => {
+    translations.setAttribute("aria-checked", String(PageTranslations.enabled));
+    let size = await PageTranslations.downloadedSize();
+    document.getElementById("translations-files-row").hidden = !size;
+    document.l10n.setAttributes(document.getElementById("translations-files"), "settings-translations-files", {
+      size: Math.max(1, Math.round(size / 1e6)),
+    });
+    document.getElementById("translations-delete").disabled = false;
+  };
+  translations.addEventListener("click", () => {
+    Services.prefs.setBoolPref(PageTranslations.ENABLED_PREF, !PageTranslations.enabled);
+  });
+  document.getElementById("translations-enabled-label").addEventListener("click", e => {
+    e.preventDefault();
+    translations.click();
+  });
+  document.getElementById("translations-delete").addEventListener("click", e => {
+    e.target.disabled = true;
+    PageTranslations.deleteAll();
+  });
+  let onTranslationFiles = () => syncTranslations();
+  Services.prefs.addObserver(PageTranslations.ENABLED_PREF, syncTranslations);
+  Services.obs.addObserver(onTranslationFiles, PageTranslations.FILES_TOPIC);
+  window.addEventListener("unload", () => {
+    Services.prefs.removeObserver(PageTranslations.ENABLED_PREF, syncTranslations);
+    Services.obs.removeObserver(onTranslationFiles, PageTranslations.FILES_TOPIC);
+  });
+  syncTranslations();
+
   // Downloads: the folder files are saved to, or ask each time.
   let { Downloads } = ChromeUtils.importESModule("resource://gre/modules/Downloads.sys.mjs");
   let folder = document.getElementById("downloads-folder");

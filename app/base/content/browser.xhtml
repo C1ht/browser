@@ -31,6 +31,7 @@
   <script src="chrome://browser-wip/content/fullscreen.js"/>
   <script src="chrome://browser-wip/content/passwords.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
+  <script src="chrome://browser-wip/content/translations.js"/>
   <script src="chrome://browser-wip/content/bookmarks.js"/>
   <script src="chrome://browser-wip/content/printing.js"/>
   <script src="chrome://browser-wip/content/drm.js"/>
@@ -132,6 +133,7 @@
       <xul:menuitem data-l10n-id="app-menu-history" key="key_history" command="cmd_history"/>
       <xul:menuitem data-l10n-id="app-menu-downloads" key="key_downloads" command="cmd_downloads"/>
       <xul:menuitem id="app-menu-print" data-l10n-id="app-menu-print" key="key_print" command="cmd_print"/>
+      <xul:menuitem id="app-menu-translate" data-l10n-id="app-menu-translate"/>
       <xul:menuitem data-l10n-id="app-menu-bookmarks-bar" type="checkbox" key="key_toggleBookmarksBar"
                     command="cmd_toggleBookmarksBar"/>
       <xul:menuitem data-l10n-id="app-menu-settings" command="cmd_settings"/>
@@ -342,6 +344,32 @@
         </div>
       </div>
     </xul:panel>
+    <!-- Page translation (translations.js): view= is offer, translating,
+         translated or error. -->
+    <xul:panel id="translations-panel" class="wip-panel" type="arrow" role="dialog"
+               aria-labelledby="translations-title">
+      <form id="translations-form" class="panel-body translations-panel-body">
+        <h2 id="translations-title" class="panel-title"></h2>
+        <p id="translations-status" class="panel-text" role="status"></p>
+        <div id="translations-languages" class="translations-languages">
+          <label class="bookmark-field">
+            <span data-l10n-id="translations-from"></span>
+            <select id="translations-from" class="panel-input"></select>
+          </label>
+          <label class="bookmark-field">
+            <span data-l10n-id="translations-to"></span>
+            <select id="translations-to" class="panel-input"></select>
+          </label>
+        </div>
+        <p id="translations-note" class="panel-text"></p>
+        <div class="panel-buttons">
+          <button id="translations-original" class="panel-button" type="button" data-l10n-id="translations-show-original"/>
+          <span class="panel-spacer"></span>
+          <button id="translations-cancel" class="panel-button" type="button" data-l10n-id="translations-not-now"/>
+          <button id="translations-translate" class="panel-button primary" type="submit" data-l10n-id="translations-translate"/>
+        </div>
+      </form>
+    </xul:panel>
     <!-- Passwords (passwords.js): save or update a login, unlock, set up,
          and the site's logins, all under the key button. view= picks one. -->
     <xul:panel id="passwords-panel" class="wip-panel" type="arrow" role="dialog"
@@ -498,6 +526,10 @@
       </button>
       <button id="passwords-button" class="urlbar-button" hidden="true" data-l10n-id="passwords-button">
         <img class="icon" src="chrome://browser-wip/skin/icons/key.svg" alt=""/>
+      </button>
+      <button id="translations-button" class="urlbar-button" hidden="true" data-l10n-id="translations-button">
+        <img class="icon" src="chrome://browser-wip/skin/icons/translate.svg" alt=""/>
+        <span id="translations-button-locale"></span>
       </button>
       <button id="protections-button" class="urlbar-button" data-l10n-id="protections-button">
         <img id="protections-icon" class="icon" src="chrome://browser-wip/skin/icons/shield.svg" alt=""/>

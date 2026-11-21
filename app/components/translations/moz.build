@@ -1,0 +1,11 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+EXTRA_JS_MODULES.browserwip += [
+    "PageTranslations.sys.mjs",
+]
+
+# The list of translation files (tools/update-translation-models.py):
+# resource://gre/defaults/translations/models.json
+FINAL_TARGET_FILES.defaults.translations += ["models.json"]

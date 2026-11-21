@@ -31,6 +31,12 @@ settings-startup-newtab = Open a new tab
 settings-startup-restore = Continue where you left off
 settings-startup-help = After a crash your tabs always come back. You can also bring them back from the menu with “Restore previous session”.
 settings-search-engine = Search with
+settings-translations-heading = Translation
+settings-translations-label = Translate pages
+settings-translations-help = Pages are translated on this device; what you read is never sent anywhere. The first time you translate a language, its files (about 25 MB) download from Mozilla. Off, nothing of it runs.
+# $size (Number): megabytes
+settings-translations-files = Language files on this device: { $size } MB
+settings-translations-delete = Delete
 settings-downloads-heading = Downloads
 settings-downloads-folder = Save files to
 settings-downloads-change = Change…

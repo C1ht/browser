@@ -316,6 +316,25 @@ rm -f "$secrets"
 say "checks passed: each package unpacks and runs from where it should, nothing private in any," \
   "the PKGBUILD builds, the checksums match"
 
+# ---------------------------------------------------------------------------
+# Release notes: what changed since the last dev build, from the commit
+# messages (release_notes.py; the format is in CLAUDE.md).
+
+gecko_version="$(sed -n 's/^version=//p' "$repo/GECKO_REVISION")"
+previous=""
+for t in $(gh release list --repo "$github" --limit 100 --json tagName --jq '.[].tagName' 2> /dev/null | grep '^dev-'); do
+  commit="$(git rev-parse --verify --quiet "${t##*-}^{commit}" || true)"
+  if [[ -n "$commit" && "$commit" != "$sha" ]] && git merge-base --is-ancestor "$commit" "$sha"; then
+    previous="$t"
+    break
+  fi
+done
+range="${previous:+${previous##*-}..$sha}"
+python3 -I "$repo/tools/release/release_notes.py" "${range:-$sha^!}" --base "$base" --tag "$tag" \
+  --gecko "$gecko_version" --repo "$github" --sha "$sha" --previous "$previous" > "$out/notes.md"
+headline="$(git log -1 --format=%s "$sha" | sed 's/ *\[skip ci\]//')"
+say "release notes: since ${previous:-the first commit}, in $out/notes.md"
+
 if ((dry_run)); then
   say "dry run: not publishing $tag"
   exit 0
@@ -324,22 +343,8 @@ fi
 # ---------------------------------------------------------------------------
 # Publish
 
-gecko_version="$(sed -n 's/^version=//p' "$repo/GECKO_REVISION")"
-cat > "$work/notes.md" << EOF
-**Unstable dev build. Not a stable release.** Built automatically on the developer's machine from $sha, on Gecko $gecko_version. Expect bugs; don't rely on it for anything important.
-
-| Linux x86_64 | File |
-|---|---|
-| Any distribution, portable | \`$base.tar.zst\` or \`$base.tar.xz\`: extract, run \`browser-wip/browser-wip\` |
-| Any distribution, one file | \`$base.AppImage\`: \`chmod +x\` it, run it |
-| Debian, Ubuntu | \`$base.deb\`: \`sudo apt install ./$base.deb\` |
-| Fedora, openSUSE | \`$base.rpm\`: \`sudo dnf install ./$base.rpm\` |
-| Arch Linux | \`PKGBUILD\`: put it in an empty folder, run \`makepkg -si\` |
-
-Check a download with \`sha256sum -c SHA256SUMS --ignore-missing\`. The packages aren't signed.
-EOF
 gh release create "$tag" --repo "$github" --target "$sha" --prerelease --latest=false \
-  --title "Dev build $(date -u -d "@$epoch" +%Y-%m-%d) ($short), unstable" --notes-file "$work/notes.md" \
+  --title "Dev build $(date -u -d "@$epoch" +%Y-%m-%d) ($short): $headline" --notes-file "$out/notes.md" \
   "$out/$base".* "$out/PKGBUILD" "$out/SRCINFO" "$out/SHA256SUMS"
 
 # What GitHub serves has to match what was checked.

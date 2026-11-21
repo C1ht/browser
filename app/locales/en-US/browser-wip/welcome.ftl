@@ -5,6 +5,8 @@
 welcome-page-title = Welcome to { -brand-short-name }
 welcome-heading = How much privacy do you want?
 welcome-intro = Every choice blocks trackers and ads, stops sites from following you with cookies, and never sends your browsing to us or anyone else.
+welcome-translate-label = Translate pages
+welcome-translate-help = On this device; what you read is never sent anywhere. Language files download from Mozilla the first time you translate a language. Turn it off and none of it runs.
 welcome-advanced = Advanced
 welcome-change-later = You can change this any time in Settings.
 welcome-continue = Continue

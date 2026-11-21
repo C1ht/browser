@@ -39,7 +39,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PAGES = ROOT / "tests/runtime/pages"
 
 RESULTS = []
-ALL_PARTS = list(range(1, 18))
+ALL_PARTS = list(range(1, 19))
 # Headless Gecko (every check runs headless) can't do some things a real
 # window can; those checks are skipped there and listed in
 # docs/MANUAL-CHECKS.md for a headed run.
@@ -373,10 +373,13 @@ def part3(bindir, base, shots):
           return std.getAttribute("aria-checked") == "true" && {
             standard: std.getAttribute("aria-checked"),
             strict: d.getElementById("mode-strict").getAttribute("aria-checked"),
-            advancedOpen: adv.open, toggles: d.querySelectorAll(".toggle-row").length,
+            advancedOpen: adv.open, toggles: d.querySelectorAll("#toggles .toggle-row").length,
+            translate: d.getElementById("translate").getAttribute("aria-checked"),
             heading: d.querySelector("h1").textContent };""")
         record(3, "Standard is preselected, Advanced collapsed",
                state and state["strict"] == "false" and state["advancedOpen"] is False and state["toggles"] == 5, state)
+        record(3, "page translation has its own switch, on, outside Advanced",
+               state and state["translate"] == "true", state)
         if shots:
             b.m.screenshot(str(Path(shots) / "first-run.png"))
 
@@ -386,21 +389,26 @@ def part3(bindir, base, shots):
           let strict = d.getElementById("mode-strict").getAttribute("aria-checked");
           let restartLabel = d.getElementById("continue").getAttribute("data-l10n-id");
           d.getElementById("toggle-jit").click();
-          return { strict, restartLabel,
+          d.getElementById("translate").click();
+          return { strict, restartLabel, translate: d.getElementById("translate").getAttribute("aria-checked"),
+                   translatePref: Services.prefs.getBoolPref("browser.translations.enable"),
                    custom: !d.querySelector(".custom-note").hidden,
                    label: d.getElementById("continue").getAttribute("data-l10n-id"),
                    prefsUntouched: !Services.prefs.prefHasUserValue("dom.security.https_only_mode") };""")
         record(3, "choosing Strict selects it and offers a restart for JIT",
                mix["strict"] == "true" and mix["restartLabel"] == "welcome-continue-restart", mix)
         record(3, "flipping a switch shows Custom; nothing applied before Continue",
-               mix["custom"] and mix["label"] == "welcome-continue" and mix["prefsUntouched"], mix)
+               mix["custom"] and mix["label"] == "welcome-continue" and mix["prefsUntouched"]
+               and mix["translate"] == "false" and mix["translatePref"], mix)
         b.js(WELCOME + "d.getElementById('continue').click();")
         after = b.wait(IMPORTS + """
           return gBrowser.selectedBrowser.currentURI.spec == "about:newtab" && {
             mode: PrivacyModes.mode, httpsOnly: pref("dom.security.https_only_mode"),
-            ion: pref("javascript.options.ion"), done: pref("browserwip.firstrun.completed") };""")
+            ion: pref("javascript.options.ion"), done: pref("browserwip.firstrun.completed"),
+            translate: pref("browser.translations.enable") };""")
         record(3, "Continue applies the choice and opens a new tab",
                after and after["mode"] == "custom" and after["httpsOnly"] and after["ion"] and after["done"], after)
+        record(3, "page translation switched off in setup is off", after and after["translate"] is False, after)
     finally:
         b.quit()
 
@@ -413,8 +421,10 @@ def part3(bindir, base, shots):
           d.dispatchEvent(new d.defaultView.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));""")
         after = b.wait(IMPORTS + """
           return gBrowser.selectedBrowser.currentURI.spec == "about:newtab" &&
-            { mode: PrivacyModes.mode, done: pref("browserwip.firstrun.completed") };""")
-        record(3, "Escape lands on Standard", after and after["mode"] == "standard" and after["done"], after)
+            { mode: PrivacyModes.mode, done: pref("browserwip.firstrun.completed"),
+              translate: pref("browser.translations.enable") };""")
+        record(3, "Escape lands on Standard, with page translation",
+               after and after["mode"] == "standard" and after["done"] and after["translate"], after)
     finally:
         b.quit()
     # And the screen doesn't come back.
@@ -4320,6 +4330,209 @@ def part17(bindir, base, shots):
         shutil.rmtree(scratch, ignore_errors=True)
 
 
+TRANSLATIONS_LIST = ROOT / "app/components/translations/models.json"
+
+
+class TranslationFilesHandler(http.server.BaseHTTPRequestHandler):
+    """Mozilla's attachment server, for the files fetch_translation_files.py
+    fetched: serves each record's location from TEST_DEPS/translations, and
+    counts what it served in SERVED. CORRUPT serves the right size of the
+    wrong bytes."""
+    FILES = {}
+    SERVED = []
+    CORRUPT = False
+
+    def do_GET(self):
+        path = TranslationFilesHandler.FILES.get(self.path.lstrip("/"))
+        if not path:
+            self.send_error(404)
+            return
+        body = path.read_bytes()
+        if TranslationFilesHandler.CORRUPT:
+            body = bytes(len(body))
+        TranslationFilesHandler.SERVED.append(self.path)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+def translation_files():
+    """location -> local file, for what fetch_translation_files.py fetches."""
+    data = json.loads(TRANSLATIONS_LIST.read_text(encoding="utf-8"))
+    records = data["wasm"] + [r for r in data["models"] if (r["sourceLanguage"], r["targetLanguage"]) == ("fr", "en")]
+    return {r["attachment"]["location"]: TEST_DEPS / "translations" / r["attachment"]["hash"] for r in records}
+
+
+def part18(bindir, base, shots):
+    """Page translation: on by default, offered on a page in another
+    language, translated on the device with files downloaded (from a local
+    stand-in for Mozilla's server) only when asked, checked and kept; off
+    in Settings, none of it runs."""
+    files = translation_files()
+    if not all(p.exists() for p in files.values()):
+        skip(18, "page translation", "run tools/runtime/fetch-test-deps.sh (the French-to-English files)")
+        return
+    TranslationFilesHandler.FILES = files
+    TranslationFilesHandler.SERVED = []
+    TranslationFilesHandler.CORRUPT = False
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), TranslationFilesHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    origin = f"http://127.0.0.1:{server.server_address[1]}/"
+    prefs = {"browserwip.firstrun.completed": True, "browserwip.translations.testFilesURL": origin}
+    PT = 'const { PageTranslations } = ChromeUtils.importESModule("resource://gre/modules/browserwip/PageTranslations.sys.mjs");'
+    french = f"{base}/french.html"
+    load = "gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0]);"
+    button = """let b = document.getElementById("translations-button");
+      return { shown: !b.hidden, translated: b.hasAttribute("translated"),
+               locale: document.getElementById("translations-button-locale").textContent };"""
+    panel = """let p = document.getElementById("translations-panel"), $ = id => document.getElementById(id);
+      return { state: p.state, view: p.getAttribute("view"), title: $("translations-title").textContent,
+               from: $("translations-from").value, to: $("translations-to").value, note: $("translations-note").textContent,
+               status: $("translations-status").hidden ? "" : $("translations-status").textContent,
+               translate: !$("translations-translate").hidden && $("translations-translate").textContent,
+               original: !$("translations-original").hidden };"""
+
+    b = Browser(bindir, env={"BWV_AUTOMATION": "1"}, prefs=prefs)
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        r = b.js(PT + """return PageTranslations.downloadedSize().then(files => ({ enabled: PageTranslations.enabled,
+          popup: Services.prefs.getBoolPref("browser.translations.automaticallyPopup"), files }));""")
+        record(18, "page translation is on, without pop-ups, and nothing is downloaded",
+               r == {"enabled": True, "popup": False, "files": 0}, r)
+
+        b.js(load, f"{base}/target.html")
+        b.wait("return gBrowser.selectedBrowser.contentTitle.startsWith('target');")
+        time.sleep(1.5)
+        r = b.js(button)
+        record(18, "a page in the user's language offers nothing", not r["shown"], r)
+
+        b.js(load, french)
+        r = b.wait("return !document.getElementById('translations-button').hidden;", timeout=15)
+        record(18, "a page in French shows the translate button", bool(r), b.js(button))
+
+        b.js("document.getElementById('translations-button').click();")
+        r = b.wait(panel.replace("return {", "let r = {") + " return r.state == 'open' && r.note && r;", timeout=10)
+        record(18, "its panel offers French to English, and says what downloads first (from Mozilla, 24 MB)",
+               bool(r) and r["view"] == "offer" and r["from"] == "fr" and r["to"] == "en"
+               and "24 MB" in r["note"] and "Mozilla" in r["note"] and r["translate"] == "Translate", r)
+        record(18, "offering downloads nothing", not TranslationFilesHandler.SERVED, TranslationFilesHandler.SERVED)
+
+        b.js("window.__views = []; new MutationObserver(() => __views.push(document.getElementById('translations-status').textContent))"
+             ".observe(document.getElementById('translations-status'), { childList: true, subtree: true, characterData: true });"
+             "document.getElementById('translations-translate').click();")
+        title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t != 'Page en français' && t;", timeout=60)
+        time.sleep(1)
+        r = b.js(button)
+        views = b.js("return __views;")
+        record(18, "Translate translates the page on the device",
+               bool(title) and "English" in title, {"title": title})
+        record(18, "the panel showed the download's progress, then closed; the button shows the page is in English",
+               any("Downloading language files" in v for v in views)
+               and b.js("return document.getElementById('translations-panel').state;") == "closed"
+               and r == {"shown": True, "translated": True, "locale": "en"}, {"views": views[-3:], "button": r})
+        served = sorted(TranslationFilesHandler.SERVED)
+        r = b.js(PT + """return (async () => {
+          let list = await PageTranslations._list();
+          let names = [...list.wasm, ...list.models.filter(r => r.sourceLanguage == "fr" && r.targetLanguage == "en")];
+          let kept = [];
+          for (let r of names) {
+            let path = PathUtils.join(PathUtils.profileDir, "translations", r.attachment.hash);
+            kept.push(await IOUtils.exists(path) && (await IOUtils.computeHexDigest(path, "sha256")) == r.attachment.hash);
+          }
+          return kept;
+        })();""")
+        record(18, "the engine and the French-English files were downloaded once each, checked, and kept in the profile",
+               len(served) == 3 and len(set(served)) == 3 and r == [True, True, True], {"served": served, "kept": r})
+
+        b.js("document.getElementById('translations-button').click();")
+        r = b.wait(panel.replace("return {", "let r = {") + " return r.state == 'open' && r;", timeout=10)
+        record(18, "the panel then says it's translated, and offers Show original",
+               bool(r) and r["view"] == "translated" and r["title"] == "Translated from French to English"
+               and r["original"] and not r["translate"], r)
+        b.js("document.getElementById('translations-original').click();")
+        title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t == 'Page en français' && t;", timeout=15)
+        record(18, "Show original brings the page back in French", bool(title), title)
+
+        # Again, on a fresh load: from the files kept, nothing downloaded.
+        TranslationFilesHandler.SERVED = []
+        b.js(load, french + "?again")
+        b.wait("""return gBrowser.selectedBrowser.currentURI.spec.endsWith("?again") &&
+          PageTranslationsUI._state()?.detectedLanguages && !document.getElementById("translations-button").hidden;""", timeout=15)
+        b.js("document.getElementById('translations-button').click();")
+        r = b.wait(panel.replace("return {", "let r = {") + " return r.state == 'open' && r.note == 'Translated on this device.' && r;", timeout=10) or b.js(panel)
+        b.js("document.getElementById('translations-translate').click();")
+        title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t != 'Page en français' && t;", timeout=30)
+        record(18, "translating again downloads nothing, and the panel says so",
+               bool(title) and not TranslationFilesHandler.SERVED and r["note"] == "Translated on this device.",
+               {"title": title, "served": TranslationFilesHandler.SERVED, "note": r["note"]})
+
+        # Settings: the files kept, deleted; and the switch.
+        b.js("BrowserWip.openSettings();")
+        r = b.wait("""let doc = gBrowser.selectedBrowser.contentDocument, $ = id => doc?.getElementById(id);
+          return $("translations-files")?.textContent && { on: $("translations-enabled").getAttribute("aria-checked"),
+            files: $("translations-files").textContent, row: !$("translations-files-row").hidden };""", timeout=15)
+        record(18, "Settings has the switch, on, and the language files kept (24 MB)",
+               bool(r) and r["on"] == "true" and r["row"] and "24 MB" in r["files"], r)
+        r = b.js(PT + """let doc = gBrowser.selectedBrowser.contentDocument;
+          doc.getElementById("translations-delete").click();
+          return new Promise(done => setTimeout(done, 1000)).then(() => PageTranslations.downloadedSize())
+            .then(size => ({ size, row: !doc.getElementById("translations-files-row").hidden }));""")
+        record(18, "Delete deletes them", r == {"size": 0, "row": False}, r)
+        r = b.js("""let doc = gBrowser.selectedBrowser.contentDocument;
+          doc.getElementById("translations-enabled").click();
+          return { pref: Services.prefs.getBoolPref("browser.translations.enable"),
+                   on: doc.getElementById("translations-enabled").getAttribute("aria-checked") };""")
+        record(18, "turning it off in Settings turns it off", r == {"pref": False, "on": "false"}, r)
+        b.js(load, french + "?off")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'Page en français';", timeout=15)
+        time.sleep(1.5)
+        r = b.js("""let actor = null;
+          try { actor = gBrowser.selectedBrowser.browsingContext.currentWindowGlobal.getActor("Translations"); } catch (e) {}
+          return { button: !document.getElementById("translations-button").hidden, actor: !!actor,
+                   menu: !document.getElementById("app-menu-translate").hidden };""")
+        record(18, "off, none of it runs: no actor on the French page, no button, no menu item",
+               r == {"button": False, "actor": False, "menu": False}, r)
+    finally:
+        b.quit()
+
+    # A file that doesn't match its hash is refused, and the panel says
+    # translating failed; Try again, with the right file, translates.
+    TranslationFilesHandler.CORRUPT = True
+    TranslationFilesHandler.SERVED = []
+    b = Browser(bindir, env={"BWV_AUTOMATION": "1"}, prefs=prefs)
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js(load, french)
+        b.wait("return !document.getElementById('translations-button').hidden;", timeout=15)
+        b.js("PageTranslationsUI.openPanel();")
+        b.wait("return document.getElementById('translations-panel').state == 'open' && document.getElementById('translations-note').textContent;", timeout=10)
+        b.js("document.getElementById('translations-translate').click();")
+        r = b.wait(panel.replace("return {", "let r = {") + " return r.view == 'error' && r;", timeout=60)
+        kept = b.js(PT + "return PageTranslations.downloadedSize();")
+        record(18, "a download that doesn't match the list is refused, kept nowhere, and the panel offers Try again",
+               bool(r) and r["title"] == "Couldn’t translate this page" and r["translate"] == "Try again"
+               and bool(TranslationFilesHandler.SERVED) and kept == 0, {"panel": r, "kept": kept})
+        TranslationFilesHandler.CORRUPT = False
+        if b.js("return document.getElementById('translations-panel').state;") != "open":
+            b.js("PageTranslationsUI.openPanel();")
+            b.wait("return document.getElementById('translations-panel').state == 'open';", timeout=10)
+        b.js("document.getElementById('translations-translate').click();")
+        title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t != 'Page en français' && t;", timeout=60)
+        record(18, "Try again, with the right files, translates", bool(title) and "English" in title, title)
+        if shots:
+            b.js("PageTranslationsUI.openPanel();")
+            time.sleep(1)
+            b.m.screenshot(str(Path(shots) / "translations.png"))
+    finally:
+        b.quit()
+        server.shutdown()
+
+
 def part13(bindir, base, shots):
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), CacheHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -4526,7 +4739,8 @@ def main():
              13: lambda: part13(args.bindir, base, args.shots), 14: lambda: part14(args.bindir, base, args.shots),
              15: lambda: part15(args.bindir, base, args.shots),
              16: lambda: part16(args.bindir, base, args.shots),
-             17: lambda: part17(args.bindir, base, args.shots)}
+             17: lambda: part17(args.bindir, base, args.shots),
+             18: lambda: part18(args.bindir, base, args.shots)}
     for p in args.part:
         try:
             parts[p]()

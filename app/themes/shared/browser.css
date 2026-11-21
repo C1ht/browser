@@ -318,6 +318,37 @@ browser:focus-visible {
   color: var(--warn-fg);
 }
 
+/* Page translation (translations.js): the language a page is translated
+   to shows next to the icon. */
+#translations-button[translated] {
+  color: var(--accent);
+  padding-inline: 5px 7px;
+}
+
+#translations-button-locale {
+  text-transform: uppercase;
+}
+
+#translations-button:not([translated]) #translations-button-locale {
+  display: none;
+}
+
+#translations-button[loading] .icon {
+  animation: translations-loading 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes translations-loading {
+  to {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #translations-button[loading] .icon {
+    animation: none;
+  }
+}
+
 #sharing-button {
   color: var(--rec-fg);
   background-color: var(--rec-bg);
@@ -2475,6 +2506,20 @@ panel.urlbar-popup {
   font-size: 12px;
   font-weight: 500;
   color: var(--chrome-muted);
+}
+
+.translations-panel-body {
+  display: grid;
+  gap: 10px;
+}
+
+.translations-panel-body .panel-title {
+  margin: 0;
+}
+
+.translations-languages {
+  display: grid;
+  gap: 8px;
 }
 
 .panel-input {

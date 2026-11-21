@@ -18,5 +18,6 @@ DIRS += [
     "privacy",
     "sessionstore",
     "startup",
+    "translations",
     "updates",
 ]

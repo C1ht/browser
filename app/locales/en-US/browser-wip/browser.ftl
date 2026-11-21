@@ -128,6 +128,8 @@ app-menu-downloads =
     .label = Downloads
 app-menu-print =
     .label = Print…
+app-menu-translate =
+    .label = Translate page…
 app-menu-settings =
     .label = Settings
 app-menu-quit =
@@ -362,6 +364,34 @@ drm-disabled = This page wants to play DRM-controlled video or music. DRM is off
 drm-turn-on = Turn on DRM
 drm-not-now = Not now
 drm-ok = OK
+
+## Page translation (translations.js). $from, $to (String): language
+## names, e.g. "French", "English".
+
+translations-button =
+    .title = Translate this page
+translations-button-translated =
+    .title = Translated from { $from } to { $to }
+translations-offer = Translate this page?
+# $to (String): the language being translated to
+translations-translating = Translating to { $to }…
+translations-translated = Translated from { $from } to { $to }
+translations-error = Couldn’t translate this page
+translations-error-load = The language files couldn’t be downloaded. Check your connection and try again.
+translations-error-other = Something went wrong while translating. Try again.
+translations-starting = Starting the translation…
+# $received, $total: megabytes downloaded so far, and in all.
+translations-downloading = Downloading language files… { $received } of { $total } MB
+translations-from = From
+translations-to = To
+translations-choose = Choose a language
+# $size (Number): megabytes
+translations-note-download = Translated on this device. The first time, { -brand-short-name } downloads the language files ({ $size } MB) from Mozilla.
+translations-note-ready = Translated on this device.
+translations-translate = Translate
+translations-try-again = Try again
+translations-not-now = Not now
+translations-show-original = Show original
 
 ## Fullscreen pages
 

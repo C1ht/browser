@@ -13,6 +13,8 @@ python3 -I app/components/contentblocking/compile_lists.py "$CB_OUT" \
 status=0
 echo "== tests/unit/compile_lists_test.py"
 python3 -I tests/unit/compile_lists_test.py || status=1
+echo "== tests/unit/translation_models_test.py"
+python3 -I tests/unit/translation_models_test.py || status=1
 for t in tests/unit/*.test.mjs; do
   echo "== $t"
   node "$t" || status=1

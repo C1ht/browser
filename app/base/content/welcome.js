@@ -7,12 +7,15 @@
 "use strict";
 
 const COMPLETED_PREF = "browserwip.firstrun.completed";
+const TRANSLATIONS_PREF = "browser.translations.enable";
 
 let controls;
 
 function finish({ apply }) {
   if (apply) {
     controls.commit();
+    let translate = document.getElementById("translate").getAttribute("aria-checked") == "true";
+    Services.prefs.setBoolPref(TRANSLATIONS_PREF, translate);
   }
   Services.prefs.setBoolPref(COMPLETED_PREF, true);
   // JIT settings are read when the browser starts. Nothing is open yet, so
@@ -38,6 +41,17 @@ window.addEventListener("DOMContentLoaded", () => {
     },
   });
   button.addEventListener("click", () => finish({ apply: true }));
+
+  // Page translation: held, like the rest, until Continue.
+  let translate = document.getElementById("translate");
+  translate.setAttribute("aria-checked", String(Services.prefs.getBoolPref(TRANSLATIONS_PREF, false)));
+  translate.addEventListener("click", () => {
+    translate.setAttribute("aria-checked", String(translate.getAttribute("aria-checked") != "true"));
+  });
+  document.getElementById("translate-label").addEventListener("click", e => {
+    e.preventDefault();
+    translate.click();
+  });
 
   document.addEventListener("keydown", e => {
     if (e.key == "Escape") {

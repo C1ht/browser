@@ -102,6 +102,7 @@ Runtime check parts (`ALL_PARTS` in `check.py`; add a new part there and in `.gi
 | 15 | Dev-build check |
 | 16 | Clear site data |
 | 17 | DRM (Widevine, with a local stand-in for Google's download) |
+| 18 | Page translation (the real engine and French-English files, served locally; `fetch-test-deps.sh` fetches them) |
 
 How to write checks:
 - Test pages live in `tests/runtime/pages/`, served on 127.0.0.1. Use `Browser(bindir, prefs=…)`, `b.js(…)`, `b.wait(…)`, `record(part, name, ok, detail)`.
@@ -123,6 +124,9 @@ How to write checks:
   - `element.ownerGlobal` does not exist in this Gecko (it was renamed `documentGlobal`). Use `element.ownerDocument.defaultView`.
   - Gecko only fires `onContentBlockingEvent` when a page's blocking state changes, not for every block. The shield recounts on `browserwip:request-blocked`, which `NetworkBlocker.cpp` sends for each blocked request.
   - Content processes are sandboxed. Data they need is published from the parent through `Services.ppmm.sharedData`.
+  - Toolkit actors without child events (Translations) are created only when something calls `getActor`. Firefox's window asks on each page load; ours must do the same where a feature depends on it (`translations.js`).
+  - A JSWindowActor's state events can fire while the actor is being created. Calling `getActor` from that handler creates another actor, endlessly. Defer the work (`queueMicrotask`).
+  - Marionette scripts can't `fetch` the network, and don't allow top-level `await`. Return a promise instead.
 - New JSWindowActors are registered in `JSWINDOWACTORS` in `BrowserWipGlue.sys.mjs`; new modules go in the directory's `moz.build` (`EXTRA_JS_MODULES.browserwip`) and new directories in `app/components/moz.build`.
 - Privacy modes: a toggle that affects prefs is defined in `PrivacyModes.sys.mjs`, shown through `privacy-controls.js`, and listed in Settings and `welcome.js`. A toggle added after release goes in `ADDED_TOGGLES` so existing profiles get its default once. Update `tests/unit/privacy-modes.test.mjs`.
 - **Privacy rules:**
@@ -143,10 +147,35 @@ How to write checks:
   git commit -m "Summary [skip ci]"
   ```
   Don't commit files you didn't create without asking (for example large reference files under `docs/design/`).
+- **Commit messages are the release notes.** `tools/release/release_notes.py` builds each dev build's notes from the commits since the previous one, so write them for the people using the browser:
+  ```
+  Page translation on your device; address bar fix [skip ci]
+
+  One or two plain paragraphs: what this commit brings and why it matters
+  to someone using the browser.
+
+  New
+  - Translate pages on your device: a button in the address bar on pages in
+    another language. Language files download from Mozilla the first time.
+
+  Fixes
+  - The address bar no longer shows the site name over the selected address
+    when you switch windows.
+
+  Changes
+  - Settings → General has a Translation section.
+
+  Co-Authored-By: ...
+  ```
+  - The subject line becomes the release title, so keep it short and say what changed.
+  - The sections are `New`, `Fixes` and `Changes`, with `- ` bullets; a continuation line is indented two spaces. Leave out sections that are empty.
+  - Say what changed for the user, not which file changed. Name the place in the UI.
+  - A commit with no sections shows its subject under Changes. Trailers and `[skip ci]` are dropped.
+  - Preview the notes with `tools/release/dev-release.sh --dry-run`; they're written to `obj-release/dev-release/<tag>/notes.md`.
 - **After every push, publish a dev build:** `tools/release/dev-release.sh`.
   - It builds with `mozconfigs/ci-linux` in `obj-release`.
   - It packages `.tar.zst`, `.tar.xz`, `.deb`, `.rpm`, `.AppImage` and an AUR `PKGBUILD`, with `SHA256SUMS`.
   - It scans the unpacked packages for keys, tokens and profile files (`scan_secrets.py`), and checks the checksums again after upload.
-  - It publishes a GitHub **pre-release** `dev-<date>-<sha>` that is never marked stable or latest.
+  - It publishes a GitHub **pre-release** `dev-<date>-<sha>` that is never marked stable or latest, titled with the commit's subject, with notes made from the commits since the last dev build.
   - It needs a clean tree and a pushed HEAD. `--dry-run` does everything but publish. Its packaging tools come from `tools/release/fetch-release-deps.sh` (no root).
 - Ask before destructive or outward-facing actions beyond those above.

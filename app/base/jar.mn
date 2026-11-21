@@ -19,6 +19,7 @@ browser-wip.jar:
   content/browser-wip/bookmarks.js           (content/bookmarks.js)
   content/browser-wip/printing.js            (content/printing.js)
   content/browser-wip/drm.js                 (content/drm.js)
+  content/browser-wip/translations.js        (content/translations.js)
   content/browser-wip/privacy-controls.js    (content/privacy-controls.js)
   content/browser-wip/welcome.html           (content/welcome.html)
   content/browser-wip/welcome.js             (content/welcome.js)

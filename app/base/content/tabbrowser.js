@@ -238,6 +238,13 @@ class TabBrowser {
     return this.tabs.find(t => t.linkedBrowser == browser) ?? null;
   }
 
+  // Toolkit's translations ask for a tab's find bar. The window has one,
+  // bound to the selected tab's page (BrowserWip.find).
+  getCachedFindBar(tab = this.selectedTab) {
+    let findbar = this.document.getElementById("findbar");
+    return findbar?.browser == tab?.linkedBrowser ? findbar : null;
+  }
+
   // ---------------------------------------------------------------------
   // Opening and closing
 

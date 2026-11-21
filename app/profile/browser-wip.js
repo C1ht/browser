@@ -324,7 +324,13 @@ pref("webextensions.storage.sync.serverURL", "");
 // Machine-learning features download models from Mozilla.
 pref("browser.ml.enable", false);
 pref("browser.ml.chat.enabled", false);
-pref("browser.translations.enable", false);
+// Page translation, on this device (components/translations): a switch in
+// setup and Settings. Its files download only when the user translates. It
+// offers itself with an address-bar button, never a pop-up; translating a
+// selection needs Firefox's UI.
+pref("browser.translations.enable", true);
+pref("browser.translations.automaticallyPopup", false);
+pref("browser.translations.select.enable", false);
 pref("captchadetection.actor.enabled", false);
 pref("toolkit.shopping.ohttpConfigURL", "");
 pref("toolkit.shopping.ohttpRelayURL", "");

@@ -3,8 +3,9 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
-<!-- First run: choose Standard or Strict Privacy. Standard is preselected
-     and is what every way of leaving this page keeps. -->
+<!-- First run: choose Standard or Strict Privacy, and whether pages can be
+     translated. Standard, with translation, is preselected and is what every
+     way of leaving this page keeps. -->
 <html>
 <head>
   <meta charset="utf-8"/>
@@ -27,6 +28,15 @@
       <p class="muted" data-l10n-id="welcome-intro"></p>
     </header>
     <div id="modes" class="modes"></div>
+    <div id="features" class="toggles">
+      <div class="toggle-row">
+        <div>
+          <label id="translate-label" for="translate" data-l10n-id="welcome-translate-label"></label>
+          <span class="help" data-l10n-id="welcome-translate-help"></span>
+        </div>
+        <button id="translate" class="switch" type="button" role="switch" aria-labelledby="translate-label"></button>
+      </div>
+    </div>
     <details id="advanced" class="advanced">
       <summary data-l10n-id="welcome-advanced"></summary>
       <div id="toggles" class="toggles"></div>

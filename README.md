@@ -18,6 +18,7 @@ with no changes to mozilla-central. `browser-wip` is a codename;
 | `app/base/content/` | Browser window, tab strip, address bar, about: pages |
 | `app/components/` | Startup, privacy modes, content blocking, about: page module |
 | `app/components/contentblocking/lists/` | Vendored filter lists (`tools/update-blocklists.py` refreshes them) |
+| `app/components/translations/` | Page translation on the device: Firefox's engine, with files from a bundled list (`tools/update-translation-models.py` refreshes it), downloaded only when a page is translated |
 | `app/components/contentblocking/youtube/` | Opt-in YouTube ad blocker: uBlock Origin's YouTube rules, downloaded only while it is on |
 | `app/policies/` | Bundled enterprise policy that disables Remote Settings |
 | `app/themes/shared/` | Folio styles, icons, Instrument Sans |
@@ -51,7 +52,7 @@ need only `./mach build faster`.
 
 ```sh
 tests/unit/run.sh                                        # no Gecko needed
-tools/runtime/fetch-test-deps.sh                         # once: strace and gnome-keyring, into ~/.cache
+tools/runtime/fetch-test-deps.sh                         # once: strace, gnome-keyring and translation files, into ~/.cache
 tools/runtime/check.py ../mozilla-central/obj-browser-wip/dist/bin    # runtime checks, all parts
 tools/netsilence/run.sh ../mozilla-central/obj-browser-wip/dist/bin   # no background network calls
 tools/wayland-shot.sh <dist/bin> /tmp/p shot.png         # screenshot on headless Weston

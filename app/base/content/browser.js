@@ -37,6 +37,7 @@ var BrowserWip = {
     BrowserContextMenu.init(window);
     PermissionPrompts.init(window);
     DrmNotices.init();
+    PageTranslationsUI.init();
     TabOverview.init(window);
     FullScreen.init(window);
     PasswordsUI.init(window);

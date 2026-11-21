@@ -10,6 +10,9 @@
 #       root/usr/bin/strace                 part 2, the network-silence check
 #       root/usr/bin/gnome-keyring-daemon   part 11, the system keyring
 #       root/usr/lib/...                    their libraries
+#       translations/<sha256>               part 18: the translation engine and
+#                                           its French-to-English files, from
+#                                           Mozilla (fetch_translation_files.py)
 #
 # On Arch Linux it downloads the versions pacman's sync database names, from
 # the first mirror in pacman's mirror list (or the Arch Linux Archive when
@@ -26,6 +29,8 @@ set -euo pipefail
 cache="${BWV_TEST_DEPS:-${XDG_CACHE_HOME:-$HOME/.cache}/browser-wip/test-deps}"
 packages=(strace gnome-keyring gcr gcr-4)
 force="${1:-}"
+
+python3 -I "$(dirname "$0")/fetch_translation_files.py" "$cache/translations"
 
 if [[ -x "$cache/root/usr/bin/strace" && -x "$cache/root/usr/bin/gnome-keyring-daemon" && "$force" != "--force" ]]; then
   echo "fetch-test-deps: already in $cache ($(cat "$cache/versions" 2>/dev/null | tr '\n' ' '))"
