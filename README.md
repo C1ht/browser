@@ -52,6 +52,7 @@
 - **Split view:** drag a tab onto another tab to show the two pages side by side.
 - **Tab overview:** every tab as a live card, with search. It zooms out of the page you're on and back into the one you pick.
 - **Translate pages on your device.** What you read is never sent anywhere. Language files download from Mozilla the first time you use a language, or switch translation off completely.
+- **Screenshots** with Ctrl+Shift+S: drag over an area or click an element, or save the visible part or the whole page. Copy it or save it.
 - **Middle-click or Ctrl+click Back, Forward or Reload** to do it in a new tab.
 - **Tabs you can drag** between windows or out into a new window. Tabs can also be pinned and muted.
 - **Session restore** after a crash, or every time you start, if you like.
@@ -64,6 +65,8 @@
 - **A recovery key** in case you forget the master password.
 - **Unlock with the system keyring** on Linux.
 - **Password generator.** It saves logins when you sign in and fills them in, matching per subdomain.
+- **Passkeys, saved in the browser or on a security key: your choice each time.** The browser's passkeys are encrypted with your passwords and never leave the device. Security keys (a YubiKey, say) get prompts for their PIN and for touching them. Passkeys also show in login fields' dropdowns.
+- **Authenticator codes for two-step verification**, so you don't need a separate authenticator app. Add a site's setup key, or right-click its QR code. The code fills into the site's code field, including rows of one-digit boxes.
 
 ### Everything else
 - **Streaming that works.** Google's Widevine installs the first time a site needs it, so Netflix, Spotify and Disney+ play. It's on in Standard, off in Strict Privacy and Anonymous.
@@ -156,7 +159,7 @@ Dev builds are built, packaged and checked on the developer's machine, not on Gi
 
 ```sh
 tools/release/dev-release.sh --dry-run   # build, package, check and write the release notes; publish nothing
-tools/release/dev-release.sh             # the same, then publish the pushed commit as a pre-release
+tools/release/dev-release.sh             # the same, then publish the pushed commit as a dev build
 ```
 
 - **Packages:** `.tar.zst`, `.tar.xz`, `.deb`, `.rpm`, `.AppImage` and an AUR `PKGBUILD`, with `SHA256SUMS`.
@@ -191,6 +194,7 @@ tools/release/dev-release.sh             # the same, then publish the pushed com
 - [**uBlock Origin**](https://github.com/gorhill/uBlock): for the YouTube rules the optional YouTube blocker uses.
 - [**Bergamot**](https://browser.mt/): for the on-device translation engine.
 - [**libsodium**](https://libsodium.org/): for the cryptography in the password vault.
+- [**jsQR**](https://github.com/cozmo/jsQR): for reading authenticator QR codes.
 - [**Instrument Sans**](https://github.com/Instrument/instrument-sans): for the interface font.
 
 ## License
@@ -199,3 +203,4 @@ The code is under the [Mozilla Public License 2.0](LICENSE).
 
 - **Instrument Sans:** SIL Open Font License 1.1 (`app/themes/shared/fonts/OFL.txt`).
 - **Filter lists:** by the EasyList authors, under CC BY-SA 3.0, credited in Settings.
+- **jsQR:** Apache License 2.0 (`app/third_party/jsqr/LICENSE`).

@@ -39,7 +39,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PAGES = ROOT / "tests/runtime/pages"
 
 RESULTS = []
-ALL_PARTS = list(range(1, 19))
+ALL_PARTS = list(range(1, 23))
 # Headless Gecko (every check runs headless) can't do some things a real
 # window can; those checks are skipped there and listed in
 # docs/MANUAL-CHECKS.md for a headed run.
@@ -959,12 +959,12 @@ def part4(bindir, base, shots):
         expected = {
             "link": ["context-openlink-tab", "context-openlink-window", "context-copylink", "context-savelink",
                      "context-inspect"],
-            "image": ["context-openimage", "context-copyimage", "context-copyimage-link", "context-saveimage",
+            "image": ["context-openimage", "context-copyimage", "context-copyimage-link", "context-add-authenticator", "context-saveimage",
                       "context-inspect"],
             "field": ["context-undo", "context-cut", "context-copy-edit", "context-paste", "context-delete",
                       "context-selectall", "context-inspect"],
             "page": ["context-back", "context-forward", "context-reload", "context-selectall",
-                     "context-savepage", "context-viewsource", "context-inspect"],
+                     "context-savepage", "context-screenshot", "context-viewsource", "context-inspect"],
         }
         record(4, "right-click menus fit what was clicked (link, image, field, page)", menus == expected, menus)
 
@@ -2005,6 +2005,137 @@ PW_PAGES = {
 <script>setTimeout(() => {{ u.focus(); u.click(); document.title = "focused"; }}, 300);</script>""",
     "/welcome": "<!doctype html><meta charset=utf-8><title>welcome</title><p>Signed in.",
 }
+
+# Authenticator codes (part 20): code fields, each reporting its value in the
+# title, and setup pages with a QR code.
+OTP_REPORT = """<script>
+let report = () => document.title = "code=" + [...document.querySelectorAll("input")].map(i => i.value).join("");
+for (let f of document.querySelectorAll("input")) f.addEventListener("input", report);
+</script>"""
+
+
+def qr_page(name, title):
+    data = base64.b64encode((PAGES / name).read_bytes()).decode()
+    return (f"<!doctype html><meta charset=utf-8><title>{title}</title>"
+            f"<p>Scan this with your authenticator app</p><img src='data:image/png;base64,{data}' width=300 height=300>")
+
+
+PW_PAGES.update({
+    "/otp": f"""<!doctype html><meta charset=utf-8><title>otp</title>{PW_STYLE}
+<form action="/welcome" method="post"><input id=code name=otp autocomplete=one-time-code inputmode=numeric style="top:40px">
+<button id=go>Verify</button></form>{OTP_REPORT}""",
+    "/otp-named": f"""<!doctype html><meta charset=utf-8><title>otp-named</title>{PW_STYLE}
+<form action="/welcome" method="post"><input id=code name=verification_code style="top:40px">
+<button id=go>Verify</button></form>{OTP_REPORT}""",
+    "/otp-boxes": f"""<!doctype html><meta charset=utf-8><title>otp-boxes</title>
+<style>body{{margin:0}}input{{position:absolute;top:40px;width:40px;height:40px}}</style>
+<form action="/welcome" method="post"><div>""" + "".join(
+        f"<input maxlength=1 inputmode=numeric style='left:{40 + i * 50}px'>" for i in range(6)) + f"""</div>
+</form>{OTP_REPORT}""",
+    "/otp-autofocus": f"""<!doctype html><meta charset=utf-8><title>otp-autofocus</title>{PW_STYLE}
+<input id=code autocomplete=one-time-code style="top:40px">{OTP_REPORT}
+<script>setTimeout(() => {{ code.focus(); document.title = "focused"; }}, 300);</script>""",
+    "/setup-bob": qr_page("otp-qr-bob.png", "setup-bob"),
+    "/setup-carol": qr_page("otp-qr-carol.png", "setup-carol"),
+    "/setup-link": qr_page("qr-link.png", "setup-link"),
+    "/setup-none": "<!doctype html><meta charset=utf-8><title>setup-none</title><p>No QR code here.",
+    # Passkeys kept by the browser (part 22): a relying party in a page. It
+    # keeps the public key it registered (localStorage) and verifies each
+    # sign-in's signature with it, as a server would; the title says how it
+    # went.
+    "/rp": """<!doctype html><meta charset=utf-8><title>rp</title>
+<style>button{position:absolute;left:20px;width:220px;height:30px}input{position:absolute;left:300px;width:200px;height:30px}</style>
+<button id=create style="top:10px">Add a passkey</button>
+<button id=again style="top:50px">Add it again</button>
+<button id=get style="top:90px">Sign in</button>
+<button id=allow style="top:130px">Sign in (this passkey only)</button>
+<button id=required style="top:170px">Sign in (verify me)</button>
+<button id=discouraged style="top:210px">Sign in (don't verify)</button>
+<form><input id=u name=username autocomplete="username webauthn" style="top:10px">
+<input id=p name=password type=password autocomplete=current-password style="top:50px"></form>
+<script>
+let rand = n => crypto.getRandomValues(new Uint8Array(n));
+let b64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+let unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+let saved = () => JSON.parse(localStorage.passkey || "null");
+let fail = e => document.title = "error:" + e.name;
+async function make(exclude) {
+  document.title = "waiting";
+  let userId = saved()?.userId ? unb64(saved().userId) : rand(16);
+  try {
+    let cred = await navigator.credentials.create({ publicKey: {
+      rp: { name: "Test RP" }, user: { id: userId, name: "ana@example.com", displayName: "Ana" },
+      challenge: rand(32), pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+      authenticatorSelection: { residentKey: "required", userVerification: "preferred" },
+      excludeCredentials: exclude && saved() ? [{ type: "public-key", id: unb64(saved().id) }] : [],
+      extensions: { credProps: true }, timeout: 120000 } });
+    let r = cred.response;
+    localStorage.passkey = JSON.stringify({ id: b64(cred.rawId), key: b64(r.getPublicKey()), userId: b64(userId) });
+    document.title = ["created", cred.authenticatorAttachment, r.getPublicKeyAlgorithm(),
+      cred.getClientExtensionResults().credProps?.rk, r.getTransports().join("+")].join(":");
+  } catch (e) { fail(e); }
+}
+// DER (SEQUENCE of two INTEGERs) to the r || s Web Crypto verifies.
+function raw(der) {
+  let out = new Uint8Array(64), pos = 2;
+  for (let i = 0; i < 2; i++) {
+    let len = der[pos + 1], v = der.slice(pos + 2, pos + 2 + len);
+    v = v.slice(Math.max(0, v.length - 32));
+    out.set(v, i * 32 + 32 - v.length);
+    pos += 2 + len;
+  }
+  return out;
+}
+async function signIn(options) {
+  document.title = "waiting";
+  let s = saved();
+  try {
+    let challenge = rand(32);
+    let cred = await navigator.credentials.get({ publicKey: { challenge, timeout: 120000, ...options } });
+    let r = cred.response;
+    let key = await crypto.subtle.importKey("spki", unb64(s.key), { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+    let hash = new Uint8Array(await crypto.subtle.digest("SHA-256", r.clientDataJSON));
+    let data = new Uint8Array(r.authenticatorData);
+    let signed = new Uint8Array(data.length + 32); signed.set(data); signed.set(hash, data.length);
+    let ok = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, raw(new Uint8Array(r.signature)), signed);
+    let client = JSON.parse(new TextDecoder().decode(r.clientDataJSON));
+    let rpHash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(location.hostname)));
+    document.title = ["signed", ok ? "verified" : "BAD-SIGNATURE", data[32] & 4 ? "uv" : "no-uv",
+      b64(r.userHandle) == s.userId ? "user" : "BAD-USER", b64(cred.rawId) == s.id ? "id" : "BAD-ID",
+      client.challenge == btoa(String.fromCharCode(...challenge)).replaceAll("+", "-").replaceAll("/", "_").split("=")[0] ? "challenge" : "BAD-CHALLENGE",
+      b64(data.slice(0, 32)) == b64(rpHash) ? "rp" : "BAD-RP"].join(":");
+  } catch (e) { fail(e); }
+}
+create.onclick = () => make(false);
+again.onclick = () => make(true);
+get.onclick = () => signIn({ userVerification: "preferred" });
+allow.onclick = () => signIn({ userVerification: "preferred", allowCredentials: [{ type: "public-key", id: unb64(saved().id) }] });
+required.onclick = () => signIn({ userVerification: "required" });
+discouraged.onclick = () => signIn({ userVerification: "discouraged" });
+if (location.hash == "#conditional") {
+  PublicKeyCredential.isConditionalMediationAvailable().then(ok => {
+    document.title = "conditional:" + ok;
+    if (ok) navigator.credentials.get({ mediation: "conditional", publicKey: { challenge: rand(32) } })
+      .then(() => document.title = "conditional-signed", fail);
+  });
+}
+PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(ok => document.body.dataset.uvpaa = ok);
+</script>""",
+    # Security keys (part 21): a passkey made or used on a click; the title
+    # says how it ended.
+    "/passkey": """<!doctype html><meta charset=utf-8><title>passkey</title>
+<button id=create style="position:absolute;left:20px;top:20px;width:200px;height:40px">Add a passkey</button>
+<button id=get style="position:absolute;left:20px;top:80px;width:200px;height:40px">Sign in with a passkey</button>
+<script>
+let rand = n => crypto.getRandomValues(new Uint8Array(n));
+let end = p => p.then(() => document.title = "done", e => document.title = "error:" + e.name);
+create.onclick = () => { document.title = "waiting"; end(navigator.credentials.create({ publicKey: {
+  rp: { name: "Test" }, user: { id: rand(16), name: "ana", displayName: "Ana" }, challenge: rand(32),
+  pubKeyCredParams: [{ type: "public-key", alg: -7 }], timeout: 120000 } })); };
+get.onclick = () => { document.title = "waiting"; end(navigator.credentials.get({ publicKey: {
+  challenge: rand(32), timeout: 120000, userVerification: "preferred" } })); };
+</script>""",
+})
 
 
 class PasswordPageHandler(http.server.BaseHTTPRequestHandler):
@@ -4533,6 +4664,830 @@ def part18(bindir, base, shots):
         server.shutdown()
 
 
+# Ctrl+Shift+S, as the user presses it (trusted key events).
+SCREENSHOT_KEYS = """let tip = Cc["@mozilla.org/text-input-processor;1"].createInstance(Ci.nsITextInputProcessor);
+tip.beginInputTransactionForTests(window);
+let ctrl = new KeyboardEvent("", { key: "Control", code: "ControlLeft", keyCode: KeyboardEvent.DOM_VK_CONTROL });
+let shift = new KeyboardEvent("", { key: "Shift", code: "ShiftLeft", keyCode: KeyboardEvent.DOM_VK_SHIFT });
+let s = new KeyboardEvent("", { key: "S", code: "KeyS", keyCode: KeyboardEvent.DOM_VK_S });
+tip.keydown(ctrl); tip.keydown(shift); tip.keydown(s); tip.keyup(s); tip.keyup(shift); tip.keyup(ctrl);"""
+# Mouse input over the page, in its CSS pixels: what the overlay receives.
+SCREENSHOT_MOUSE = """let page = gBrowser.selectedBrowser.getBoundingClientRect();
+let mouse = (type, x, y) => window.synthesizeMouseEvent(type, page.left + x, page.top + y, { button: 0 });"""
+# A PNG's size and the color at points in it: { width, height, colors }.
+SCREENSHOT_PIXELS = """async function pixels(buffer, points) {
+  let bitmap = await createImageBitmap(new Blob([buffer], { type: "image/png" }));
+  let canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  let context = canvas.getContext("2d");
+  context.drawImage(bitmap, 0, 0);
+  let colors = points.map(([x, y]) => {
+    let [r, g, b] = context.getImageData(Math.round(x), Math.round(y), 1, 1).data;
+    return [r, g, b].map(c => c > 200 ? "f" : c < 60 ? "0" : "?").join("");
+  });
+  return { width: bitmap.width, height: bitmap.height, colors };
+}"""
+SCREENSHOT_STATE = """let o = document.getElementById("screenshots-overlay");
+let shown = el => el && !el.hidden && el.getClientRects().length > 0;
+let rect = el => { let r = el.getBoundingClientRect(), p = o.getBoundingClientRect();
+  return [Math.round(r.left - p.left), Math.round(r.top - p.top), Math.round(r.width), Math.round(r.height)]; };
+return o ? { state: o.getAttribute("state"), bar: shown(o.querySelector(".screenshots-bar")),
+  hover: shown(o.querySelector(".screenshots-hover")) ? rect(o.querySelector(".screenshots-hover")) : null,
+  box: shown(o.querySelector(".screenshots-box")) ? rect(o.querySelector(".screenshots-box")) : null,
+  actions: shown(o.querySelector(".screenshots-actions")), preview: shown(o.querySelector(".screenshots-preview")) } : null;"""
+
+
+def part19(bindir, base, shots):
+    """Screenshots: Ctrl+Shift+S over the page; an element clicked, an area
+    dragged, moved and resized; the visible part and the full page; copied
+    to the clipboard and saved through the downloads list, checked pixel by
+    pixel."""
+    downloads = tempfile.mkdtemp(prefix="wip-screenshots-")
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True, "browser.download.folderList": 2,
+                               "browser.download.dir": downloads, "browser.download.useDownloadDir": True})
+    state = lambda: b.js(SCREENSHOT_STATE)
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0]);", f"{base}/screenshot.html")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'screenshot page';")
+        dpr = b.js("return window.devicePixelRatio;")
+        # Headless Gecko's clipboard holds only text: what Copy hands to
+        # toolkit's copyImageToClipboard is kept for the checks, then passed on.
+        b.js("""let real = Screenshots.lazy.BrowserUtils;
+          Object.defineProperty(Screenshots.lazy, "BrowserUtils", { value: {
+            copyImageToClipboard(buffer) { window.__copied = buffer.slice(0); real.copyImageToClipboard(buffer); } } });""")
+
+        b.js(SCREENSHOT_KEYS)
+        r = b.wait("let s = (() => {" + SCREENSHOT_STATE + "})(); return s?.state == 'choosing' && s;", timeout=10)
+        record(19, "Ctrl+Shift+S covers the page with the screenshot overlay and its bar",
+               bool(r) and r["bar"] and not r["box"], r)
+        r = b.js("""return { menu: !!document.getElementById("app-menu-screenshot")?.getAttribute("key"),
+          context: !!document.getElementById("context-screenshot") };""")
+        record(19, "the app menu and the page's context menu have Take screenshot", r == {"menu": True, "context": True}, r)
+
+        # Hovering outlines the element a click would capture; clicking selects it.
+        b.js(SCREENSHOT_MOUSE + "mouse('mousemove', 350, 420);")
+        r = b.wait("let s = (() => {" + SCREENSHOT_STATE + "})(); return s?.hover && s;", timeout=10)
+        record(19, "hovering outlines the element under the pointer",
+               bool(r) and r["hover"] == [200, 300, 300, 200], r)
+        b.js(SCREENSHOT_MOUSE + "mouse('mousedown', 350, 420); mouse('mouseup', 350, 420);")
+        r = b.wait("let s = (() => {" + SCREENSHOT_STATE + "})(); return s?.state == 'selected' && s;", timeout=10)
+        record(19, "clicking it selects it, with Copy and Download",
+               bool(r) and r["box"] == [200, 300, 300, 200] and r["actions"], r)
+
+        # Copy: a PNG of the element on the clipboard.
+        b.js("window.__copied = null; document.getElementById('screenshots-copy').click();")
+        r = b.wait(SCREENSHOT_PIXELS + """
+          if (document.getElementById("screenshots-overlay") || !window.__copied) return false;
+          let bytes = window.__copied;
+          let dpr = window.devicePixelRatio;
+          return pixels(bytes, [[150 * dpr, 150 * dpr]]).then(p => ({ ...p,
+            toast: document.getElementById("screenshots-toast").textContent }));""", timeout=10)
+        record(19, "Copy puts the element on the clipboard, at its size, and says so",
+               bool(r) and r["width"] == round(300 * dpr) and r["height"] == round(200 * dpr)
+               and r["colors"] == ["00f"] and r["toast"] == "Screenshot copied", r)
+
+        # An area dragged, then moved and resized, then downloaded.
+        b.js(SCREENSHOT_KEYS)
+        b.wait("return document.getElementById('screenshots-overlay')?.getAttribute('state') == 'choosing';", timeout=10)
+        b.js(SCREENSHOT_MOUSE + """mouse('mousedown', 40, 40);
+          for (let i = 1; i <= 5; i++) mouse('mousemove', 40 + i * 24, 40 + i * 16);
+          mouse('mouseup', 160, 120);""")
+        r = b.wait("let s = (() => {" + SCREENSHOT_STATE + "})(); return s?.state == 'selected' && s;", timeout=10)
+        record(19, "dragging selects an area", bool(r) and r["box"] == [40, 40, 120, 80], r)
+        # Moved up and left by 20, then its bottom right corner (now at
+        # 140, 100) dragged out by 40.
+        b.js(SCREENSHOT_MOUSE + """mouse('mousedown', 100, 80); mouse('mousemove', 90, 70); mouse('mousemove', 80, 60);
+          mouse('mouseup', 80, 60);
+          mouse('mousedown', 140, 100); mouse('mousemove', 160, 120); mouse('mousemove', 180, 140); mouse('mouseup', 180, 140);""")
+        r = state()
+        record(19, "the area moves by dragging it, and resizes by its corner",
+               bool(r) and r["box"] == [20, 20, 160, 120], r)
+        b.js("document.getElementById('screenshots-download').click();")
+        r = b.wait(SCREENSHOT_PIXELS + """
+          let dir = arguments[0];
+          return IOUtils.getChildren(dir).then(async files => {
+            let png = files.find(f => /Screenshot \\d{4}-\\d\\d-\\d\\d at \\d\\d-\\d\\d-\\d\\d screenshot page\\.png$/.test(f));
+            if (!png) return false;
+            let { Downloads } = ChromeUtils.importESModule("resource://gre/modules/Downloads.sys.mjs");
+            let list = await (await Downloads.getList(Downloads.PUBLIC)).getAll();
+            let dpr = window.devicePixelRatio;
+            return { ...(await pixels(await IOUtils.read(png), [[50 * dpr, 50 * dpr], [140 * dpr, 110 * dpr]])),
+              name: PathUtils.filename(png), listed: list.some(d => d.target.path == png && d.succeeded),
+              toast: document.getElementById("screenshots-toast").textContent };
+          });""", downloads, timeout=15)
+        record(19, "Download saves the area as a PNG named after the page and the time, in the downloads list",
+               bool(r) and r["width"] == round(160 * dpr) and r["height"] == round(120 * dpr)
+               and r["colors"] == ["f00", "fff"] and r["listed"] and r["toast"].startswith("Screenshot saved"), r)
+
+        # The full page: a preview first, then saved, all 3000 pixels of it.
+        b.js(SCREENSHOT_KEYS)
+        b.wait("return document.getElementById('screenshots-overlay')?.getAttribute('state') == 'choosing';", timeout=10)
+        b.js("document.getElementById('screenshots-full').click();")
+        r = b.wait("let s = (() => {" + SCREENSHOT_STATE + "})(); return s?.preview && "
+                   "document.querySelector('.screenshots-preview-image').complete && s;", timeout=20)
+        record(19, "Save full page shows a preview with Copy and Download", bool(r) and r["state"] == "preview", r)
+        if shots:
+            b.m.screenshot(str(Path(shots) / "screenshots-preview.png"))
+        b.js("window.__copied = null; document.getElementById('screenshots-preview-copy').click();")
+        r = b.wait(SCREENSHOT_PIXELS + """
+          if (document.getElementById("screenshots-overlay") || !window.__copied) return false;
+          let bytes = window.__copied;
+          let dpr = window.devicePixelRatio;
+          return pixels(bytes, [[60 * dpr, 60 * dpr], [10 * dpr, 2950 * dpr], [350 * dpr, 400 * dpr]]);""", timeout=20)
+        record(19, "the full page is captured top to bottom, past what the window shows",
+               bool(r) and r["height"] == round(3000 * dpr) and r["colors"] == ["f00", "0f0", "00f"], r)
+
+        # The visible part, after scrolling: what's on screen.
+        b.js("gBrowser.selectedBrowser.focus();")
+        b.js(SCREENSHOT_KEYS)
+        b.wait("return document.getElementById('screenshots-overlay')?.getAttribute('state') == 'choosing';", timeout=10)
+        b.js("""let o = document.getElementById("screenshots-overlay"), r = o.getBoundingClientRect();
+          o.dispatchEvent(new WheelEvent("wheel", { deltaY: 2600, deltaMode: 0, clientX: r.left + 10, clientY: r.top + 10, bubbles: true }));""")
+        time.sleep(1)
+        b.js("document.getElementById('screenshots-visible').click();")
+        b.wait("let s = (() => {" + SCREENSHOT_STATE + "})(); return s?.preview && s;", timeout=20)
+        b.js("window.__copied = null; document.getElementById('screenshots-preview-copy').click();")
+        r = b.wait(SCREENSHOT_PIXELS + """
+          if (document.getElementById("screenshots-overlay") || !window.__copied) return false;
+          let bytes = window.__copied;
+          let page = gBrowser.selectedBrowser.getBoundingClientRect();
+          return pixels(bytes, [[10, (page.height - 20) * window.devicePixelRatio]]).then(p => ({ ...p, pageHeight: page.height }));""",
+                   timeout=20)
+        record(19, "scrolling over the overlay scrolls the page; Save visible captures what's on screen",
+               bool(r) and r["colors"] == ["0f0"] and abs(r["height"] - round(r["pageHeight"] * dpr)) <= 2 * dpr, r)
+
+        # Escape leaves; so does switching tabs.
+        b.js(SCREENSHOT_KEYS)
+        b.wait("return !!document.getElementById('screenshots-overlay');", timeout=10)
+        b.js("""let o = document.getElementById("screenshots-overlay");
+          o.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));""")
+        r = b.js("return !document.getElementById('screenshots-overlay');")
+        b.js(SCREENSHOT_KEYS)
+        b.wait("return !!document.getElementById('screenshots-overlay');", timeout=10)
+        b.js("gBrowser.selectTab(gBrowser.addTab('about:blank'));")
+        r2 = b.js("return !document.getElementById('screenshots-overlay');")
+        record(19, "Escape closes the overlay, and so does switching tabs", r and r2, {"escape": r, "tab": r2})
+    finally:
+        b.quit()
+        shutil.rmtree(downloads, ignore_errors=True)
+
+
+AUTH = 'const { totp, formatCode } = ChromeUtils.importESModule("resource://gre/modules/browserwip/Authenticator.sys.mjs");'
+# The code for a key now, as an authenticator app would show it.
+OTP_NOW = AUTH + "return totp(arguments[0], arguments[1] ?? {}).then(r => r.code);"
+OTP_KEY = "JBSWY3DPEHPK3PXP"
+
+
+def part20(bindir, base, shots):
+    """Authenticator codes in the password manager: added from a setup key
+    or a QR code on the page, shown in about:passwords and the key button's
+    panel, filled into code fields (one field or a row of boxes), sealed in
+    the vault and carried through export and import."""
+    work = tempfile.mkdtemp(prefix="wip-otp-")
+    certificate = make_certificate(work)
+    if not certificate:
+        record(20, "openssl makes the test server's certificate", False, "openssl not found or failed")
+        return
+    server, site = serve_https("127.0.0.1", certificate)
+    master = "correct horse battery"
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True})
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js('Cc["@mozilla.org/security/certoverride;1"].getService(Ci.nsICertOverrideService)'
+             '.setDisableAllSecurityChecksAndLetAttackersInterceptMyData(true);')
+        dropdown = lambda: b.js(PW_DROPDOWN)
+        key = lambda k: b.js(PW_TYPE, "", k)
+        title = lambda: b.js("return gBrowser.selectedBrowser.contentTitle;")
+        now = lambda k=OTP_KEY: b.js(OTP_NOW, k)
+
+        def load(path, expected):
+            b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0], "
+                 "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", site + path)
+            return b.wait("return gBrowser.selectedBrowser.contentTitle == arguments[0];", expected, timeout=15)
+
+        def fresh_code(k=OTP_KEY):
+            # Not in the last 3 seconds of a code's 30: it mustn't change mid-check.
+            b.js("return new Promise(done => { let wait = () => (Date.now() / 1000) % 30 > 26 ? setTimeout(wait, 250) : done(); wait(); });")
+            return now(k)
+
+        ids = b.js(PV + """return (async () => {
+          await PasswordVault.setup(arguments[0], arguments[0]);
+          let ana = await PasswordVault.saveLogin({ origin: arguments[1], username: "ana", password: "pw-ana-123" });
+          let bob = await PasswordVault.saveLogin({ origin: arguments[1], username: "bob", password: "pw-bob-123" });
+          return { ana, bob };
+        })();""", master, site)
+
+        # -- about:passwords: added from a setup key; bad keys refused, by name.
+        b.js("gBrowser.selectTab(gBrowser.addTab('about:passwords', "
+             "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));")
+        b.wait("return gBrowser.selectedBrowser.contentDocument?.querySelector('#list .row');", timeout=15)
+        page = "let doc = gBrowser.selectedBrowser.contentDocument;"
+        b.js(page + "doc.querySelector(`#list .row[data-id='${arguments[0]}']`).click();", ids["ana"])
+        b.wait(page + "return [...doc.querySelectorAll('#detail button')].some(x => /authenticator/i.test(x.textContent));", timeout=10)
+        errors = {}
+        for bad, name in [("otpauth://hotp/x?secret=JBSWY3DPEHPK3PXP&counter=1", "counter"),
+                          ("not a key!", "invalid"), ("JBSWY3DP", "short")]:
+            errors[name] = b.js(page + """let add = [...doc.querySelectorAll("#detail button")].find(x => /authenticator/i.test(x.textContent));
+              if (add && !add.hidden) add.click();
+              let form = doc.querySelector(".otp-form"), input = form.querySelector("input");
+              input.value = arguments[0];
+              form.requestSubmit();
+              return new Promise(done => setTimeout(() => done(doc.querySelector(".otp-form + p + .error, #detail .error:not([hidden])")?.textContent ?? ""), 600));""", bad)
+        record(20, "about:passwords refuses what isn't a setup key, and says why (counter-based, not a key, too short)",
+               "counter-based" in errors["counter"] and "isn’t a setup key" in errors["invalid"] and "too short" in errors["short"], errors)
+        b.js(page + """let form = doc.querySelector(".otp-form"), input = form.querySelector("input");
+          input.value = "jbsw y3dp ehpk 3pxp"; form.requestSubmit();""")
+        # The page's code is the one an authenticator app shows now (it
+        # refreshes every second, so give it one).
+        r = b.wait(page + AUTH + """let code = doc.getElementById("otp-code"), left = doc.querySelector(".otp-left")?.textContent;
+          if (!code?.dataset.code || !left) return false;
+          return totp(arguments[0], {}).then(now => now.code == code.dataset.code &&
+            { code: code.dataset.code, shown: code.textContent, left, expected: now.code });""", OTP_KEY, timeout=10)
+        record(20, "a setup key adds the authenticator; its code shows, grouped, counting down, as an authenticator app's",
+               bool(r) and r["shown"] == r["code"][:3] + " " + r["code"][3:] and r["left"].endswith(" s"), r)
+        r = b.js(PV + """let entry = PasswordVault.getEntry(arguments[0]);
+          return { otp: entry.otp && { digits: entry.otp.digits, period: entry.otp.period, algorithm: entry.otp.algorithm },
+                   indexHasKey: JSON.stringify(PasswordVault._index).includes(arguments[1]) };""", ids["ana"], OTP_KEY)
+        record(20, "the setup key is sealed in the vault like a password; the index has only its settings",
+               r == {"otp": {"digits": 6, "period": 30, "algorithm": "SHA1"}, "indexHasKey": False}, r)
+        r = b.js(PV + """return (async () => { await PasswordVault.lock(); await PasswordVault.unlock(arguments[0]);
+          return (await PasswordVault.authenticatorCode(arguments[1])).code; })();""", master, ids["ana"])
+        record(20, "it's still there after locking and unlocking", r == now(), r)
+
+        # -- Code fields: the dropdown offers the code; Enter fills it.
+        b.js("gBrowser.selectTab(gBrowser.tabs[0]);")
+        load("/otp", "otp")
+        fresh_code()
+        b.m.click(60, 55)
+        r = b.wait("let d = document.getElementById('passwords-dropdown'); return d.state == 'open' && d.querySelector('.passwords-option')?.textContent;", timeout=10)
+        expected = now()
+        rows = dropdown()["rows"]
+        record(20, "clicking a one-time-code field offers the login's authenticator code",
+               bool(r) and any(expected[:3] + " " + expected[3:] in row and "ana" in row for row in rows), rows)
+        key("ArrowDown")
+        key("Enter")
+        r = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t != 'otp' && t;", timeout=10)
+        record(20, "choosing it fills the current code", r == f"code={expected}", {"title": r, "expected": expected})
+
+        load("/otp-boxes", "otp-boxes")
+        fresh_code()
+        b.m.click(60, 60)
+        b.wait("return document.getElementById('passwords-dropdown').state == 'open';", timeout=10)
+        expected = now()
+        key("ArrowDown")
+        key("Enter")
+        r = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.length == 11 && t;", timeout=10)
+        record(20, "a row of one-digit boxes gets one digit each", r == f"code={expected}", {"title": r, "expected": expected})
+
+        load("/otp-named", "otp-named")
+        b.m.click(60, 55)
+        r = b.wait("return document.getElementById('passwords-dropdown').state == 'open';", timeout=10)
+        b.js("document.getElementById('passwords-dropdown').hidePopup();")
+        record(20, "a field named like a verification code is recognised too", bool(r))
+
+        load("/otp-autofocus", "otp-autofocus")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'focused';", timeout=10)
+        time.sleep(1)
+        r = b.js("return document.getElementById('passwords-dropdown').state;")
+        record(20, "a code field the page focuses by itself doesn't open the dropdown", r == "closed", r)
+
+        load("/login", "login")
+        b.m.click(60, 115)
+        b.wait("return document.getElementById('passwords-dropdown').state == 'open';", timeout=10)
+        rows = dropdown()["rows"]
+        b.js("document.getElementById('passwords-dropdown').hidePopup();")
+        record(20, "a login form's password field still offers logins, not codes",
+               any("ana" in row for row in rows) and not any("Authenticator code" in row for row in rows), rows)
+
+        # -- The key button's panel shows the code.
+        load("/otp", "otp")
+        fresh_code()
+        b.m.click(60, 55)
+        b.wait("return !document.getElementById('passwords-button').hidden;", timeout=10)
+        b.js("document.getElementById('passwords-dropdown').hidePopup(); document.getElementById('passwords-button').click();")
+        r = b.wait("""let p = document.getElementById("passwords-panel");
+          let code = p.querySelector(".passwords-site-code")?.textContent;
+          return p.state == "open" && p.getAttribute("view") == "site" && code && code;""", timeout=10)
+        expected = now()
+        b.js("document.getElementById('passwords-panel').hidePopup();")
+        record(20, "the key button's panel shows the site's code beside its login",
+               r in (expected[:3] + " " + expected[3:],), {"panel": r, "expected": expected})
+
+        # -- A QR code on the page: read in the browser, assigned to a login.
+        b.js(SCREENSHOTS_TOAST_RESET)
+        load("/setup-bob", "setup-bob")
+        b.js("PasswordsUI.addAuthenticatorFromPage();")
+        r = b.wait("""let p = document.getElementById("passwords-panel");
+          let checked = p.querySelector("#passwords-otp-logins input:checked");
+          return p.state == "open" && p.getAttribute("view") == "otp" && checked && {
+            title: document.getElementById("passwords-title").textContent,
+            text: document.getElementById("passwords-text").textContent,
+            checked: checked.closest("label").textContent };""", timeout=20)
+        record(20, "a QR code on the page is read, and the login it names (bob) is chosen",
+               bool(r) and r["title"].startswith("Add authenticator for 127.0.0.1") and "Example · bob" in r["text"]
+               and r["checked"].startswith("bob"), r)
+        fresh_code()
+        b.js("document.getElementById('passwords-otp-save').click();")
+        r = b.wait("""let p = document.getElementById("passwords-panel");
+          return p.getAttribute("view") == "otp-done" && document.getElementById("passwords-otp-code").textContent;""", timeout=10)
+        expected = now()
+        bob = b.js(PV + "return PasswordVault.getEntry(arguments[0]).otp?.issuer;", ids["bob"])
+        record(20, "Add gives bob the authenticator and shows its first code, to finish the site's setup",
+               r == expected[:3] + " " + expected[3:] and bob == "Example", {"code": r, "expected": expected, "issuer": bob})
+        b.js("document.getElementById('passwords-panel').hidePopup();")
+
+        load("/setup-carol", "setup-carol")
+        b.js("PasswordsUI.addAuthenticatorFromPage();")
+        r = b.wait("""let p = document.getElementById("passwords-panel");
+          let checked = p.querySelector("#passwords-otp-logins input:checked");
+          return p.getAttribute("view") == "otp" && checked && { value: checked.value,
+            username: document.getElementById("passwords-otp-username").value,
+            field: !document.getElementById("passwords-otp-new").hidden };""", timeout=20)
+        b.js("document.getElementById('passwords-otp-save').click();")
+        b.wait("return document.getElementById('passwords-panel').getAttribute('view') == 'otp-done';", timeout=10)
+        carol = b.js(PV + "let e = PasswordVault.find(arguments[0], 'carol'); return e && { otp: !!e.otp };", site)
+        b.js("document.getElementById('passwords-panel').hidePopup();")
+        record(20, "a QR code for an account with no login offers a new login with that username, and makes it",
+               r == {"value": "", "username": "carol", "field": True} and carol == {"otp": True}, {"panel": r, "carol": carol})
+
+        for path, expected_toast in [("/setup-link", "isn’t an authenticator"), ("/setup-none", "No QR code on screen")]:
+            b.js(SCREENSHOTS_TOAST_RESET)
+            load(path, path[1:])
+            b.js("PasswordsUI.addAuthenticatorFromPage();")
+            toast = b.wait("let t = document.getElementById('screenshots-toast'); return !t.hidden && t.textContent;", timeout=20)
+            record(20, f"{'a QR code that is a link' if 'link' in path else 'a page without a QR code'}: nothing is added, and a message says so",
+                   bool(toast) and expected_toast in toast and b.js("return document.getElementById('passwords-panel').state;") == "closed", toast)
+
+        # -- Export and import keep authenticators; moving a login keeps it.
+        r = b.js(PV + AUTH + """let expect = async () => (await totp(arguments[2], {})).code;
+        return (async () => {
+          let csv = await PasswordVault.exportCSV(arguments[0]);
+          let file = await PasswordVault.exportEncrypted(arguments[0], "export passphrase 1", "export passphrase 1");
+          for (let e of PasswordVault.entries()) await PasswordVault.removeEntry(e.id);
+          let back = await PasswordVault.readImport(file, "export passphrase 1");
+          await PasswordVault.applyImport(PasswordVault.planImport(back.logins));
+          let fromFile = PasswordVault.find(arguments[1], "ana");
+          let fileCode = (await PasswordVault.authenticatorCode(fromFile.id)).code == await expect();
+          for (let e of PasswordVault.entries()) await PasswordVault.removeEntry(e.id);
+          let fromCSV = await PasswordVault.readImport(new TextEncoder().encode(csv));
+          await PasswordVault.applyImport(PasswordVault.planImport(fromCSV.logins));
+          let ana = PasswordVault.find(arguments[1], "ana");
+          let csvCode = (await PasswordVault.authenticatorCode(ana.id)).code == await expect();
+          await PasswordVault.updateEntry(ana.id, { origin: arguments[1].replace("127.0.0.1", "localhost") });
+          let movedCode = (await PasswordVault.authenticatorCode(ana.id)).code == await expect();
+          return { csvHasLink: csv.includes("otpauth://totp/") && csv.includes(arguments[2]), fileCode, csvCode, movedCode,
+                   withOtp: PasswordVault.entries().filter(e => e.otp).length };
+        })();""", master, site, OTP_KEY)
+        record(20, "encrypted export and CSV export (as an otpauth:// link) carry authenticators through import",
+               bool(r) and r["csvHasLink"] and r["fileCode"] and r["csvCode"] and r["withOtp"] == 3, r)
+        record(20, "moving a login to another address keeps its authenticator", bool(r) and r["movedCode"], r)
+
+        r = b.js(PV + """return (async () => {
+          let ana = PasswordVault.entries().find(e => e.username == "ana");
+          await PasswordVault.removeAuthenticator(ana.id);
+          let gone; try { await PasswordVault.authenticatorCode(ana.id); } catch (e) { gone = e.code; }
+          return { otp: PasswordVault.getEntry(ana.id).otp, gone };
+        })();""")
+        record(20, "Remove takes the authenticator away", r == {"otp": None, "gone": "no-otp"}, r)
+    finally:
+        b.quit()
+        server.shutdown()
+        shutil.rmtree(work, ignore_errors=True)
+
+
+SCREENSHOTS_TOAST_RESET = "let t = document.getElementById('screenshots-toast'); t.hidden = true; t.textContent = '';"
+
+
+WEBAUTHN_PANEL = """let p = document.getElementById("webauthn-panel");
+return { state: p.state, kind: p.getAttribute("kind"), text: document.getElementById("webauthn-text").textContent,
+  note: !document.getElementById("webauthn-note").hidden, cancel: !document.getElementById("webauthn-cancel").hidden };"""
+
+
+def fido_device_present():
+    """Whether a security key is plugged in (a hidraw device with the FIDO
+    usage page): then the checks don't start requests that would reach it."""
+    for descriptor in Path("/sys/class/hidraw").glob("hidraw*/device/report_descriptor"):
+        try:
+            if b"\x06\xd0\xf1" in descriptor.read_bytes():
+                return True
+        except OSError:
+            continue
+    return False
+
+
+# Sends a prompt as Gecko's WebAuthn service does, for the selected tab.
+WEBAUTHN_SEND = """let [prompt, tid] = arguments;
+Services.obs.notifyObservers(null, "webauthn-prompt", JSON.stringify({
+  prompt, tid, origin: "https://example.com", browsingContextId: gBrowser.selectedBrowser.browsingContext.id }));"""
+
+
+def part21(bindir, base, shots):
+    """Security key prompts (passkeys and two-step verification on a USB
+    key): every prompt Gecko's WebAuthn service asks for, and what the
+    browser answers it; and, with no key plugged in, a site asking for a
+    passkey: "touch your security key" with Cancel, instead of waiting
+    silently."""
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True})
+    panel = lambda: b.js(WEBAUTHN_PANEL)
+    send = lambda prompt, tid: b.js(WEBAUTHN_SEND, prompt, tid)
+    calls = lambda: b.js("return window.__webauthnCalls.splice(0);")
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        # The service, replaced by a recorder: nothing reaches a real key.
+        b.js("""window.__webauthnCalls = [];
+          let record = name => (...args) => window.__webauthnCalls.push([name, ...args]);
+          Object.defineProperty(WebAuthnPrompts, "_service", { value: {
+            cancel: record("cancel"), pinCallback: record("pin"), selectionCallback: record("select"),
+            setHasAttestationConsent: record("consent") } });""")
+        shown = lambda: b.wait("let s = (() => {" + WEBAUTHN_PANEL + "})(); return s.state == 'open' && s.text && s;", timeout=10)
+
+        send({"type": "presence"}, 1)
+        r = shown()
+        record(21, "touch your security key: the site's name, a note on what works, and Cancel",
+               bool(r) and r["text"] == "Touch your security key to continue with example.com." and r["note"] and r["cancel"], r)
+        b.js("document.getElementById('webauthn-cancel').click();")
+        record(21, "Cancel cancels the request with the service, and closes", calls() == [["cancel", 1]] and panel()["state"] == "closed")
+
+        send({"type": "pin-required"}, 2)
+        r = shown()
+        b.js("""let pin = document.getElementById("webauthn-pin"); pin.value = "1234";
+          document.getElementById("webauthn-pin-form").requestSubmit();""")
+        c = calls()
+        record(21, "the key's PIN is asked for in the prompt, given to the service, and not kept",
+               bool(r) and r["text"] == "Please enter the PIN for your device." and c == [["pin", 2, "1234"]]
+               and b.js("return document.getElementById('webauthn-pin').value;") == "", {"prompt": r, "calls": c})
+
+        texts = {}
+        for retries in (2, 8):
+            send({"type": "pin-invalid", "retries": retries}, 3)
+            texts[retries] = shown()["text"]
+        b.js("document.getElementById('webauthn-cancel').click();")
+        calls()
+        record(21, "a wrong PIN says so; close to locking the key for good, with the attempts left",
+               texts[2].startswith("Incorrect PIN. You have 2 attempts left") and texts[8] == "Incorrect PIN. Try again.", texts)
+
+        send({"type": "select-sign-result", "entities": [{"name": "ana@example.com"}, {}]}, 4)
+        shown()
+        accounts = b.wait("let a = [...document.querySelectorAll('.webauthn-account')].map(b => b.textContent);"
+                          "return a.length == 2 && a[1] && a;", timeout=5)
+        b.js("document.querySelectorAll('.webauthn-account')[1].click();")
+        c = calls()
+        record(21, "several accounts on the key: one button each, and the one chosen goes to the service",
+               accounts == ["ana@example.com", "Unknown account"] and c == [["select", 4, 1]], {"accounts": accounts, "calls": c})
+
+        for button, answer in [("webauthn-allow", True), ("webauthn-block", False)]:
+            send({"type": "attestation-consent"}, 5)
+            r = shown()
+            b.js("document.getElementById(arguments[0]).click();", button)
+            c = calls()
+            record(21, f"a site asking which key it is: {'Allow' if answer else 'Block'} answers the service",
+                   bool(r) and "requesting extended information about your security key" in r["text"] and not r["cancel"]
+                   and c == [["consent", 5, answer]], {"prompt": r, "calls": c})
+
+        send({"type": "pin-auth-blocked"}, 6)
+        r = shown()
+        send({"type": "cancel"}, 6)
+        closed = b.wait("return document.getElementById('webauthn-panel').state == 'closed';", timeout=5)
+        record(21, "what went wrong is said, with Cancel; the service ending the request closes it",
+               bool(r) and "temporarily blocked" in r["text"] and r["cancel"] and bool(closed), r)
+
+        send({"type": "presence"}, 7)
+        shown()
+        b.js("""document.getElementById("webauthn-panel").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));""")
+        record(21, "Escape is Cancel", calls() == [["cancel", 7]] and panel()["state"] == "closed")
+
+        send({"type": "presence"}, 8)
+        shown()
+        b.js("window.__keyTab = gBrowser.selectedTab; gBrowser.selectTab(gBrowser.addTab('about:blank'));")
+        away = b.wait("return document.getElementById('webauthn-panel').state == 'closed';", timeout=5)
+        b.js("gBrowser.selectTab(window.__keyTab);")
+        back = b.wait("return document.getElementById('webauthn-panel').state == 'open';", timeout=5)
+        send({"type": "cancel"}, 8)
+        record(21, "a prompt hides in another tab and comes back with its own", bool(away) and bool(back),
+               {"away": away, "back": back})
+    finally:
+        b.quit()
+
+    # A real request, through Gecko: only with no key plugged in, so nothing
+    # reaches the user's own key.
+    if fido_device_present():
+        skip(21, "a site asking for a passkey shows the prompt, and Cancel refuses it to the page",
+             "a security key is plugged in; the checks don't use it")
+        return
+    work = tempfile.mkdtemp(prefix="wip-webauthn-")
+    certificate = make_certificate(work)
+    if not certificate:
+        record(21, "openssl makes the test server's certificate", False, "openssl not found or failed")
+        return
+    server, site = serve_https("127.0.0.1", certificate)
+    # WebAuthn refuses IP addresses as the site: localhost, on the same server.
+    site = site.replace("127.0.0.1", "localhost")
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True})
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js('Cc["@mozilla.org/security/certoverride;1"].getService(Ci.nsICertOverrideService)'
+             '.setDisableAllSecurityChecksAndLetAttackersInterceptMyData(true);')
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0], "
+             "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", site + "/passkey")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'passkey';", timeout=15)
+        b.m.click(100, 40)
+        r = b.wait("let s = (() => {" + WEBAUTHN_PANEL + "})(); return s.state == 'open' && s.text && s;", timeout=15)
+        if shots:
+            b.m.screenshot(str(Path(shots) / "webauthn-presence.png"))
+        b.js("document.getElementById('webauthn-cancel').click();")
+        title = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t.startsWith('error') && t;", timeout=15)
+        record(21, "a site asking for a passkey shows the prompt, and Cancel refuses it to the page",
+               bool(r) and r["kind"] == "presence" and r["text"] == "Touch your security key to continue with localhost."
+               and title == "error:NotAllowedError" and b.js(WEBAUTHN_PANEL)["state"] == "closed",
+               {"prompt": r, "title": title})
+        b.m.click(100, 100)
+        b.wait("return document.getElementById('webauthn-panel').state == 'open';", timeout=15)
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, 'about:blank', "
+             "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });")
+        r = b.wait("return document.getElementById('webauthn-panel').state == 'closed';", timeout=15)
+        record(21, "signing in asks the same, and leaving the page closes the prompt", bool(r))
+    finally:
+        b.quit()
+        server.shutdown()
+        shutil.rmtree(work, ignore_errors=True)
+
+
+PASSKEY_PANEL = """let p = document.getElementById("passkey-panel");
+let shown = el => !el.hidden && el.getClientRects().length > 0;
+return { state: p.state, view: p.getAttribute("view"), title: document.getElementById("passkey-title").textContent,
+  text: document.getElementById("passkey-text").textContent,
+  choices: [...p.querySelectorAll(".passkey-choice")].map(b => ({ text: b.textContent, disabled: b.disabled })),
+  error: shown(document.getElementById("passkey-error")) ? document.getElementById("passkey-error").textContent : "" };"""
+
+
+def part22(bindir, base, shots):
+    """Passkeys kept by the browser: made and used on a relying party's page
+    that verifies them as a server would; the choice between the browser and
+    a security key, each time; unlocking, setting up and verifying with the
+    master password; passkey autofill; private windows; about:passwords;
+    export and import."""
+    work = tempfile.mkdtemp(prefix="wip-passkeys-")
+    certificate = make_certificate(work)
+    if not certificate:
+        record(22, "openssl makes the test server's certificate", False, "openssl not found or failed")
+        return
+    server, site = serve_https("127.0.0.1", certificate)
+    site = site.replace("127.0.0.1", "localhost")
+    master = "correct horse battery"
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True})
+    panel = lambda: b.js(PASSKEY_PANEL)
+    title = lambda: b.js("return gBrowser.selectedBrowser.contentTitle;")
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js('Cc["@mozilla.org/security/certoverride;1"].getService(Ci.nsICertOverrideService)'
+             '.setDisableAllSecurityChecksAndLetAttackersInterceptMyData(true);')
+
+        def load(hash=""):
+            b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0], "
+                 "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", site + "/rp" + hash)
+            return b.wait("let t = gBrowser.selectedBrowser.contentTitle; return t != 'waiting' && t.startsWith(arguments[0]) && t;",
+                          "conditional" if hash else "rp", timeout=15)
+
+        def press(button):
+            y = {"create": 25, "again": 65, "get": 105, "allow": 145, "required": 185, "discouraged": 225}[button]
+            b.m.click(100, y)
+
+        def wait_panel(view="choose"):
+            return b.wait("let s = (() => {" + PASSKEY_PANEL + "})(); return s.state == 'open' && s.view == arguments[0] && s.title && s;",
+                          view, timeout=15)
+
+        def choose(text):
+            b.js("""let b = [...document.querySelectorAll(".passkey-choice")].find(b => b.textContent.includes(arguments[0]));
+              b.click();""", text)
+
+        def submit(*values):
+            b.js("""let [a, c] = arguments; document.getElementById("passkey-password").value = a;
+              if (c !== undefined) document.getElementById("passkey-confirm").value = c;
+              document.getElementById("passkey-form").requestSubmit();""", *values)
+
+        def result(prefix):
+            return b.wait("let t = gBrowser.selectedBrowser.contentTitle; return (t.startsWith(arguments[0]) || t.startsWith('error')) && t;",
+                          prefix, timeout=20)
+
+        load()
+        # -- Saving: the choice, then a vault set up on the way.
+        press("create")
+        r = wait_panel()
+        record(22, "adding a passkey asks where: in the browser, or on a security key",
+               bool(r) and r["title"] == "Save a passkey for localhost" and "ana@example.com" in r["text"]
+               and len(r["choices"]) == 2 and "Save in browser-wip" in r["choices"][0]["text"]
+               and "Use a security key" in r["choices"][1]["text"] and not r["choices"][0]["disabled"], r)
+        if shots:
+            b.m.screenshot(str(Path(shots) / "passkey-choose.png"))
+        choose("Save in browser-wip")
+        r = wait_panel("setup")
+        submit(master, "not the same password")
+        error = b.wait("let e = document.getElementById('passkey-error'); return !e.hidden && e.textContent;", timeout=5)
+        submit(master, master)
+        created = result("created")
+        record(22, "with no passwords yet, it sets up the master password first (and says when the two differ)",
+               bool(r) and r["title"] == "Keep passkeys in browser-wip" and error == "The two passwords aren’t the same."
+               and created and created.startswith("created"), {"panel": r, "error": error, "page": created})
+        record(22, "the site gets a platform passkey: ES256, discoverable (credProps), internal transport",
+               created == "created:platform:-7:true:internal", created)
+        r = b.js(PV + "return PasswordVault.passkeys().map(p => [p.rpId, p.userName, p.displayName]);")
+        hidden = b.js(PV + "return JSON.stringify(PasswordVault._index).includes('PRIVATE') || "
+                      "Object.keys(PasswordVault._index.passkeys[0]).includes('privateKey');")
+        record(22, "it's kept in the vault: the site and account in the index, the private key sealed apart",
+               r == [["localhost", "ana@example.com", "Ana"]] and hidden is False, {"passkeys": r, "keyInIndex": hidden})
+
+        # -- Signing in: the browser's passkey, verified by the site.
+        press("get")
+        r = wait_panel()
+        record(22, "signing in offers the browser's passkey for the site, and a security key",
+               bool(r) and r["title"] == "Sign in to localhost with a passkey" and len(r["choices"]) == 2
+               and "ana@example.com" in r["choices"][0]["text"] and "Use a security key" in r["choices"][1]["text"], r)
+        choose("ana@example.com")
+        signed = result("signed")
+        record(22, "the site verifies the signature with the key it registered: its challenge, its RP ID, the user",
+               signed == "signed:verified:uv:user:id:challenge:rp", signed)
+        press("allow")
+        wait_panel()
+        choose("ana@example.com")
+        record(22, "with the site naming the passkey (allowCredentials), the same", result("signed") == "signed:verified:uv:user:id:challenge:rp")
+
+        # -- The master password, when it's been a while.
+        b.js(PV + "PasswordVault._revealUntil = 0;")
+        press("required")
+        wait_panel()
+        choose("ana@example.com")
+        r = wait_panel("verify")
+        submit("wrong master password")
+        error = b.wait("let e = document.getElementById('passkey-error'); return !e.hidden && e.textContent;", timeout=5)
+        submit(master)
+        signed = result("signed")
+        record(22, "a site asking to verify the user gets the master password asked for again after 5 minutes",
+               bool(r) and r["title"] == "Confirm it’s you" and error == "That isn’t the master password."
+               and signed == "signed:verified:uv:user:id:challenge:rp", {"panel": r, "error": error, "page": signed})
+        b.js(PV + "PasswordVault._revealUntil = 0;")
+        press("discouraged")
+        wait_panel()
+        choose("ana@example.com")
+        signed = result("signed")
+        record(22, "a site that doesn't ask for it: no master password, and it's told the user wasn't verified",
+               signed == "signed:verified:no-uv:user:id:challenge:rp", signed)
+
+        # -- Locked: unlock, then the passkeys.
+        b.js(PV + "return PasswordVault.lock();")
+        press("get")
+        r = wait_panel()
+        choose("Use a passkey from browser-wip")
+        wait_panel("unlock")
+        submit(master)
+        r2 = wait_panel("choose")
+        choose("ana@example.com")
+        signed = result("signed")
+        record(22, "with the passwords locked, it offers to unlock them, then lists the passkeys",
+               bool(r) and "Unlock your passwords" in r["choices"][0]["text"] and bool(r2)
+               and "ana@example.com" in r2["choices"][0]["text"] and signed == "signed:verified:uv:user:id:challenge:rp",
+               {"locked": r, "unlocked": r2, "page": signed})
+
+        # -- The same account again: not twice in the browser.
+        press("again")
+        r = wait_panel()
+        b.js("document.getElementById('passkey-cancel').click();")
+        refused = result("error")
+        record(22, "an account that has a passkey here can't get a second one here; Cancel refuses it to the site",
+               bool(r) and r["choices"][0]["disabled"] and "already has a passkey" in r["choices"][0]["text"]
+               and not r["choices"][1]["disabled"] and refused == "error:NotAllowedError", {"panel": r, "page": refused})
+        press("get")
+        wait_panel()
+        b.js("""document.getElementById("passkey-panel").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));""")
+        record(22, "Escape refuses it too", result("error") == "error:NotAllowedError" and panel()["state"] == "closed")
+
+        # -- A security key: Gecko's service takes it over.
+        if fido_device_present():
+            skip(22, "Use a security key hands the request to Gecko (touch your key)", "a security key is plugged in; the checks don't use it")
+        else:
+            press("get")
+            wait_panel()
+            choose("Use a security key")
+            r = b.wait("let p = document.getElementById('webauthn-panel'); return p.state == 'open' && document.getElementById('webauthn-text').textContent;", timeout=15)
+            b.js("document.getElementById('webauthn-cancel').click();")
+            record(22, "Use a security key hands the request to Gecko (touch your key)",
+                   r == "Touch your security key to continue with localhost." and panel()["state"] == "closed"
+                   and result("error") == "error:NotAllowedError", r)
+
+        # -- Passkey autofill: the login field's dropdown.
+        # A new document (only the hash changing wouldn't load the page again).
+        r = load("?autofill#conditional")
+        b.m.click(400, 25)
+        rows = b.wait("let d = document.getElementById('passwords-dropdown'); return d.state == 'open' && "
+                      "[...d.querySelectorAll('.passwords-option')].map(o => o.textContent);", timeout=10)
+        b.js("[...document.querySelectorAll('#passwords-dropdown .passwords-option')].find(o => o.textContent.includes('Passkey')).click();")
+        signed = result("conditional-signed")
+        record(22, "on a login page waiting for a passkey, the login field's dropdown offers it, and picking it signs in",
+               r == "conditional:true" and bool(rows) and any("ana@example.com" in x and "Passkey · localhost" in x for x in rows)
+               and signed == "conditional-signed", {"page": r, "rows": rows, "after": signed})
+
+        # -- about:passwords lists it, and deletes it.
+        b.js("gBrowser.selectTab(gBrowser.addTab('about:passwords', { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));")
+        P = "let doc = gBrowser.selectedBrowser.contentDocument;"
+        r = b.wait(P + """let row = doc?.querySelector("#list .row[data-id^='pk:']");
+          return row && { group: doc.querySelector(".list-group")?.textContent, row: row.textContent };""", timeout=15)
+        b.js(P + "doc.querySelector(\"#list .row[data-id^='pk:']\").click();")
+        detail = b.wait(P + "let t = doc.querySelector('#detail .detail-title')?.textContent; return t == 'localhost' && doc.getElementById('detail').textContent;", timeout=10)
+        record(22, "about:passwords lists passkeys after the logins, with their site and account",
+               bool(r) and r["group"] == "Passkeys (1)" and "ana@example.com" in r["row"] and bool(detail)
+               and "Passkey" in detail and "Last used" in detail, {"list": r, "detail": detail})
+
+        # -- Export and import carry passkeys; signing in still works after.
+        r = b.js(PV + """return (async () => {
+          let file = await PasswordVault.exportEncrypted(arguments[0], "export passphrase 1", "export passphrase 1");
+          let id = PasswordVault.passkeys()[0].id;
+          await PasswordVault.removePasskey(id);
+          let back = await PasswordVault.readImport(file, "export passphrase 1");
+          let count = await PasswordVault.applyImport(PasswordVault.planImport(back.logins, back.passkeys));
+          return { count, passkeys: PasswordVault.passkeys().length };
+        })();""", master)
+        b.js("gBrowser.removeTab(gBrowser.selectedTab);")
+        load()
+        press("get")
+        wait_panel()
+        choose("ana@example.com")
+        signed = result("signed")
+        record(22, "an encrypted export carries passkeys; imported, the site still verifies the sign-in",
+               r == {"count": 1, "passkeys": 1} and signed == "signed:verified:uv:user:id:challenge:rp", {"import": r, "page": signed})
+
+        b.js("gBrowser.selectTab(gBrowser.addTab('about:passwords', { triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() }));")
+        b.wait(P + "return doc?.querySelector(\"#list .row[data-id^='pk:']\");", timeout=15)
+        b.js(P + "doc.querySelector(\"#list .row[data-id^='pk:']\").click();")
+        b.wait(P + "return doc.querySelector('#detail .detail-title')?.textContent == 'localhost';", timeout=10)
+        b.js(P + "[...doc.querySelectorAll('#detail button')].find(x => x.textContent == 'Delete').click();")
+        b.wait(P + "return doc.querySelector('.confirm-box button.danger');", timeout=5)
+        b.js(P + "doc.querySelector('.confirm-box button.danger').click();")
+        gone = b.wait(PV + "return PasswordVault.passkeys().length == 0;", timeout=10)
+        b.js("gBrowser.removeTab(gBrowser.selectedTab);")
+        load()
+        if fido_device_present():
+            # Signing in now goes to a security key directly: not here.
+            record(22, "Delete in about:passwords deletes the passkey", bool(gone))
+        else:
+            press("get")
+            r = b.wait("return document.getElementById('webauthn-panel').state == 'open';", timeout=15)
+            b.js("document.getElementById('webauthn-cancel').click();")
+            record(22, "Delete deletes it; with no passkey here for the site, signing in goes to a security key at once",
+                   bool(gone) and bool(r) and panel()["state"] == "closed", {"gone": gone, "securityKey": r})
+    finally:
+        b.quit()
+
+    # A security key, chosen instead: Gecko's service takes the request
+    # over. Here Gecko's software authenticator stands in for the key (no
+    # USB device is used), so the whole way through is checked.
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True,
+                               "security.webauth.webauthn_enable_softtoken": True,
+                               "security.webauth.webauthn_enable_usbtoken": False})
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js('Cc["@mozilla.org/security/certoverride;1"].getService(Ci.nsICertOverrideService)'
+             '.setDisableAllSecurityChecksAndLetAttackersInterceptMyData(true);')
+        b.js("""Cc["@mozilla.org/webauthn/service;1"].getService(Ci.nsIWebAuthnService)
+          .addVirtualAuthenticator("ctap2_1", "usb", true, true, true, true);""")
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0], "
+             "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", site + "/rp")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'rp';", timeout=15)
+        b.m.click(100, 25)
+        b.wait("let s = (() => {" + PASSKEY_PANEL + "})(); return s.state == 'open' && s.choices.length;", timeout=15)
+        b.js("""[...document.querySelectorAll(".passkey-choice")].find(b => b.textContent.includes("Use a security key")).click();""")
+        created = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return (t.startsWith('created') || t.startsWith('error')) && t;", timeout=20)
+        kept = b.js(PV + "return PasswordVault.state == 'unlocked' ? PasswordVault.passkeys().length : 0;")
+        b.m.click(100, 105)
+        r = b.wait("let s = (() => {" + PASSKEY_PANEL + "})(); return s.state == 'open' && s.choices.length && s;", timeout=10)
+        if r:
+            b.js("""[...document.querySelectorAll(".passkey-choice")].find(b => b.textContent.includes("Use a security key")).click();""")
+        signed = b.wait("let t = gBrowser.selectedBrowser.contentTitle; return (t.startsWith('signed') || t.startsWith('error')) && t;", timeout=20)
+        record(22, "choosing a security key instead: the key makes the passkey (not the browser), and signs in with it",
+               bool(created) and created.startswith("created:cross-platform:-7") and kept == 0
+               and signed == "signed:verified:uv:user:id:challenge:rp", {"created": created, "keptHere": kept, "signed": signed})
+    finally:
+        b.quit()
+
+    # A private window: passkeys aren't made there.
+    b = Browser(bindir, prefs={"browserwip.firstrun.completed": True, "browser.privatebrowsing.autostart": True})
+    try:
+        b.wait("return gBrowser?.selectedTab && document.readyState == 'complete';")
+        b.js('Cc["@mozilla.org/security/certoverride;1"].getService(Ci.nsICertOverrideService)'
+             '.setDisableAllSecurityChecksAndLetAttackersInterceptMyData(true);')
+        b.js("gBrowser.loadURL(gBrowser.selectedBrowser, arguments[0], "
+             "{ triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() });", site + "/rp")
+        b.wait("return gBrowser.selectedBrowser.contentTitle == 'rp';", timeout=15)
+        b.m.click(100, 25)
+        r = b.wait("let s = (() => {" + PASSKEY_PANEL + "})(); return s.state == 'open' && s.choices.length && s;", timeout=15)
+        b.js("document.getElementById('passkey-cancel').click();")
+        record(22, "in a private window the browser doesn't keep passkeys (a security key still works)",
+               bool(r) and r["choices"][0]["disabled"] and "Not in private windows" in r["choices"][0]["text"]
+               and not r["choices"][1]["disabled"], r)
+    finally:
+        b.quit()
+        server.shutdown()
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def part13(bindir, base, shots):
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), CacheHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -4689,8 +5644,8 @@ def preflight(parts):
     if linux and 11 in parts:
         for tool in ("dbus-daemon", "dbus-send", "secret-tool"):
             need[tool] = "part 11 (system keyring)"
-    if sys.platform != "win32" and (8 in parts or 12 in parts):
-        need["openssl"] = "parts 8 and 12 (HTTPS test servers)"
+    if sys.platform != "win32" and (8 in parts or 12 in parts or 20 in parts or 21 in parts or 22 in parts):
+        need["openssl"] = "parts 8, 12, 20, 21 and 22 (HTTPS test servers)"
     missing = [f"{tool} — {why}" for tool, why in need.items() if not shutil.which(tool)]
     if linux and 11 in parts and not keyring_daemon()[0]:
         missing.append("gnome-keyring-daemon — part 11 (system keyring)")
@@ -4740,7 +5695,11 @@ def main():
              15: lambda: part15(args.bindir, base, args.shots),
              16: lambda: part16(args.bindir, base, args.shots),
              17: lambda: part17(args.bindir, base, args.shots),
-             18: lambda: part18(args.bindir, base, args.shots)}
+             18: lambda: part18(args.bindir, base, args.shots),
+             19: lambda: part19(args.bindir, base, args.shots),
+             20: lambda: part20(args.bindir, base, args.shots),
+             21: lambda: part21(args.bindir, base, args.shots),
+             22: lambda: part22(args.bindir, base, args.shots)}
     for p in args.part:
         try:
             parts[p]()

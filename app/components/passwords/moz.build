@@ -3,6 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 EXTRA_JS_MODULES.browserwip += [
+    "Authenticator.sys.mjs",
     "AuthPrompt.sys.mjs",
     "LoginManagerStubChild.sys.mjs",
     "LoginManagerStubParent.sys.mjs",

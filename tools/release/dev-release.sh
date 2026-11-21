@@ -4,8 +4,8 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #
 # Builds browser-wip here, on this machine, packages it for Linux, and
-# publishes the packages as a GitHub pre-release: a dev build of the pushed
-# commit, never marked stable or latest. Nothing runs on GitHub Actions.
+# publishes the packages as a GitHub release: a dev build of the pushed
+# commit, marked neither pre-release nor latest. Nothing runs on GitHub Actions.
 #
 #   tools/release/dev-release.sh              build, package, check, publish
 #   tools/release/dev-release.sh --dry-run    all but publishing; the working
@@ -343,7 +343,7 @@ fi
 # ---------------------------------------------------------------------------
 # Publish
 
-gh release create "$tag" --repo "$github" --target "$sha" --prerelease --latest=false \
+gh release create "$tag" --repo "$github" --target "$sha" --latest=false \
   --title "Dev build $(date -u -d "@$epoch" +%Y-%m-%d) ($short): $headline" --notes-file "$out/notes.md" \
   "$out/$base".* "$out/PKGBUILD" "$out/SRCINFO" "$out/SHA256SUMS"
 
@@ -351,4 +351,4 @@ gh release create "$tag" --repo "$github" --target "$sha" --prerelease --latest=
 mkdir "$work/served"
 gh release download "$tag" --repo "$github" --dir "$work/served"
 (cd "$work/served" && sha256sum --quiet -c SHA256SUMS) || die "the files GitHub serves don't match SHA256SUMS"
-say "published https://github.com/$github/releases/tag/$tag (pre-release); the files GitHub serves match SHA256SUMS"
+say "published https://github.com/$github/releases/tag/$tag; the files GitHub serves match SHA256SUMS"

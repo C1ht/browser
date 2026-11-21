@@ -130,6 +130,8 @@ app-menu-print =
     .label = Print…
 app-menu-translate =
     .label = Translate page…
+app-menu-screenshot =
+    .label = Take screenshot
 app-menu-settings =
     .label = Settings
 app-menu-quit =
@@ -219,6 +221,10 @@ context-selectall =
     .label = Select all
 context-savepage =
     .label = Save page as…
+context-add-authenticator =
+    .label = Add authenticator from QR code
+context-screenshot =
+    .label = Take screenshot
 context-viewsource =
     .label = View page source
 context-inspect =
@@ -392,6 +398,79 @@ translations-translate = Translate
 translations-try-again = Try again
 translations-not-now = Not now
 translations-show-original = Show original
+
+## Security key prompts (webauthn.js); the rest of their text is toolkit's
+## (toolkit/webauthnDialog.ftl).
+
+webauthn-pin-placeholder =
+    .placeholder = PIN
+webauthn-pin-submit = OK
+webauthn-note = Plug in your security key, such as a YubiKey, then touch it.
+
+## Passkeys (passkeys.js). $host (String): the site, e.g. "github.com";
+## $account (String): the account's name on it.
+
+passkey-create-title = Save a passkey for { $host }
+passkey-create-account = For { $account }. Where should it go?
+passkey-create-text = Where should it go?
+passkey-get-title = Sign in to { $host } with a passkey
+passkey-get-text = Choose a passkey.
+passkey-get-none = { -brand-short-name } has no passkeys for { $host }. Use a security key, or cancel.
+passkey-save-here = Save in { -brand-short-name }
+passkey-save-here-note = Encrypted with your passwords, on this device
+passkey-cannot-private = Not in private windows
+passkey-cannot-algorithm = { $host } asks for a kind of passkey { -brand-short-name } can’t make
+passkey-cannot-exists = This account already has a passkey in { -brand-short-name }
+passkey-saved-here = Saved in { -brand-short-name }
+passkey-no-name = Passkey (no account name)
+passkey-use-here = Use a passkey from { -brand-short-name }
+passkey-use-here-locked = Unlock your passwords to see them
+passkey-security-key = Use a security key
+passkey-security-key-note = A USB key, such as a YubiKey
+passkey-unlock-title = Unlock your passwords
+passkey-unlock-text = Passkeys are kept with your passwords. Enter your master password to use them on { $host }.
+passkey-unlock = Unlock
+passkey-verify-title = Confirm it’s you
+passkey-verify-text = { $host } asks to make sure it’s you. Enter your master password.
+passkey-continue = Continue
+passkey-setup-title = Keep passkeys in { -brand-short-name }
+passkey-setup-text = Passkeys are kept with your passwords, encrypted under a master password. Choose one; you’ll need it to use them.
+passkey-setup-create = Create
+passkey-master-password =
+    .placeholder = Master password
+passkey-master-confirm =
+    .placeholder = Master password again
+passkey-wrong-password = That isn’t the master password.
+passkey-too-short = Use at least 12 characters.
+passkey-mismatch = The two passwords aren’t the same.
+passkey-error = Something went wrong. Try again, or use a security key.
+passkey-cancel = Cancel
+
+## Screenshots (screenshots.js)
+
+screenshots-overlay =
+    .aria-label = Take a screenshot
+screenshots-hint = Drag to select an area, or click an element. Esc to cancel.
+screenshots-save-visible = Save visible
+screenshots-save-full = Save full page
+screenshots-close =
+    .title = Close
+    .aria-label = Close
+screenshots-cancel = Cancel
+screenshots-retry = Start over
+screenshots-copy = Copy
+screenshots-download = Download
+screenshots-cropped = The page is too long for one image, so the screenshot stops partway down.
+screenshots-copied = Screenshot copied
+screenshots-copied-cropped = Screenshot copied. The page was too long, so it stops partway down.
+# $name (String): the file's name
+screenshots-saved = Screenshot saved: { $name }
+screenshots-failed = Couldn’t take the screenshot
+screenshots-unavailable = Screenshots can’t be taken of this page
+screenshots-picker-title = Save screenshot
+# The start of a screenshot's file name; the page's title follows.
+# $stamp (String): the date and time, e.g. "2026-11-21 at 14-03-22"
+screenshots-file-name = Screenshot { $stamp }
 
 ## Fullscreen pages
 

@@ -1,0 +1,6 @@
+jsQR 1.4.0 (https://github.com/cozmo/jsQR), Apache License 2.0 (LICENSE).
+dist/jsQR.js from the npm package, unchanged:
+  https://registry.npmjs.org/jsqr/-/jsqr-1.4.0.tgz
+  integrity sha512-dxLob7q65Xg2DvstYkRpkYtmKm2sPJ9oFhrhmudT1dZvNFFTlroai3AWSpLey/w5vMcLBXRgOJsbXpdN9HzU/A==
+Used by app/base/content/qr-worker.js to read authenticator QR codes from
+the page on screen (docs/PASSWORDS.md §19). No network, DOM or eval in it.

@@ -218,6 +218,9 @@ var BrowserContextMenu = {
       case "context-copyimage-link":
         this._copy(data.imageURL);
         break;
+      case "context-add-authenticator":
+        PasswordsUI.addAuthenticatorFromPage(browser);
+        break;
       case "context-saveimage":
         this._save(data.imageURL, "SaveImageTitle");
         break;
@@ -267,6 +270,9 @@ var BrowserContextMenu = {
         break;
       case "context-savepage":
         ContentAreaUtilsScope.saveBrowser(browser);
+        break;
+      case "context-screenshot":
+        Screenshots.toggle();
         break;
       case "context-viewsource":
         gBrowser.addTab("view-source:" + browser.currentURI.spec, { opener: gBrowser.selectedTab });

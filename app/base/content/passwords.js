@@ -26,6 +26,8 @@ const PasswordsLazy = {};
 ChromeUtils.defineESModuleGetters(PasswordsLazy, {
   PasswordVault: "resource://gre/modules/browserwip/PasswordVault.sys.mjs",
   PrivacyModes: "resource://gre/modules/browserwip/PrivacyModes.sys.mjs",
+  formatCode: "resource://gre/modules/browserwip/Authenticator.sys.mjs",
+  parseAuthenticator: "resource://gre/modules/browserwip/Authenticator.sys.mjs",
 });
 
 const PASSWORDS_URL = "about:passwords";
@@ -120,6 +122,16 @@ var PasswordsUI = {
 
     // Site and intro
     $("passwords-site-manage").addEventListener("click", () => this.openManager());
+    $("passwords-site-qr").addEventListener("click", () => this.addAuthenticatorFromPage());
+    $("passwords-otp-cancel").addEventListener("click", () => this.panel.hidePopup());
+    $("passwords-otp-save").addEventListener("click", () => this._saveAuthenticator());
+    $("passwords-otp-copy").addEventListener("click", async () => {
+      let id = this._otpDone?.entryId;
+      if (id) {
+        await PasswordsLazy.PasswordVault.copyAuthenticatorCode(id).catch(() => {});
+        this.window.document.l10n.setAttributes($("passwords-otp-copy"), "passwords-copied");
+      }
+    });
     $("passwords-site-lock").addEventListener("click", () => {
       this.panel.hidePopup();
       PasswordsLazy.PasswordVault.lock();
@@ -390,6 +402,9 @@ var PasswordsUI = {
       }
     }
     this._view = null;
+    this._otpPending = null;
+    this._otpDone = null;
+    clearInterval(this._otpTimer);
     this._clearSecrets();
   },
 
@@ -501,6 +516,16 @@ var PasswordsUI = {
       case "site":
         this._fillSiteView(browser);
         break;
+      case "otp":
+        this._fillAuthenticatorView();
+        break;
+      case "otp-done":
+        doc.l10n.setAttributes(this.title, "passwords-otp-done-title");
+        this.text.hidden = true;
+        doc.l10n.setAttributes($("passwords-otp-copy"), "passwords-otp-copy");
+        this._tickAuthenticator();
+        this._focusSoon($("passwords-otp-copy"));
+        break;
       case "intro":
         doc.l10n.setAttributes(this.title, "passwords-site-intro-title");
         doc.l10n.setAttributes(this.text, "passwords-site-intro");
@@ -579,6 +604,28 @@ var PasswordsUI = {
     where.textContent = passwordsHostOf(entry.origin);
     text.append(name, where);
     row.append(text);
+    // Its authenticator's code, to read or copy (§19).
+    if (entry.otp) {
+      let code = doc.createElement("span");
+      code.className = "passwords-site-code mono";
+      let copyCode = doc.createElement("button");
+      copyCode.className = "passwords-icon-button";
+      doc.l10n.setAttributes(copyCode, "passwords-copy-code");
+      let icon = doc.createElement("img");
+      icon.className = "icon";
+      icon.src = "chrome://browser-wip/skin/icons/authenticator.svg";
+      icon.alt = "";
+      copyCode.append(icon);
+      copyCode.addEventListener("click", async () => {
+        await vault.copyAuthenticatorCode(entry.id).catch(() => {});
+        doc.l10n.setAttributes(copyCode, "passwords-copied");
+      });
+      vault
+        .authenticatorCode(entry.id)
+        .then(now => (code.textContent = PasswordsLazy.formatCode(now.code)))
+        .catch(() => {});
+      row.append(code, copyCode);
+    }
     if (entry.username) {
       let copy = doc.createElement("button");
       copy.className = "passwords-icon-button";
@@ -779,6 +826,10 @@ var PasswordsUI = {
     let purpose = this._unlockPurpose;
     let resume = this._resume;
     this._resume = null;
+    if (this._otpPending) {
+      this._showView("otp");
+      return;
+    }
     if (purpose == "save" && this._pendingFor(gBrowser.selectedBrowser)) {
       // The login was captured while locked: now it can be compared.
       let browser = gBrowser.selectedBrowser;
@@ -800,6 +851,201 @@ var PasswordsUI = {
     } else {
       this._showView("site");
     }
+  },
+
+  // -----------------------------------------------------------------------
+  // Authenticators from a QR code on the page (§19)
+
+  /**
+   * Reads the QR code on the page on screen and, if it's an authenticator's
+   * (otpauth://totp/), asks which of the site's logins it's for. The page is
+   * captured here, in the browser; it can't tell.
+   */
+  async addAuthenticatorFromPage(browser = gBrowser.selectedBrowser) {
+    let origin = this._siteOrigin(browser);
+    if (!origin || !origin.startsWith("https://")) {
+      Screenshots.toast("passwords-qr-https");
+      return;
+    }
+    let text;
+    try {
+      text = await this._readQRCode(browser);
+    } catch (e) {
+      console.error("browser-wip: reading the QR code failed", e);
+    }
+    if (browser != gBrowser.selectedBrowser) {
+      return;
+    }
+    if (!text) {
+      Screenshots.toast("passwords-qr-none");
+      return;
+    }
+    let parsed;
+    try {
+      parsed = PasswordsLazy.parseAuthenticator(text);
+    } catch (e) {
+      Screenshots.toast(e.code == "otp-counter" ? "passwords-qr-counter" : "passwords-qr-not-authenticator");
+      return;
+    }
+    this._otpPending = { browser, origin, input: text, settings: parsed.settings };
+    let vault = PasswordsLazy.PasswordVault;
+    await vault.init().catch(() => {});
+    this._resume = null;
+    if (vault.state == "locked") {
+      this._showView("unlock", { purpose: "general" });
+    } else if (vault.state == "none") {
+      this._showView("setup");
+    } else {
+      this._showView("otp");
+    }
+    // _showView may have changed nothing about the panel being closed.
+    let pending = this._otpPending;
+    if (this.panel.state == "closed" || this.panel.state == "hiding") {
+      this.button.hidden = false;
+      this.button.setAttribute("open", "true");
+      this.panel.openPopup(this.button, "bottomright topright", 0, 4);
+      // Opening the panel doesn't clear what's being added.
+      this._otpPending = pending;
+    }
+  },
+
+  // The visible part of the page, as pixels, read by jsQR in a worker.
+  async _readQRCode(browser) {
+    let scale = this.window.devicePixelRatio || 1;
+    let bitmap = await browser.browsingContext.currentWindowGlobal.drawSnapshot(null, scale, "rgb(255,255,255)");
+    let canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    let context = canvas.getContext("2d");
+    context.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    let { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
+    let worker = new Worker("chrome://browser-wip/content/qr-worker.js");
+    try {
+      return await new Promise((resolve, reject) => {
+        worker.onmessage = e => resolve(e.data);
+        worker.onerror = e => reject(new Error(e.message));
+        worker.postMessage({ pixels: data, width, height }, [data.buffer]);
+      });
+    } finally {
+      worker.terminate();
+    }
+  },
+
+  // Which login: the site's logins (the one with the QR code's account name
+  // first), or a new one.
+  _fillAuthenticatorView() {
+    let $ = this.$;
+    let doc = this.window.document;
+    let vault = PasswordsLazy.PasswordVault;
+    let { origin, settings } = this._otpPending;
+    doc.l10n.setAttributes(this.title, "passwords-otp-title", { host: passwordsHostOf(origin) });
+    let label = [settings.issuer, settings.account].filter(Boolean).join(" · ");
+    doc.l10n.setAttributes(this.text, label ? "passwords-otp-text-label" : "passwords-otp-text", { label });
+    let { exact, sameSite } = vault.matchSite(origin);
+    let entries = [...exact, ...sameSite];
+    // The login the QR code names; with no name, the site's first login;
+    // a name no login has is a new login.
+    let preferred = settings.account
+      ? entries.find(e => e.username.toLowerCase() == settings.account.toLowerCase())
+      : entries[0];
+    let list = $("passwords-otp-logins");
+    let radio = (value, primary, secondary, checked) => {
+      let row = doc.createElement("label");
+      row.className = "passwords-otp-login";
+      let input = doc.createElement("input");
+      input.type = "radio";
+      input.name = "passwords-otp-login";
+      input.value = value;
+      input.checked = checked;
+      input.addEventListener("change", () => this._syncAuthenticatorView());
+      let text = doc.createElement("span");
+      text.className = "passwords-option-text";
+      for (let [part, cls] of [[primary, "passwords-option-primary"], [secondary, "passwords-option-secondary"]]) {
+        let span = doc.createElement("span");
+        span.className = cls;
+        if (part.l10n) {
+          doc.l10n.setAttributes(span, part.l10n, part.args);
+        } else {
+          span.textContent = part.text;
+        }
+        text.append(span);
+      }
+      row.append(input, text);
+      return row;
+    };
+    list.replaceChildren(
+      ...entries.map(entry =>
+        radio(
+          entry.id,
+          entry.username ? { text: entry.username } : { l10n: "passwords-dropdown-no-username" },
+          entry.otp
+            ? { l10n: "passwords-otp-replaces", args: { host: passwordsHostOf(entry.origin) } }
+            : { text: passwordsHostOf(entry.origin) },
+          entry == preferred
+        )
+      ),
+      radio("", { l10n: "passwords-otp-new-login" }, { text: passwordsHostOf(origin) }, !preferred)
+    );
+    $("passwords-otp-username").value = settings.account;
+    $("passwords-otp-error").hidden = true;
+    $("passwords-otp-save").disabled = false;
+    this._syncAuthenticatorView();
+    this._focusSoon($("passwords-otp-save"));
+  },
+
+  _syncAuthenticatorView() {
+    let chosen = this.$("passwords-otp-logins").querySelector("input:checked");
+    this.$("passwords-otp-new").hidden = !!chosen?.value;
+  },
+
+  async _saveAuthenticator() {
+    let $ = this.$;
+    let pending = this._otpPending;
+    if (!pending) {
+      return;
+    }
+    let vault = PasswordsLazy.PasswordVault;
+    let save = $("passwords-otp-save");
+    save.disabled = true;
+    let entryId = $("passwords-otp-logins").querySelector("input:checked")?.value;
+    try {
+      if (!entryId) {
+        // A new login with this username; its password can be added later.
+        let username = $("passwords-otp-username").value;
+        entryId = vault.find(pending.origin, username)?.id;
+        entryId ??= await vault.saveLogin({ origin: pending.origin, username, password: "" });
+      }
+      await vault.setAuthenticator(entryId, pending.input);
+    } catch (e) {
+      save.disabled = false;
+      this.window.document.l10n.setAttributes($("passwords-otp-error"), "passwords-otp-save-failed");
+      $("passwords-otp-error").hidden = false;
+      return;
+    }
+    this._otpPending = null;
+    this._otpDone = { entryId };
+    this._showView("otp-done");
+  },
+
+  // The new authenticator's code, as it changes, while the panel shows it.
+  async _tickAuthenticator() {
+    clearInterval(this._otpTimer);
+    let doc = this.window.document;
+    let update = async () => {
+      let id = this._otpDone?.entryId;
+      if (!id || this._view != "otp-done") {
+        clearInterval(this._otpTimer);
+        return;
+      }
+      try {
+        let { code, remaining } = await PasswordsLazy.PasswordVault.authenticatorCode(id);
+        this.$("passwords-otp-code").textContent = PasswordsLazy.formatCode(code);
+        doc.l10n.setAttributes(this.$("passwords-otp-left"), "passwords-otp-left", { seconds: remaining });
+      } catch (e) {
+        clearInterval(this._otpTimer);
+      }
+    };
+    await update();
+    this._otpTimer = setInterval(update, 1000);
   },
 
   async _setup() {
@@ -852,7 +1098,9 @@ var PasswordsUI = {
   },
 
   async _afterSetup() {
-    if (this._pendingFor(gBrowser.selectedBrowser)) {
+    if (this._otpPending) {
+      this._showView("otp");
+    } else if (this._pendingFor(gBrowser.selectedBrowser)) {
       this._view = "save";
       await this._save();
     } else {
@@ -951,7 +1199,50 @@ var PasswordsUI = {
         this._option("key.svg", { l10n: "passwords-dropdown-locked" }, { l10n: "passwords-dropdown-unlock" }),
         () => this._unlockFromDropdown(browser, actor, request)
       );
+    } else if (vault.state == "unlocked" && request.kind == "one-time-code") {
+      // The codes of this site's logins with an authenticator.
+      for (let entry of vault.authenticatorsFor(request.origin)) {
+        let code;
+        try {
+          ({ code } = await vault.authenticatorCode(entry.id));
+        } catch (e) {
+          continue;
+        }
+        let who = entry.username || entry.otp.account;
+        add(
+          this._option(
+            "authenticator.svg",
+            { text: PasswordsLazy.formatCode(code), mono: true },
+            { l10n: "passwords-dropdown-code", args: { who: who || passwordsHostOf(entry.origin), host: passwordsHostOf(entry.origin) } }
+          ),
+          () => this._fillCode(actor, entry.id)
+        );
+      }
+      if (browser != gBrowser.selectedBrowser) {
+        return;
+      }
     } else if (vault.state == "unlocked") {
+      // Passkey autofill: the site waits for a passkey (§20); the browser's
+      // passkeys for it come first.
+      let conditional = request.kind != "new-password" && Passkeys.conditionalFor(actor.browsingContext?.id);
+      if (conditional) {
+        for (let passkey of Passkeys.candidates(conditional)) {
+          add(
+            this._option(
+              "passkey.svg",
+              passkey.userName ? { text: passkey.userName } : { l10n: "passkey-no-name" },
+              { l10n: "passwords-dropdown-passkey", args: { host: conditional.details.rpId } }
+            ),
+            () => {
+              this.closeDropdown();
+              PasskeyPrompts.useFromDropdown(conditional, passkey.id);
+            }
+          );
+        }
+        if (body.childElementCount) {
+          add(this._separator());
+        }
+      }
       let { exact, sameSite } = vault.match(request.origin);
       let typed = request.kind == "username" ? (request.value ?? "").toLowerCase() : "";
       if (typed) {
@@ -1184,6 +1475,15 @@ var PasswordsUI = {
       await actor.fill(entryId);
     } catch (e) {
       console.error("browser-wip: filling a login failed", e.code ?? e.name);
+    }
+  },
+
+  async _fillCode(actor, entryId) {
+    this.closeDropdown();
+    try {
+      await actor.fillCode(entryId);
+    } catch (e) {
+      console.error("browser-wip: filling a code failed", e.code ?? e.name);
     }
   },
 

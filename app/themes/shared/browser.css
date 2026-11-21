@@ -2001,6 +2001,8 @@ menupopup.wip-menu menuseparator {
 #passwords-panel[view="setup"] #passwords-setup-view,
 #passwords-panel[view="recovery"] #passwords-recovery-view,
 #passwords-panel[view="site"] #passwords-site-view,
+#passwords-panel[view="otp"] #passwords-otp-view,
+#passwords-panel[view="otp-done"] #passwords-otp-done-view,
 #passwords-panel[view="intro"] #passwords-intro-view {
   display: flex;
   flex-direction: column;
@@ -2334,6 +2336,23 @@ panel.passwords-dropdown {
   white-space: nowrap;
 }
 
+.passwords-option-primary.mono,
+.passwords-site-code {
+  font-family: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.passwords-option-primary.mono {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.passwords-site-code {
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .passwords-option-secondary.mono {
   font-family: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
   letter-spacing: 0.02em;
@@ -2655,4 +2674,356 @@ select.panel-input {
 #bookmarks-bar-overflow {
   width: 28px;
   height: 26px;
+}
+
+/* ---------- Screenshots (screenshots.js) ---------- */
+
+/* Its parts are shown and hidden with the hidden attribute. */
+#screenshots-overlay [hidden] {
+  display: none !important;
+}
+
+/* Over the selected page's cell of its .browserStack. */
+#screenshots-overlay {
+  grid-area: 1 / 1;
+  z-index: 2;
+  position: relative;
+  overflow: hidden;
+  cursor: crosshair;
+  outline: none;
+  font: 13px/1.4 var(--font-ui);
+  user-select: none;
+}
+
+.screenshots-dim {
+  position: absolute;
+  inset: 0;
+  background-color: rgb(0 0 0 / 0.35);
+}
+
+.screenshots-hover {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed #FFFFFF;
+  outline: 1px solid rgb(0 0 0 / 0.45);
+  background-color: rgb(255 255 255 / 0.12);
+  pointer-events: none;
+}
+
+/* The selected area: the rest of the page is dimmed around it. */
+.screenshots-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed #FFFFFF;
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.45);
+  cursor: move;
+}
+
+#screenshots-overlay[state="choosing"] .screenshots-box {
+  cursor: crosshair;
+}
+
+.screenshots-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -7px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 0.3);
+  background-color: #FFFFFF;
+}
+
+#screenshots-overlay[state="choosing"] .screenshots-handle,
+#screenshots-overlay[state="choosing"] .screenshots-size {
+  display: none;
+}
+
+.screenshots-handle.n { top: 0; left: 50%; cursor: ns-resize; }
+.screenshots-handle.s { top: 100%; left: 50%; cursor: ns-resize; }
+.screenshots-handle.e { top: 50%; left: 100%; cursor: ew-resize; }
+.screenshots-handle.w { top: 50%; left: 0; cursor: ew-resize; }
+.screenshots-handle.nw { top: 0; left: 0; cursor: nwse-resize; }
+.screenshots-handle.se { top: 100%; left: 100%; cursor: nwse-resize; }
+.screenshots-handle.ne { top: 0; left: 100%; cursor: nesw-resize; }
+.screenshots-handle.sw { top: 100%; left: 0; cursor: nesw-resize; }
+
+.screenshots-size {
+  position: absolute;
+  left: -2px;
+  bottom: calc(100% + 6px);
+  padding: 2px 6px;
+  border-radius: 6px;
+  background-color: rgb(0 0 0 / 0.7);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Floating bars and the preview, in the panels' style. */
+.screenshots-bar,
+.screenshots-actions,
+.screenshots-preview {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  background-color: var(--panel-bg);
+  color: var(--chrome-fg);
+  box-shadow: var(--panel-shadow);
+  cursor: default;
+}
+
+.screenshots-bar {
+  top: 12px;
+  left: 50%;
+  translate: -50% 0;
+  max-width: calc(100% - 24px);
+  white-space: nowrap;
+}
+
+.screenshots-hint {
+  padding-inline: 6px;
+  color: var(--chrome-muted);
+}
+
+/* Right-aligned with the selection's right edge (screenshots.js sets left). */
+.screenshots-actions {
+  translate: -100% 0;
+}
+
+.screenshots-button {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+#screenshots-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 7px;
+  border-color: transparent;
+}
+
+#screenshots-close .icon {
+  width: 16px;
+  height: 16px;
+  -moz-context-properties: fill, stroke;
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.screenshots-preview {
+  inset: 24px;
+  margin: auto;
+  width: fit-content;
+  height: fit-content;
+  max-width: calc(100% - 48px);
+  max-height: calc(100% - 48px);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px;
+}
+
+.screenshots-preview-image {
+  min-height: 0;
+  max-width: 100%;
+  max-height: calc(100vh - 260px);
+  object-fit: contain;
+  border: 1px solid var(--field-border);
+  border-radius: 6px;
+  background-color: #FFFFFF;
+}
+
+.screenshots-preview-note {
+  margin: 0;
+  color: var(--chrome-muted);
+}
+
+.screenshots-preview-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.screenshots-spacer {
+  flex: 1;
+}
+
+#screenshots-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  translate: -50% 0;
+  z-index: 20;
+  padding: 9px 16px;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background-color: var(--panel-bg);
+  color: var(--chrome-fg);
+  box-shadow: var(--panel-shadow);
+  font: 13px/1.4 var(--font-ui);
+  transition: opacity 200ms ease-out;
+}
+
+#screenshots-toast.leaving {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #screenshots-toast { transition: none; }
+}
+
+/* Adding an authenticator (passwords.js): which login, then the code. */
+.passwords-otp-logins {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.passwords-otp-login {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 6px;
+}
+
+.passwords-otp-login:hover {
+  background-color: var(--hover-bg);
+}
+
+.passwords-otp-login .passwords-option-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.passwords-otp-code-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.passwords-otp-code {
+  font-family: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+#passwords-otp-left {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Security key prompts (webauthn.js). */
+.webauthn-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.webauthn-body .panel-title,
+.webauthn-body .panel-text {
+  margin: 0;
+}
+
+.webauthn-pin-form {
+  display: flex;
+  gap: 8px;
+}
+
+.webauthn-pin-form .panel-input {
+  flex: 1;
+}
+
+.webauthn-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.webauthn-account {
+  text-align: start;
+}
+
+/* Passkeys (passkeys.js): where to keep one, or which to use. */
+.passkey-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 320px;
+}
+
+.passkey-body .panel-title,
+.passkey-body .panel-text {
+  margin: 0;
+}
+
+.passkey-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.passkey-choice {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--chrome-fg);
+  font: inherit;
+  text-align: start;
+}
+
+.passkey-choice:not([disabled]):hover {
+  background-color: var(--hover-bg);
+}
+
+.passkey-choice[disabled] {
+  opacity: 0.6;
+}
+
+.passkey-choice .icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  -moz-context-properties: fill, stroke;
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.passkey-choice-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.passkey-choice-primary {
+  font-weight: 600;
+}
+
+.passkey-choice-secondary {
+  font-size: 12px;
+  color: var(--chrome-muted);
+}
+
+.passkey-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#passkey-panel #passkey-form[hidden],
+#passkey-panel .passkey-choices[hidden] {
+  display: none;
 }

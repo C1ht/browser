@@ -15,6 +15,9 @@
  * - Fills exactly one credential when the parent sends it, after checking
  *   each field it would touch (§7.1.5). Nothing is ever filled on load.
  * - Reports a submitted login: only values the user typed or we filled.
+ * - Recognises fields for an authenticator code when they get focus
+ *   (autocomplete="one-time-code", or named like one, or a row of one-digit
+ *   boxes): they get the dropdown too, which fills the code (§19).
  *
  * The parent decides everything else, from the frame's own principal.
  */
@@ -26,6 +29,12 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 const FIELD_EVENTS = ["click", "keydown", "input", "blur"];
+// What names, ids, placeholders and labels of a code field say.
+const CODE_HINT =
+  /one[-_ ]?time|\botp\b|totp|\b2fa\b|\bmfa\b|two[-_ ]?(factor|step)|verification[-_ ]?code|security[-_ ]?code|auth(entication|enticator)?[-_ ]?code|passcode/i;
+// A field named only this is a code field if it's sized like one.
+const CODE_NAMES = new Set(["code", "token", "pin", "otc"]);
+const CODE_TYPES = new Set(["text", "tel", "number", "password"]);
 const DROPDOWN_KEYS = ["ArrowDown", "ArrowUp", "Enter", "Escape", "Tab"];
 // A field this small, or outside the viewport, isn't one the user can see.
 const MIN_FIELD_SIZE = 4;
@@ -51,6 +60,8 @@ export class PasswordsChild extends JSWindowActorChild {
   #generated = new WeakMap();
   // The last password reported, so a form seen twice isn't offered twice.
   #reportedValue = new WeakMap();
+  // Fields recognised as fields for an authenticator code.
+  #codeFields = new WeakSet();
 
   handleEvent(event) {
     switch (event.type) {
@@ -63,6 +74,9 @@ export class PasswordsChild extends JSWindowActorChild {
         break;
       case "form-submission-detected":
         this.#submitted(event.detail?.form ?? null);
+        break;
+      case "focusin":
+        this.#focusin(event);
         break;
       case "pagehide":
         this.#closeDropdown();
@@ -92,6 +106,8 @@ export class PasswordsChild extends JSWindowActorChild {
         return this.#fill(message.data);
       case "Passwords:FillGenerated":
         return this.#fillGenerated(message.data.password);
+      case "Passwords:FillCode":
+        return this.#fillCode(message.data.code);
       case "Passwords:DropdownState": {
         this.#dropdownOpen = !!message.data.open;
         this.#dropdownSelected = this.#dropdownOpen && !!message.data.selected;
@@ -169,7 +185,75 @@ export class PasswordsChild extends JSWindowActorChild {
     }
   }
 
+  // A field for an authenticator code: by its autocomplete token, by what
+  // it's called, or one of a row of one-digit boxes.
+  #isCodeField(field) {
+    if (!HTMLInputElement.isInstance(field) || !CODE_TYPES.has(field.type)) {
+      return false;
+    }
+    if (field.getAutocompleteInfo()?.fieldName == "one-time-code") {
+      return true;
+    }
+    let form = field.form;
+    // A login form's own fields are the login's.
+    if (form && [...form.elements].some(e => e != field && e.hasBeenTypePassword)) {
+      return false;
+    }
+    if (field.hasBeenTypePassword) {
+      return false;
+    }
+    let names = [field.name, field.id, field.placeholder, field.getAttribute("aria-label"), field.autocomplete]
+      .filter(Boolean)
+      .join(" ");
+    if (CODE_HINT.test(names)) {
+      return true;
+    }
+    let sized = (field.maxLength >= 6 && field.maxLength <= 8) || field.inputMode == "numeric";
+    if (sized && (CODE_NAMES.has(field.name.toLowerCase()) || CODE_NAMES.has(field.id.toLowerCase()))) {
+      return true;
+    }
+    return field.maxLength == 1 && this.#digitBoxes(field).length >= 4;
+  }
+
+  // A row of one-digit boxes, from the first: the inputs of length 1 in the
+  // field's form, or around it.
+  #digitBoxes(field) {
+    let scope = field.form ?? field.parentElement?.parentElement ?? field.parentElement;
+    if (!scope) {
+      return [field];
+    }
+    return [...scope.querySelectorAll("input")].filter(
+      e => e.maxLength == 1 && CODE_TYPES.has(e.type) && !e.hasBeenTypePassword && this.#visible(e)
+    );
+  }
+
+  #focusin(event) {
+    let field = event.target;
+    if (!event.isTrusted || !this.#eligible() || this.#codeFields.has(field) || !this.#isCodeField(field)) {
+      return;
+    }
+    this.#codeFields.add(field);
+    if (!this.#watched.has(field)) {
+      this.#watched.add(field);
+      for (let type of FIELD_EVENTS) {
+        field.addEventListener(type, this, { mozSystemGroup: true });
+      }
+    }
+    if (!this.#reported) {
+      this.#reported = true;
+      this.sendAsyncMessage("Passwords:FormSeen", {});
+    }
+    // Focus the user gave it (a click or a key just now), not a page
+    // focusing it on load: offer the code at once.
+    if (this.contentWindow.navigator.userActivation.isActive) {
+      this.#requestDropdown(field, "click");
+    }
+  }
+
   #kind(field) {
+    if (this.#codeFields.has(field)) {
+      return "one-time-code";
+    }
     if (!field.hasBeenTypePassword) {
       return "username";
     }
@@ -288,6 +372,23 @@ export class PasswordsChild extends JSWindowActorChild {
       filled = true;
     }
     return filled;
+  }
+
+  /** An authenticator code, into its field, or one digit per box of a row. */
+  #fillCode(code) {
+    let field = this.#dropdownField?.deref();
+    if (!field || !this.#codeFields.has(field) || !this.#visible(field) || !/^\d{6,8}$/.test(code)) {
+      return false;
+    }
+    if (field.maxLength == 1) {
+      let boxes = this.#digitBoxes(field);
+      if (boxes.length >= code.length) {
+        boxes.slice(0, code.length).forEach((box, i) => this.#set(box, code[i]));
+        return true;
+      }
+    }
+    this.#set(field, code);
+    return true;
   }
 
   /** A generated password, into the new-password field and its confirmation. */

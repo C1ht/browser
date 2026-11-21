@@ -103,6 +103,10 @@ Runtime check parts (`ALL_PARTS` in `check.py`; add a new part there and in `.gi
 | 16 | Clear site data |
 | 17 | DRM (Widevine, with a local stand-in for Google's download) |
 | 18 | Page translation (the real engine and French-English files, served locally; `fetch-test-deps.sh` fetches them) |
+| 19 | Screenshots: overlay, element and area selection, copy and download, full page (pixel checks) |
+| 20 | Authenticator codes: adding (key, QR code), filling code fields, the vault, export and import |
+| 21 | Security key prompts (WebAuthn); the end-to-end check is skipped while a security key is plugged in |
+| 22 | Passkeys kept by the browser: a relying party page verifies every result; the choice, unlocking, autofill, security key handover (Gecko's software authenticator) |
 
 How to write checks:
 - Test pages live in `tests/runtime/pages/`, served on 127.0.0.1. Use `Browser(bindir, prefs=…)`, `b.js(…)`, `b.wait(…)`, `record(part, name, ok, detail)`.
@@ -127,6 +131,9 @@ How to write checks:
   - Toolkit actors without child events (Translations) are created only when something calls `getActor`. Firefox's window asks on each page load; ours must do the same where a feature depends on it (`translations.js`).
   - A JSWindowActor's state events can fire while the actor is being created. Calling `getActor` from that handler creates another actor, endlessly. Defer the work (`queueMicrotask`).
   - Marionette scripts can't `fetch` the network, and don't allow top-level `await`. Return a promise instead.
+  - Never let tests reach the user's hardware: part 21's end-to-end check skips while a FIDO device is plugged in, and part 22 uses Gecko's software authenticator (`security.webauth.webauthn_enable_softtoken`) for the security-key path.
+  - `@mozilla.org/webauthn/service;1` is `PasskeyService` (components/passkeys), which wraps Gecko's service. Code asking for the WebAuthn service gets ours.
+  - Headless Gecko's clipboard holds only text. Check images where they're handed to the clipboard (part 19 wraps `copyImageToClipboard`).
 - New JSWindowActors are registered in `JSWINDOWACTORS` in `BrowserWipGlue.sys.mjs`; new modules go in the directory's `moz.build` (`EXTRA_JS_MODULES.browserwip`) and new directories in `app/components/moz.build`.
 - Privacy modes: a toggle that affects prefs is defined in `PrivacyModes.sys.mjs`, shown through `privacy-controls.js`, and listed in Settings and `welcome.js`. A toggle added after release goes in `ADDED_TOGGLES` so existing profiles get its default once. Update `tests/unit/privacy-modes.test.mjs`.
 - **Privacy rules:**
@@ -176,6 +183,6 @@ How to write checks:
   - It builds with `mozconfigs/ci-linux` in `obj-release`.
   - It packages `.tar.zst`, `.tar.xz`, `.deb`, `.rpm`, `.AppImage` and an AUR `PKGBUILD`, with `SHA256SUMS`.
   - It scans the unpacked packages for keys, tokens and profile files (`scan_secrets.py`), and checks the checksums again after upload.
-  - It publishes a GitHub **pre-release** `dev-<date>-<sha>` that is never marked stable or latest, titled with the commit's subject, with notes made from the commits since the last dev build.
+  - It publishes a GitHub release `dev-<date>-<sha>` marked **neither pre-release nor latest**, titled with the commit's subject, with notes made from the commits since the last dev build.
   - It needs a clean tree and a pushed HEAD. `--dry-run` does everything but publish. Its packaging tools come from `tools/release/fetch-release-deps.sh` (no root).
 - Ask before destructive or outward-facing actions beyond those above.

@@ -1,0 +1,56 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+/**
+ * Passkeys kept by the browser (docs/PASSWORDS.md §20). PasskeyService
+ * stands in front of Gecko's WebAuthn service and hands each request to the
+ * provider (Passkeys.sys.mjs), which answers it with a passkey of its own,
+ * or passes it on to Gecko for a security key.
+ */
+
+/** One request from a page: make a passkey, or sign in with one. */
+[scriptable, uuid(e70baa42-5711-42ae-9ea9-7499ee933949)]
+interface nsIBrowserWipPasskeyRequest : nsISupports
+{
+  readonly attribute unsigned long long transactionId;
+  readonly attribute unsigned long long browsingContextId;
+  // "create" or "get".
+  readonly attribute ACString kind;
+  // The request as JSON (PasskeyService.cpp says what's in it); byte
+  // strings are base64url.
+  readonly attribute AUTF8String json;
+  // Answered, passed on, or cancelled.
+  readonly attribute boolean settled;
+
+  // Gecko's own WebAuthn service (security keys) takes the request over.
+  void useSecurityKey();
+
+  void resolveCreate(in Array<octet> aCredentialId,
+                     in Array<octet> aAttestationObject);
+  void resolveGet(in Array<octet> aCredentialId,
+                  in Array<octet> aAuthenticatorData,
+                  in Array<octet> aSignature,
+                  in Array<octet> aUserHandle);
+  // "not-allowed" (the user said no, or nothing fits), "invalid-state" (a
+  // passkey for this account is already here) or "not-supported".
+  void reject(in ACString aError);
+};
+
+[scriptable, uuid(62e90592-6711-4893-981a-1dd73a0a9539)]
+interface nsIBrowserWipPasskeyProvider : nsISupports
+{
+  void handle(in nsIBrowserWipPasskeyRequest aRequest);
+  // The page went away, it timed out, or a new request replaced it.
+  void cancel(in unsigned long long aTransactionId);
+};
+
+[scriptable, uuid(4c2c1e3a-4c31-416f-88b0-cb286b874f93)]
+interface nsIBrowserWipPasskeyService : nsISupports
+{
+  // Stands in front of "@mozilla.org/webauthn/service;1" from now on.
+  void install(in nsIBrowserWipPasskeyProvider aProvider);
+  readonly attribute boolean installed;
+};

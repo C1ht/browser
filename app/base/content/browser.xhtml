@@ -22,6 +22,7 @@
   <link rel="localization" href="browser-wip/passwords.ftl"/>
   <!-- The print preview's pages and their navigation (printing.js). -->
   <link rel="localization" href="toolkit/printing/printUI.ftl"/>
+  <link rel="localization" href="toolkit/webauthnDialog.ftl"/>
   <script src="chrome://browser-wip/content/tabbrowser.js"/>
   <script src="chrome://browser-wip/content/letterbox.js"/>
   <script src="chrome://browser-wip/content/downloads.js"/>
@@ -32,6 +33,9 @@
   <script src="chrome://browser-wip/content/passwords.js"/>
   <script src="chrome://browser-wip/content/urlbar.js"/>
   <script src="chrome://browser-wip/content/translations.js"/>
+  <script src="chrome://browser-wip/content/screenshots.js"/>
+  <script src="chrome://browser-wip/content/webauthn.js"/>
+  <script src="chrome://browser-wip/content/passkeys.js"/>
   <script src="chrome://browser-wip/content/bookmarks.js"/>
   <script src="chrome://browser-wip/content/printing.js"/>
   <script src="chrome://browser-wip/content/drm.js"/>
@@ -69,6 +73,7 @@
     <xul:command id="cmd_taskManager"/>
     <xul:command id="cmd_emptyCacheReload"/>
     <xul:command id="cmd_print"/>
+    <xul:command id="cmd_screenshot"/>
   </xul:commandset>
 
   <!-- reserved="true": handled by the browser even when a page has focus.
@@ -106,6 +111,7 @@
     <xul:key id="key_history" key="h" modifiers="accel" command="cmd_history"/>
     <xul:key id="key_viewSource" key="u" modifiers="accel" command="cmd_viewSource"/>
     <xul:key id="key_print" key="p" modifiers="accel" command="cmd_print"/>
+    <xul:key id="key_screenshot" key="s" modifiers="accel,shift" command="cmd_screenshot"/>
   </xul:keyset>
 
   <!-- A dialog over one tab's page, such as the print preview: cloned for
@@ -133,6 +139,7 @@
       <xul:menuitem data-l10n-id="app-menu-history" key="key_history" command="cmd_history"/>
       <xul:menuitem data-l10n-id="app-menu-downloads" key="key_downloads" command="cmd_downloads"/>
       <xul:menuitem id="app-menu-print" data-l10n-id="app-menu-print" key="key_print" command="cmd_print"/>
+      <xul:menuitem id="app-menu-screenshot" data-l10n-id="app-menu-screenshot" key="key_screenshot" command="cmd_screenshot"/>
       <xul:menuitem id="app-menu-translate" data-l10n-id="app-menu-translate"/>
       <xul:menuitem data-l10n-id="app-menu-bookmarks-bar" type="checkbox" key="key_toggleBookmarksBar"
                     command="cmd_toggleBookmarksBar"/>
@@ -174,6 +181,7 @@
       <xul:menuitem id="context-openimage" data-show="image" data-l10n-id="context-openimage"/>
       <xul:menuitem id="context-copyimage" data-show="image" data-l10n-id="context-copyimage"/>
       <xul:menuitem id="context-copyimage-link" data-show="image" data-l10n-id="context-copyimage-link"/>
+      <xul:menuitem id="context-add-authenticator" data-show="image" data-l10n-id="context-add-authenticator"/>
       <xul:menuitem id="context-saveimage" data-show="image" data-l10n-id="context-saveimage"/>
       <xul:menuseparator/>
       <xul:menuitem id="context-openmedia" data-show="media" data-l10n-id="context-openmedia"/>
@@ -193,6 +201,7 @@
       <xul:menuitem id="context-selectall" data-show="editable page" data-l10n-id="context-selectall"/>
       <xul:menuseparator/>
       <xul:menuitem id="context-savepage" data-show="page" data-l10n-id="context-savepage"/>
+      <xul:menuitem id="context-screenshot" data-show="page" data-l10n-id="context-screenshot"/>
       <xul:menuitem id="context-viewsource" data-show="page" data-l10n-id="context-viewsource"/>
       <xul:menuseparator/>
       <xul:menuitem id="context-inspect" data-l10n-id="context-inspect"/>
@@ -335,6 +344,48 @@
     </xul:panel>
     <!-- DRM notices (drm.js): Widevine being installed for the page, or DRM
          off when the page wants it. -->
+    <!-- Passkeys (passkeys.js): kept in the browser or on a security key;
+         view= is choose, unlock, setup or verify. -->
+    <xul:panel id="passkey-panel" class="wip-panel" type="arrow" role="dialog"
+               noautohide="true" aria-labelledby="passkey-title">
+      <div class="panel-body passkey-body">
+        <h2 id="passkey-title" class="panel-title"></h2>
+        <p id="passkey-text" class="panel-text"></p>
+        <div id="passkey-choices" class="passkey-choices"></div>
+        <form id="passkey-form" class="passkey-form" hidden="true">
+          <input id="passkey-password" class="panel-input" type="password" autocomplete="off"
+                 data-l10n-id="passkey-master-password"/>
+          <input id="passkey-confirm" class="panel-input" type="password" autocomplete="off"
+                 data-l10n-id="passkey-master-confirm" hidden="true"/>
+          <button id="passkey-submit" class="panel-button primary" type="submit"/>
+        </form>
+        <p id="passkey-error" class="passwords-error" role="alert" hidden="true"></p>
+        <div class="permission-buttons">
+          <button id="passkey-cancel" class="panel-button" data-l10n-id="passkey-cancel"/>
+        </div>
+      </div>
+    </xul:panel>
+    <!-- Security key prompts (webauthn.js): touch the key, its PIN, which
+         account, which key it is. kind= is the prompt's type. -->
+    <xul:panel id="webauthn-panel" class="wip-panel" type="arrow" role="alertdialog"
+               noautohide="true" aria-labelledby="webauthn-text">
+      <div class="panel-body webauthn-body">
+        <p id="webauthn-text" class="panel-title"></p>
+        <p id="webauthn-hint" class="panel-text" hidden="true"></p>
+        <form id="webauthn-pin-form" class="webauthn-pin-form" hidden="true">
+          <input id="webauthn-pin" class="panel-input" type="password" autocomplete="off"
+                 data-l10n-id="webauthn-pin-placeholder"/>
+          <button class="panel-button primary" type="submit" data-l10n-id="webauthn-pin-submit"/>
+        </form>
+        <div id="webauthn-accounts" class="webauthn-accounts" hidden="true"></div>
+        <p id="webauthn-note" class="panel-text" hidden="true" data-l10n-id="webauthn-note"></p>
+        <div class="permission-buttons">
+          <button id="webauthn-block" class="panel-button" data-l10n-id="webauthn-block" hidden="true"/>
+          <button id="webauthn-cancel" class="panel-button" data-l10n-id="webauthn-cancel"/>
+          <button id="webauthn-allow" class="panel-button primary" data-l10n-id="webauthn-allow" hidden="true"/>
+        </div>
+      </div>
+    </xul:panel>
     <xul:panel id="drm-panel" class="wip-panel" type="arrow" role="alertdialog" aria-labelledby="drm-text">
       <div class="panel-body">
         <p id="drm-text" class="panel-title"></p>
@@ -469,8 +520,37 @@
           <button id="passwords-site-all" class="panel-link passwords-site-all" hidden="true"/>
           <div class="passwords-footer">
             <button id="passwords-site-manage" class="panel-link" data-l10n-id="passwords-manage-link"/>
+            <button id="passwords-site-qr" class="panel-link" data-l10n-id="passwords-site-qr"/>
             <button id="passwords-site-lock" class="panel-link" data-l10n-id="passwords-lock-now"/>
           </div>
+        </div>
+
+        <!-- Adding an authenticator from a QR code on the page (§19):
+             which login it's for, then its first code. -->
+        <div id="passwords-otp-view" class="passwords-view">
+          <div id="passwords-otp-logins" class="passwords-otp-logins" role="radiogroup"
+               aria-labelledby="passwords-title"></div>
+          <label id="passwords-otp-new" class="passwords-field">
+            <span data-l10n-id="passwords-username-label"></span>
+            <input id="passwords-otp-username" class="passwords-input" type="text"
+                   spellcheck="false" autocomplete="off" data-l10n-id="passwords-username-none"/>
+          </label>
+          <p id="passwords-otp-error" class="passwords-error" role="alert" hidden="true"></p>
+          <div class="passwords-buttons">
+            <span class="passwords-spacer"></span>
+            <button id="passwords-otp-cancel" class="panel-button" data-l10n-id="passwords-not-now"/>
+            <button id="passwords-otp-save" class="panel-button primary" data-l10n-id="passwords-otp-save"/>
+          </div>
+        </div>
+
+        <div id="passwords-otp-done-view" class="passwords-view">
+          <div class="passwords-otp-code-row">
+            <span id="passwords-otp-code" class="passwords-otp-code"></span>
+            <span id="passwords-otp-left" class="passwords-note"></span>
+            <span class="passwords-spacer"></span>
+            <button id="passwords-otp-copy" class="panel-button primary" data-l10n-id="passwords-otp-copy"/>
+          </div>
+          <p class="passwords-note" data-l10n-id="passwords-otp-done-note"></p>
         </div>
 
         <div id="passwords-intro-view" class="passwords-view">
@@ -604,6 +684,9 @@
     <p id="tab-overview-empty" hidden="true"></p>
     <div id="tab-overview-grid"></div>
   </div>
+
+  <!-- Screenshots' message after copying or saving (screenshots.js). -->
+  <div id="screenshots-toast" role="status" hidden="true"></div>
 
   <!-- While a page is in fullscreen (fullscreen.js). A popover, so it shows
        above the fullscreen page. -->

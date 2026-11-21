@@ -454,6 +454,28 @@ Pages are translated on the device, with Firefox's translation engine (Bergamot,
 
 Runtime part 18 translates a real page with the real engine and French-English files, served from 127.0.0.1 (`tools/runtime/fetch-test-deps.sh` fetches them, checked against the snapshot): the offer, the download and its progress, the files kept and reused, a file that doesn't match refused, Settings' delete and switch, and that nothing runs when it's off. Part 3 covers the first-run switch.
 
+## 15. Screenshots
+
+As Firefox takes them, with Ctrl+Shift+S, the app menu's "Take screenshot" or the page's context menu. Firefox's own screenshots are part of its `browser/` front end, so this is ours, on the same Gecko parts.
+
+- **The overlay** covers the selected page, in the window (`screenshots.js`); the page sees nothing. Drag to select an area, or hover to outline the element under the pointer and click it. The area then moves and resizes, with its size shown, and has Cancel, Copy and Download under it. The bar at the top also offers Save visible and Save full page, which show a preview first. Scrolling over the overlay scrolls the page. Escape, switching tabs or the page navigating closes it.
+- **The page's part** is the Screenshots actor (`components/screenshots/`): its size, scroll position and the element at a point. The window bounds every number it gets back.
+- **Capturing:** `WindowGlobalParent.drawSnapshot`, in tiles of 1024 CSS pixels at the screen's scale, as Firefox does, so frames from every process are included. A page too long for one image (over 32,766 pixels or about 470 million in all) is cut at the bottom, and the preview and message say so.
+- **Saving:** "Screenshot <date> at <time> <page title>.png", where downloads go (or a file picker, with Settings › Downloads › Ask where to save), through the downloads list, so the downloads panel shows it. Copy uses toolkit's `BrowserUtils.copyImageToClipboard`. A short message confirms either.
+
+Runtime part 19 covers the shortcut and menus, hover and click, drag, move and resize, Copy and Download (checked pixel by pixel), the full page past the window, Save visible after scrolling, and closing. Headless Gecko's clipboard holds only text, so the checks take the image as it's handed to the clipboard; pasting it is in `docs/MANUAL-CHECKS.md`.
+
+## 16. Security keys (WebAuthn)
+
+Passkeys and two-step verification on a USB security key (a YubiKey, say), as in Firefox. Gecko's WebAuthn service talks to the key and asks the browser for prompts with the observer topic `webauthn-prompt`. Firefox shows them through its own notifications (toolkit's WebAuthnPromptHelper); this browser shows them in a panel under the site information button (`webauthn.js`), with toolkit's strings, and answers through `nsIWebAuthnService`. Without it, a site asking for a passkey waited with nothing on screen.
+
+- **Prompts:** touch your key, with Cancel (a note says passkeys need a USB key for now); the key's PIN, typed in the panel and never kept; a wrong PIN (with the attempts left once the key is close to locking); which of the key's accounts to use; a site asking which key it is (Allow, or Block for an anonymous answer); and what went wrong (blocked PIN, no PIN set, already registered, ...), with Cancel.
+- **Behaviour:** Escape is Cancel. A prompt belongs to its tab and shows while that tab does. The service ending the request (answered, timed out, the page gone) closes it. A page in fullscreen leaves it first.
+- **Passkeys kept by the browser** came after: docs/PASSWORDS.md §20. Each time, the user chooses the browser or a security key; choosing the key brings these prompts.
+- **Not yet:** signing in with a phone (hybrid transport, which Gecko on Linux doesn't have).
+
+Runtime part 21 sends every prompt type as the service does, with the service replaced by a recorder, and checks what the browser answers. With no security key plugged in, it also starts a real request on a page and checks the prompt and that Cancel refuses it to the page; with one plugged in, that check is skipped so the user's key is never touched.
+
 ## Stage 3 order (after approval)
 
 1. **Scaffolding and build config:** `fetch-gecko.sh`, project directory, branding, launcher, package manifest. Verify with `mach configure`, then a full compile and a launch to a blank window. Checkpoint.

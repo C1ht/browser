@@ -90,6 +90,33 @@ passwords-copy-username =
     .title = Copy username
     .aria-label = Copy username
 passwords-copied = Copied
+passwords-site-qr = Add authenticator from QR code
+# The panel for an authenticator read from a QR code. $host (String): the site
+passwords-otp-title = Add authenticator for { $host }
+passwords-otp-text = Which login is it for?
+# $label (String): the issuer and account the QR code names, e.g. "GitHub · octocat"
+passwords-otp-text-label = { $label }. Which login is it for?
+# $host (String)
+passwords-otp-replaces = { $host } · replaces its authenticator
+passwords-otp-new-login = A new login
+passwords-otp-save = Add
+passwords-otp-save-failed = Couldn’t add the authenticator. Try again.
+passwords-otp-done-title = Authenticator added
+passwords-otp-copy = Copy code
+passwords-otp-done-note = Enter this code on the site to finish turning on two-step verification. From now on, the site’s code field offers the current code.
+# Messages after "Add authenticator from QR code"
+passwords-qr-none = No QR code on screen. Scroll so the whole QR code shows, then try again.
+passwords-qr-not-authenticator = That QR code isn’t an authenticator setup code.
+passwords-qr-counter = That QR code is for counter-based codes (HOTP), which aren’t supported. Most sites offer time-based codes.
+passwords-qr-https = Authenticators can be added on secure (https) sites only.
+# A passkey in a login field's dropdown. $host (String): the site
+passwords-dropdown-passkey = Passkey · { $host }
+passwords-copy-code =
+    .title = Copy the authenticator code
+    .aria-label = Copy the authenticator code
+# An authenticator code in the dropdown of a code field. $who (String): the
+# login's username; $host (String): the site, e.g. "accounts.example.com"
+passwords-dropdown-code = Authenticator code · { $who } · { $host }
 passwords-lock-now = Lock now
 passwords-manage-link = Manage passwords
 
@@ -155,6 +182,34 @@ passwords-field-username = Username
 passwords-field-password = Password
 passwords-field-also = Also fills on
 passwords-field-history = History
+passwords-field-otp = Authenticator
+# $count (Number)
+passwords-passkeys-group = Passkeys ({ $count })
+passwords-passkey-kind = Passkey
+passwords-passkey-no-name = No account name
+passwords-field-account = Account
+passwords-field-display-name = Name
+# $created, $used (String): dates
+passwords-passkey-history = Saved { $created } · Last used { $used }
+passwords-passkey-history-unused = Saved { $created } · Never used
+# $host (String): the site
+passwords-passkey-delete-confirm = Delete this passkey? If it’s your only way to sign in to { $host }, you won’t be able to sign in with it any more.
+passwords-passkey-note = The passkey’s private key is encrypted with your passwords and never leaves this device. Sites see only its public key.
+passwords-field-otp-optional = Authenticator setup key (optional)
+passwords-field-otp-replace = New authenticator setup key (leave empty to keep the current one)
+passwords-otp-add = Add authenticator…
+passwords-otp-add-button = Add
+passwords-otp-placeholder =
+    .placeholder = Setup key or otpauth:// link
+passwords-otp-help = When a site turns on two-step verification, it shows a QR code and usually a setup key (“Can’t scan it?”). Paste the key here, or right-click the QR code and choose “Add authenticator from QR code”.
+# $seconds (Number)
+passwords-otp-left = { $seconds } s
+passwords-otp-show-key = Show setup key
+passwords-otp-hide-key = Hide setup key
+passwords-otp-remove = Remove
+passwords-otp-error-counter = This is a counter-based code (HOTP). Only time-based codes work here, which is what almost every site uses.
+passwords-otp-error-short = That key is too short to be a setup key. Check you copied all of it.
+passwords-otp-error-invalid = That isn’t a setup key. It’s letters A–Z and digits 2–7, or a link starting with otpauth://.
 passwords-also-add = Add a site of { $site }…
 passwords-also-placeholder =
     .placeholder = https://login.{ $site }
@@ -293,6 +348,12 @@ passwords-import-fresh =
     { $count ->
         [one] 1 new login
        *[other] { $count } new logins
+    }
+# $count (Number)
+passwords-import-passkeys =
+    { $count ->
+        [one] 1 passkey
+       *[other] { $count } passkeys
     }
 # $count (Number)
 passwords-import-duplicates =

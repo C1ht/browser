@@ -19,8 +19,19 @@
  * "not-fillable", "needs-passphrase", "wrong-passphrase", "bad-file",
  * "no-columns", "cancelled", "hello-unavailable", "hello-failed",
  * "keyring-unavailable", "keyring-failed", "wrong-recovery-key",
- * "no-recovery-key", "not-confirmed", or the core's status name
+ * "no-recovery-key", "not-confirmed", "otp-counter", "otp-not-a-key",
+ * "otp-short-key", "no-otp", or the core's status name
  * ("BWV_E_IO", ...).
+ *
+ * Authenticator codes (§19): an entry may carry a setup key, sealed in
+ * nsIPasswordVault like its password (under an id of its own, for the
+ * entry's origin), with the code's settings in the index (entry.otp). Codes
+ * are made here, one at a time, to fill or show; the key itself comes out
+ * only for the master password, as passwords do.
+ *
+ * Passkeys (§20, components/passkeys): the index lists them (index.passkeys)
+ * and each private key is sealed like a password, for "https://" + its
+ * relying party. They come out one at a time, to sign in.
  *
  * Windows Hello (§5.3) and, on Linux, the system keyring (§5.2) are second
  * ways to unlock, for filling. Showing and copying ask again, with Hello or
@@ -49,6 +60,11 @@ import {
   toCSV,
 } from "resource://gre/modules/browserwip/PasswordTransfer.sys.mjs";
 import { suggestPassphrase } from "resource://gre/modules/browserwip/PasswordWords.sys.mjs";
+import {
+  authenticatorURI,
+  parseAuthenticator,
+  totp,
+} from "resource://gre/modules/browserwip/Authenticator.sys.mjs";
 
 const lazy = {};
 XPCOMUtils.defineLazyServiceGetter(
@@ -109,6 +125,12 @@ const CORE_STATUS = new Set([
 function coreCode(e) {
   let name = e?.message;
   return CORE_STATUS.has(name) ? "BWV_E_" + name.toUpperCase().replace("-", "_") : "BWV_E_STATE";
+}
+
+// What a passkey's private key is sealed for: its relying party, as an
+// origin, so it opens only as that site's.
+function passkeyOrigin(rpId) {
+  return "https://" + rpId;
 }
 
 function getBaseDomain(host) {
@@ -881,6 +903,7 @@ export const PasswordVault = {
         created: now,
         changed: now,
         used: 0,
+        otp: null,
       };
       this._index.entries.push(entry);
     } else {
@@ -927,6 +950,9 @@ export const PasswordVault = {
         }
         if (origin != entry.origin) {
           await lazy.core.moveSecret(id, entry.origin, origin);
+          if (entry.otp) {
+            await lazy.core.moveSecret(entry.otp.id, entry.origin, origin);
+          }
           entry.origin = origin;
         }
       }
@@ -949,11 +975,15 @@ export const PasswordVault = {
   async removeEntry(id) {
     await this._waitForReplacement();
     this._requireUnlocked();
-    if (!this._index.entries.some(e => e.id == id)) {
+    let entry = this._index.entries.find(e => e.id == id);
+    if (!entry) {
       return;
     }
     try {
       await lazy.core.removeSecret(id);
+      if (entry.otp) {
+        await lazy.core.removeSecret(entry.otp.id);
+      }
     } catch (e) {
       throw failure(coreCode(e), e);
     }
@@ -986,6 +1016,207 @@ export const PasswordVault = {
 
   async copyText(text) {
     Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper).copyString(text);
+  },
+
+  // ---------------------------------------------------------------------
+  // Authenticator codes (§19)
+
+  /**
+   * Gives an entry an authenticator, or replaces its key: `input` is what
+   * the site showed, an otpauth://totp/ link (from its QR code) or the
+   * setup key as text. Throws "otp-counter", "otp-not-a-key" or
+   * "otp-short-key" for anything else.
+   */
+  async setAuthenticator(id, input) {
+    await this._waitForReplacement();
+    this._requireUnlocked();
+    let entry = this._index.entries.find(e => e.id == id);
+    if (!entry) {
+      throw failure("BWV_E_NOT_FOUND");
+    }
+    let parsed;
+    try {
+      parsed = parseAuthenticator(input);
+    } catch (e) {
+      throw failure(e.code ?? "otp-not-a-key", e);
+    }
+    let otpId = entry.otp?.id ?? newEntryId(bytes => crypto.getRandomValues(bytes));
+    try {
+      await lazy.core.setSecret(otpId, entry.origin, parsed.key);
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    }
+    entry.otp = { id: otpId, ...parsed.settings };
+    entry.changed = Date.now();
+    await this._save();
+  },
+
+  async removeAuthenticator(id) {
+    await this._waitForReplacement();
+    this._requireUnlocked();
+    let entry = this._index.entries.find(e => e.id == id);
+    if (!entry?.otp) {
+      return;
+    }
+    try {
+      await lazy.core.removeSecret(entry.otp.id);
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    }
+    entry.otp = null;
+    entry.changed = Date.now();
+    await this._save();
+  },
+
+  async _authenticatorKey(entry) {
+    if (!entry?.otp) {
+      throw failure("no-otp");
+    }
+    try {
+      return await lazy.core.getSecret(entry.otp.id, entry.origin);
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    }
+  },
+
+  /**
+   * The entry's current code: { code, remaining, period }. For the manager
+   * and the key button's panel, while unlocked (codes last seconds; the key
+   * stays sealed).
+   */
+  async authenticatorCode(id) {
+    this._requireUnlocked();
+    let entry = this._index.entries.find(e => e.id == id);
+    return totp(await this._authenticatorKey(entry), entry.otp);
+  },
+
+  /**
+   * The code, for filling a frame whose origin the caller took from its
+   * principal: as credentialsFor(), the entry must be offered there, or be
+   * from another origin of the same site (sign-in and verification are
+   * often on different hosts of one site).
+   */
+  async authenticatorCodeFor(id, frameOrigin) {
+    this._requireUnlocked();
+    let entry = this._index.entries.find(e => e.id == id);
+    let { exact, sameSite } = this.match(frameOrigin);
+    if (!entry?.otp || !isFillableOrigin(frameOrigin) || ![...exact, ...sameSite].some(e => e.id == id)) {
+      throw failure("not-fillable");
+    }
+    return totp(await this._authenticatorKey(entry), entry.otp);
+  },
+
+  /** The logins with an authenticator that may fill a code on frameOrigin. */
+  authenticatorsFor(frameOrigin) {
+    let { exact, sameSite } = this.match(frameOrigin);
+    return [...exact, ...sameSite].filter(e => e.otp);
+  },
+
+  /** The setup key as an otpauth:// link, to move it to another app: gated like a password. */
+  async revealAuthenticator(id) {
+    this._requireUnlocked();
+    if (!this.recentlyAuthenticated) {
+      throw failure("needs-master-password");
+    }
+    let entry = this._index.entries.find(e => e.id == id);
+    let key = await this._authenticatorKey(entry);
+    return authenticatorURI(key, { ...entry.otp, account: entry.otp.account || entry.username });
+  },
+
+  // ---------------------------------------------------------------------
+  // Passkeys (§20)
+
+  /** Copies of the passkeys, by site then account. */
+  passkeys() {
+    if (this.state != "unlocked") {
+      return [];
+    }
+    return this._index.passkeys
+      .map(p => ({ ...p }))
+      .sort((a, b) => a.rpId.localeCompare(b.rpId) || a.userName.localeCompare(b.userName));
+  },
+
+  getPasskey(id) {
+    let passkey = this._index?.passkeys.find(p => p.id == id);
+    return passkey ? { ...passkey } : null;
+  },
+
+  /**
+   * The passkeys for a relying party, and of those only the ones in
+   * `allowList` (credential ids, base64url) when it isn't empty.
+   */
+  passkeysFor(rpId, allowList = []) {
+    return this.passkeys().filter(p => p.rpId == rpId && (!allowList.length || allowList.includes(p.credentialId)));
+  },
+
+  /**
+   * Keeps a new passkey: { rpId, credentialId, userHandle, userName,
+   * displayName, privateKey } (the key as PKCS #8, base64url). One per
+   * account and relying party: a new one replaces the old, as an
+   * authenticator replaces a discoverable credential for the same user.
+   */
+  async savePasskey({ rpId, credentialId, userHandle, userName, displayName, privateKey }) {
+    await this._waitForReplacement();
+    this._requireUnlocked();
+    let id = newEntryId(bytes => crypto.getRandomValues(bytes));
+    try {
+      await lazy.core.setSecret(id, passkeyOrigin(rpId), privateKey);
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    }
+    let replaced = this._index.passkeys.filter(p => p.rpId == rpId && p.userHandle == userHandle);
+    for (let old of replaced) {
+      await lazy.core.removeSecret(old.id).catch(() => {});
+    }
+    this._index.passkeys = this._index.passkeys.filter(p => !replaced.includes(p));
+    let now = Date.now();
+    this._index.passkeys.push({ id, rpId, credentialId, userHandle, userName, displayName, created: now, used: 0 });
+    await this._save();
+    return id;
+  },
+
+  /** A passkey's private key (PKCS #8, base64url), to sign in with. */
+  async passkeyKey(id) {
+    this._requireUnlocked();
+    let passkey = this._index.passkeys.find(p => p.id == id);
+    if (!passkey) {
+      throw failure("BWV_E_NOT_FOUND");
+    }
+    try {
+      return await lazy.core.getSecret(id, passkeyOrigin(passkey.rpId));
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    }
+  },
+
+  async passkeyUsed(id) {
+    let passkey = this._index?.passkeys.find(p => p.id == id);
+    if (passkey) {
+      passkey.used = Date.now();
+      await this._save().catch(() => {});
+    }
+  },
+
+  async removePasskey(id) {
+    await this._waitForReplacement();
+    this._requireUnlocked();
+    if (!this._index.passkeys.some(p => p.id == id)) {
+      return;
+    }
+    try {
+      await lazy.core.removeSecret(id);
+    } catch (e) {
+      throw failure(coreCode(e), e);
+    }
+    this._index.passkeys = this._index.passkeys.filter(p => p.id != id);
+    await this._save();
+  },
+
+  /** Copies the current code, cleared from the clipboard like a password. */
+  async copyAuthenticatorCode(id) {
+    let { code } = await this.authenticatorCode(id);
+    await this._copySensitive(code);
+    return code;
   },
 
   async _copySensitive(text) {
@@ -1040,14 +1271,26 @@ export const PasswordVault = {
     await this.confirmMaster(master);
     this._checkNewMaster(passphrase, confirmation);
     let entries = this._index.entries;
-    let index = { v: 1, entries: entries.map(e => ({ ...e, also: [...e.also] })), never: [] };
+    let passkeys = this._index.passkeys;
+    let index = {
+      v: 1,
+      entries: entries.map(e => ({ ...e, also: [...e.also] })),
+      never: [],
+      passkeys: passkeys.map(p => ({ ...p })),
+    };
+    // Every sealed secret: the passwords, the authenticators' keys and the
+    // passkeys' private keys.
+    let secrets = [
+      ...entries.flatMap(e => [[e.id, e.origin], ...(e.otp ? [[e.otp.id, e.origin]] : [])]),
+      ...passkeys.map(p => [p.id, passkeyOrigin(p.rpId)]),
+    ];
     let file;
     try {
       file = await lazy.core.exportVault(
         passphrase.normalize("NFC"),
         JSON.stringify(index),
-        entries.map(e => e.id),
-        entries.map(e => e.origin)
+        secrets.map(([id]) => id),
+        secrets.map(([, origin]) => origin)
       );
     } catch (e) {
       throw failure(coreCode(e), e);
@@ -1055,14 +1298,21 @@ export const PasswordVault = {
     return new Uint8Array(ChromeUtils.base64URLDecode(file, { padding: "ignore" }));
   },
 
-  /** Every login in plain text (CSV: url, username, password, httpRealm). */
+  /** Every login in plain text (CSV: url, username, password, httpRealm, totp). */
   async exportCSV(master) {
     this._requireUnlocked();
     await this.confirmMaster(master);
     let rows = [];
     for (let entry of this.entries()) {
       try {
-        rows.push({ ...entry, password: await lazy.core.getSecret(entry.id, entry.origin) });
+        let password = await lazy.core.getSecret(entry.id, entry.origin);
+        let otp = entry.otp
+          ? authenticatorURI(await lazy.core.getSecret(entry.otp.id, entry.origin), {
+              ...entry.otp,
+              account: entry.otp.account || entry.username,
+            })
+          : "";
+        rows.push({ ...entry, password, otp });
       } catch (e) {
         throw failure(coreCode(e), e);
       }
@@ -1108,6 +1358,7 @@ export const PasswordVault = {
         logins.push({
           sourceId: e.id,
           sourceOrigin: e.origin,
+          sourceOtp: e.otp,
           origin,
           username: e.username,
           also: e.also,
@@ -1116,7 +1367,10 @@ export const PasswordVault = {
           changed: e.changed,
         });
       }
-      return { kind: "vault", logins, skipped };
+      // Its passkeys, but those already here (by credential id).
+      let known = new Set(this._index.passkeys.map(p => p.credentialId));
+      let passkeys = index.passkeys.filter(p => !known.has(p.credentialId));
+      return { kind: "vault", logins, skipped, passkeys };
     }
     let rows;
     try {
@@ -1129,10 +1383,13 @@ export const PasswordVault = {
     return { kind: "csv", logins, skipped };
   },
 
-  /** What importing these logins would do: { fresh, duplicates, repeated, insecure }. */
-  planImport(logins) {
+  /**
+   * What importing these logins would do: { fresh, duplicates, repeated,
+   * insecure, passkeys } (passkeys from a vault file are all added).
+   */
+  planImport(logins, passkeys = []) {
     this._requireUnlocked();
-    return planImport(this._index.entries, logins);
+    return { ...planImport(this._index.entries, logins), passkeys };
   },
 
   /**
@@ -1147,6 +1404,13 @@ export const PasswordVault = {
     let copies = { src: [], srcOrigins: [], dst: [], dstOrigins: [] };
     let added = [];
     let changed = [];
+    // Authenticators to give entries once everything is stored, the keys
+    // stored for them so far (removed if the import fails), and keys they
+    // replace (removed once it succeeds).
+    let assign = [];
+    let newKeys = [];
+    let oldKeys = [];
+    let addedPasskeys = [];
     let take = async (login, entry) => {
       if (login.sourceId) {
         copies.src.push(login.sourceId);
@@ -1155,6 +1419,31 @@ export const PasswordVault = {
         copies.dstOrigins.push(entry.origin);
       } else {
         await lazy.core.setSecret(entry.id, entry.origin, login.password);
+      }
+      // The authenticator, if the import has one: under a fresh id.
+      let otp = null;
+      if (login.sourceOtp) {
+        otp = { ...login.sourceOtp, id: newEntryId(bytes => crypto.getRandomValues(bytes)) };
+        copies.src.push(login.sourceOtp.id);
+        copies.srcOrigins.push(login.sourceOrigin);
+        copies.dst.push(otp.id);
+        copies.dstOrigins.push(entry.origin);
+      } else if (login.otp) {
+        try {
+          let parsed = parseAuthenticator(login.otp);
+          otp = { id: newEntryId(bytes => crypto.getRandomValues(bytes)), ...parsed.settings };
+          await lazy.core.setSecret(otp.id, entry.origin, parsed.key);
+          newKeys.push(otp.id);
+        } catch (e) {
+          // A column that doesn't hold a key: the login comes in without one.
+          if (!e.code?.startsWith?.("otp-")) {
+            throw e;
+          }
+          otp = null;
+        }
+      }
+      if (otp) {
+        assign.push([entry, otp]);
       }
     };
     try {
@@ -1168,9 +1457,10 @@ export const PasswordVault = {
           created: login.created || now,
           changed: login.changed || login.created || now,
           used: 0,
+          otp: null,
         };
-        await take(login, entry);
         added.push(entry);
+        await take(login, entry);
       }
       for (let duplicate of plan.duplicates) {
         let entry = replace.has(duplicate) && this._index.entries.find(e => e.id == duplicate.existing.id);
@@ -1179,23 +1469,43 @@ export const PasswordVault = {
           changed.push(entry);
         }
       }
+      // Passkeys from a vault file: their keys, under fresh ids.
+      for (let passkey of plan.passkeys ?? []) {
+        let copy = { ...passkey, id: newEntryId(bytes => crypto.getRandomValues(bytes)) };
+        copies.src.push(passkey.id);
+        copies.srcOrigins.push(passkeyOrigin(passkey.rpId));
+        copies.dst.push(copy.id);
+        copies.dstOrigins.push(passkeyOrigin(copy.rpId));
+        newKeys.push(copy.id);
+        addedPasskeys.push(copy);
+      }
       if (copies.src.length) {
         await lazy.core.importSecrets(copies.src, copies.srcOrigins, copies.dst, copies.dstOrigins);
       }
     } catch (e) {
-      for (let entry of added) {
-        await lazy.core.removeSecret(entry.id).catch(() => {});
+      for (let id of [...added.map(entry => entry.id), ...newKeys]) {
+        await lazy.core.removeSecret(id).catch(() => {});
       }
       throw failure(e.code ?? coreCode(e), e);
     } finally {
       lazy.core.closeImport().catch(() => {});
     }
+    for (let [entry, otp] of assign) {
+      if (entry.otp) {
+        oldKeys.push(entry.otp.id);
+      }
+      entry.otp = otp;
+    }
+    for (let id of oldKeys) {
+      await lazy.core.removeSecret(id).catch(() => {});
+    }
     this._index.entries.push(...added);
+    this._index.passkeys.push(...addedPasskeys);
     for (let entry of changed) {
       entry.changed = now;
     }
     await this._save();
-    return added.length + changed.length;
+    return added.length + changed.length + addedPasskeys.length;
   },
 
   /** Forgets a .bwv file opened by readImport (the user cancelled). */

@@ -61,10 +61,26 @@ assert(plan.insecure == 1, "planImport: http logins are counted as not secure");
 
 const csv = toCSV([
   { origin: "https://a.example", username: "ana", password: "p,w\"1", realm: null },
-  { origin: "https://b.example", username: " lead", password: "line\nbreak", realm: "Realm" },
+  { origin: "https://b.example", username: " lead", password: "line\nbreak", realm: "Realm", otp: "otpauth://totp/B:lead?secret=JBSWY3DPEHPK3PXP" },
 ]);
-assert(csv == 'url,username,password,httpRealm\r\nhttps://a.example,ana,"p,w""1",\r\nhttps://b.example," lead","line\nbreak",Realm\r\n',
-       "toCSV quotes commas, quotes, line breaks and edge spaces (RFC 4180)");
+assert(csv == 'url,username,password,httpRealm,totp\r\nhttps://a.example,ana,"p,w""1",,\r\n' +
+       'https://b.example," lead","line\nbreak",Realm,otpauth://totp/B:lead?secret=JBSWY3DPEHPK3PXP\r\n',
+       "toCSV quotes commas, quotes, line breaks and edge spaces (RFC 4180), with a totp column");
+
+// Authenticators: their own column, under the names other managers use.
+for (let name of ["totp", "login_totp", "otpauth", "TOTP"]) {
+  [header, rows] = rowsOf(["url", "username", "password", name], ["https://c.example", "cy", "pw", " JBSWY3DPEHPK3PXP "]);
+  ({ logins } = loginsFromCSV(header, rows));
+  assert(logins[0].otp == "JBSWY3DPEHPK3PXP", `an authenticator in a "${name}" column comes in with the login`);
+}
+[header, rows] = rowsOf(["url", "username", "password"], ["https://c.example", "cy", "pw"]);
+({ logins } = loginsFromCSV(header, rows));
+assert(logins[0].otp == "", "no authenticator column: no authenticator");
+[header, rows] = rowsOf(["url", "username", "password", "totp"],
+  ["https://d.example", "dee", "", "JBSWY3DPEHPK3PXP"], ["https://e.example", "eve", "", ""]);
+({ logins, skipped } = loginsFromCSV(header, rows));
+assert(logins.length == 1 && logins[0].username == "dee" && skipped == 1,
+       "a login with an authenticator but no password comes in; one with neither is skipped");
 
 assert(isVaultFile(new Uint8Array([0x42, 0x57, 0x56, 0x41, 0x55, 0x4c, 0x54, 0, 2, 0])), "a vault file is recognised by its magic");
 assert(!isVaultFile(new TextEncoder().encode("url,username,password\r\n")), "a CSV file is not");

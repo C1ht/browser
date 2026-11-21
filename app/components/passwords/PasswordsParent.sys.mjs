@@ -17,7 +17,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PasswordVault: "resource://gre/modules/browserwip/PasswordVault.sys.mjs",
 });
 
-const KINDS = ["username", "password", "new-password"];
+const KINDS = ["username", "password", "new-password", "one-time-code"];
 const KEYS = ["ArrowDown", "ArrowUp", "Enter", "Escape", "Tab"];
 
 function finite(value) {
@@ -125,6 +125,19 @@ export class PasswordsParent extends JSWindowActorParent {
       return false;
     }
     return this.sendQuery("Passwords:Fill", credentials);
+  }
+
+  /** Fills the entry's current authenticator code into the code field. */
+  async fillCode(entryId) {
+    let origin = this.#origin;
+    if (!origin || this.#gone()) {
+      return false;
+    }
+    let { code } = await lazy.PasswordVault.authenticatorCodeFor(entryId, origin);
+    if (this.#gone() || this.#origin != origin) {
+      return false;
+    }
+    return this.sendQuery("Passwords:FillCode", { code });
   }
 
   fillGenerated(password) {

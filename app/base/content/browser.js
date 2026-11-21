@@ -38,6 +38,9 @@ var BrowserWip = {
     PermissionPrompts.init(window);
     DrmNotices.init();
     PageTranslationsUI.init();
+    Screenshots.init();
+    WebAuthnPrompts.init();
+    PasskeyPrompts.init();
     TabOverview.init(window);
     FullScreen.init(window);
     PasswordsUI.init(window);
@@ -240,6 +243,7 @@ var BrowserWip = {
     cmd_taskManager: () => BrowserWip.openTab("about:processes"),
     cmd_emptyCacheReload: () => BrowserWip.emptyCacheAndReload(),
     cmd_print: () => Printing.print(),
+    cmd_screenshot: () => Screenshots.toggle(),
   },
 
   // Find in page: one toolkit findbar per window, bound to the selected tab.

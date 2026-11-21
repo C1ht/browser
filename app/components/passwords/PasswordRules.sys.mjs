@@ -146,13 +146,69 @@ export function newEntryId(getRandomValues) {
 
 /** An empty index, as written at setup (§4.1). */
 export function emptyIndex() {
-  return { v: 1, entries: [], never: [] };
+  return { v: 1, entries: [], never: [], passkeys: [] };
 }
 
 /**
  * The index from JSON, checked enough that the rest of the code can trust
  * its shape. Throws on anything else.
  */
+/**
+ * An entry's authenticator (Authenticator.sys.mjs): the id its setup key is
+ * sealed under in the vault, beside the entry's password, and the code's
+ * settings. Null when it has none, or what's there isn't one.
+ */
+export function parseOtp(otp) {
+  if (!otp || typeof otp != "object" || typeof otp.id != "string" || !/^[A-Za-z0-9_-]{22}$/.test(otp.id)) {
+    return null;
+  }
+  return {
+    id: otp.id,
+    digits: [6, 7, 8].includes(otp.digits) ? otp.digits : 6,
+    period: Number.isInteger(otp.period) && otp.period >= 10 && otp.period <= 300 ? otp.period : 30,
+    algorithm: ["SHA1", "SHA256", "SHA512"].includes(otp.algorithm) ? otp.algorithm : "SHA1",
+    issuer: typeof otp.issuer == "string" ? otp.issuer : "",
+    account: typeof otp.account == "string" ? otp.account : "",
+  };
+}
+
+const BASE64URL = /^[A-Za-z0-9_-]*$/;
+
+/**
+ * Passkeys the browser keeps (components/passkeys, §20): the id the private
+ * key is sealed under, the relying party, the credential id and user handle
+ * (base64url), the account's names and times. Anything else is dropped.
+ */
+export function parsePasskeys(passkeys) {
+  if (!Array.isArray(passkeys)) {
+    return [];
+  }
+  return passkeys
+    .filter(
+      p =>
+        p &&
+        typeof p.id == "string" &&
+        /^[A-Za-z0-9_-]{22}$/.test(p.id) &&
+        typeof p.rpId == "string" &&
+        p.rpId &&
+        typeof p.credentialId == "string" &&
+        p.credentialId &&
+        BASE64URL.test(p.credentialId) &&
+        typeof p.userHandle == "string" &&
+        BASE64URL.test(p.userHandle)
+    )
+    .map(p => ({
+      id: p.id,
+      rpId: p.rpId,
+      credentialId: p.credentialId,
+      userHandle: p.userHandle,
+      userName: typeof p.userName == "string" ? p.userName : "",
+      displayName: typeof p.displayName == "string" ? p.displayName : "",
+      created: Number.isFinite(p.created) ? p.created : 0,
+      used: Number.isFinite(p.used) ? p.used : 0,
+    }));
+}
+
 export function parseIndex(json) {
   let index = JSON.parse(json);
   if (!index || index.v !== 1 || !Array.isArray(index.entries)) {
@@ -168,6 +224,8 @@ export function parseIndex(json) {
     for (let key of ["created", "changed", "used"]) {
       e[key] = Number.isFinite(e[key]) ? e[key] : 0;
     }
+    e.otp = parseOtp(e.otp);
   }
+  index.passkeys = parsePasskeys(index.passkeys);
   return index;
 }

@@ -854,8 +854,8 @@ parameters are fixed.
 ## 14. Out of scope for v1
 
 - sync, breach checks, anything in the cloud
-- passkeys (WebAuthn is untouched)
-- TOTP, cards, addresses, notes
+- passkeys (added later: §20)
+- cards, addresses, notes (TOTP was added later: §19)
 - sharing
 - KDBX4 (later, as an export format)
 - password history
@@ -959,3 +959,40 @@ adds runtime part 7:
 
 If a build or API problem loops more than a few attempts, I stop and
 explain.
+
+---
+
+## 19. Authenticator codes (added 2026-11-21)
+
+Two-step verification codes, as authenticator apps make them: time-based one-time passwords (TOTP, RFC 6238). Counter-based codes (HOTP) aren't supported; almost no site uses them.
+
+- **Stored:** a login may have one authenticator. Its setup key is sealed in nsIPasswordVault exactly as the password is: a secret of its own (a fresh 16-byte id), bound to the login's origin. The index keeps only the id and the code's settings (`entry.otp`: digits, period, algorithm, issuer, account); `parseOtp` checks them on load. No C++ changes: the core already seals any number of secrets per vault.
+- **Codes** are made in `Authenticator.sys.mjs` with Web Crypto's HMAC (SHA-1, SHA-256 or SHA-512), one at a time, while the vault is unlocked: to fill, and to show in about:passwords and the key button's panel. Showing the setup key itself (as an otpauth:// link, to move it to another app) asks for the master password, as showing a password does. Copied codes clear from the clipboard like passwords.
+- **Adding one:**
+  - In about:passwords, Add authenticator on a login, or the editor's optional field: the setup key as text, or an otpauth://totp/ link.
+  - From a QR code on the page: right-click it (an image) or use the key button panel's "Add authenticator from QR code". The visible part of the page is captured in the browser (drawSnapshot), the QR code is read by jsQR (vendored, `app/third_party/jsqr`) in a worker, and the panel asks which of the site's logins it's for. The login the QR code names is chosen; a name no login has is offered as a new login (with no password yet). The panel then shows the first code, which sites ask for to finish setting up.
+- **Filling:** the page side recognises code fields when they get focus: `autocomplete="one-time-code"`, names, ids, labels or placeholders like otp, 2fa, verification code, security code, a field named code, token or pin sized like a code, and rows of one-digit boxes. Focus the user gave the field (a click or key just now) opens the dropdown with the site's codes; a page focusing the field on load doesn't. Choosing a code fills it, one digit per box for a row of boxes. The code comes from the parent, from the frame's principal: the login must be offered there, or be from another origin of the same site (sign-in and verification are often on different hosts). A login form's own fields never count as code fields. The vault locked, the dropdown offers to unlock, saying nothing about whether the site has codes.
+- **Export and import:** the encrypted export carries the keys (sealed); the CSV export adds a `totp` column with otpauth:// links. CSV import reads `totp`, `login_totp` (Bitwarden), `otpauth` (1Password) and `TOTP` (KeePassXC). A row with an authenticator and no password is a login too.
+- **Moving and deleting:** moving a login to another address seals its key again for the new origin; deleting it deletes the key.
+
+Runtime part 20 covers adding (with refusals for counter-based codes, text that isn't a key, and short keys), the key sealed and the index free of it, codes surviving a lock, filling a field and a row of boxes, named fields, autofocus not opening the dropdown, login fields unchanged, the panel's code, QR codes on the page (a login named by it, a new login, a link that isn't one, a page without one), export and import both ways, moving a login, and removing an authenticator. `tests/unit/authenticator.test.mjs` checks RFC 6238's test vectors.
+
+---
+
+## 20. Passkeys (added 2026-11-21)
+
+The browser keeps passkeys itself, in the vault beside the passwords, as a platform authenticator. Each time a site makes or asks for a passkey, the user chooses: the browser, or a security key (a YubiKey, say). The browser's passkeys work on this device only; nothing is synced.
+
+- **How requests get here.** Gecko's request handler (WebAuthnTransactionParent) asks the service behind `@mozilla.org/webauthn/service;1`. `PasskeyService` (C++, `components/passkeys`) registers itself under that contract at startup (a dynamically registered factory overrides the static one) and keeps Gecko's own service, by its class id. Make and get requests go to the provider, `Passkeys.sys.mjs`, as an `nsIBrowserWipPasskeyRequest`: the arguments as JSON (byte strings base64url), and `resolveCreate`, `resolveGet`, `reject` or `useSecurityKey`, which hands the request, unchanged, to Gecko's service (its prompts: PLAN.md §16). Everything else (PIN, consent and selection callbacks, virtual authenticators) goes straight to Gecko's service. A new request ends the last, as in Gecko. `isUVPAA` is true: sites offer passkeys.
+- **The choice** (`passkeys.js`, a panel under the site information button):
+  - Saving: "Save in browser-wip" or "Use a security key". The browser can't save one in a private window, for a site that doesn't take ES256, or for an account that already has one here (the site's exclude list); the button then says why.
+  - Signing in: the browser's passkeys for the site (one button per account) and "Use a security key". With the vault locked: "Use a passkey from browser-wip", which unlocks it (the system keyring first, where it's set up), then lists them. With no passkeys here for the site, or no vault, the request goes to a security key at once.
+  - Cancel or Escape refuses it (NotAllowedError for the site).
+- **Keys.** ECDSA P-256 (ES256), made with Web Crypto. The private key, as PKCS #8, is sealed in nsIPasswordVault for `"https://" + rpId`, opened only to sign, and wiped from memory after. The index keeps the relying party, credential id (16 random bytes), user handle and names (`index.passkeys`, `parsePasskeys`). One passkey per account and relying party: a new one replaces the old.
+- **What sites get** (`PasskeyFormats.sys.mjs`): attestation "none" (zero AAGUID, nothing identifying); authenticator data with the RP ID hash, UP, UV when verified, AT when registering, and a signature counter of 0; the public key as a COSE EC2 key; signatures in DER; transport "internal", attachment "platform", credProps rk true. No PRF, hmac-secret or largeBlob.
+- **User verification** is the master password. The vault must be unlocked; unless the site says "discouraged", the master password must have been typed in the last 5 minutes (unlocking with it counts), or the panel asks for it, and the site is told the user was verified. Unlocked through the keyring and not asked: not verified. With no vault yet, saving a passkey sets up the master password in the panel.
+- **Passkey autofill** (conditional mediation): the request waits in the provider until the user picks a passkey in a login field's dropdown (`passwords.js`), above the saved logins. One per frame; a new one replaces it.
+- **Managing:** about:passwords lists passkeys after the logins (site, account, when saved and last used) and deletes them. The encrypted export carries them, with their keys sealed; importing adds those not already here (by credential id). CSV can't hold them.
+
+Runtime part 22 runs a relying party in a page that keeps the public key it registered and verifies every sign-in as a server would (signature, challenge, RP ID hash, user handle, UV flag): the choice, setup on the way, signing in with and without naming the passkey, the master password asked again after 5 minutes and not for "discouraged", unlocking, the exclude list, Cancel and Escape, a security key chosen instead (Gecko's software authenticator standing in for the key, so no USB device is used), passkey autofill, about:passwords listing and deleting, export and import, and private windows. `tests/unit/passkey-formats.test.mjs` checks the formats with an independent CBOR decoder and Node's crypto.
+

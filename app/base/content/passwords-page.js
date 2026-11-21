@@ -18,6 +18,9 @@ const { PasswordVault } = ChromeUtils.importESModule(
 const { displayHost, isFillableOrigin, normalizeOrigin } = ChromeUtils.importESModule(
   "resource://gre/modules/browserwip/PasswordRules.sys.mjs"
 );
+const { formatCode, parseAuthenticator } = ChromeUtils.importESModule(
+  "resource://gre/modules/browserwip/Authenticator.sys.mjs"
+);
 const { isVaultFile } = ChromeUtils.importESModule(
   "resource://gre/modules/browserwip/PasswordTransfer.sys.mjs"
 );
@@ -120,7 +123,7 @@ const Page = {
     );
 
     if (unlocked) {
-      this.revealed = null;
+      this.revealed = this.revealedOtp = null;
       this.renderList({ keepSelection: true });
       // about:passwords#import, #open-older and #export (from Settings)
       // open the dialog.
@@ -140,7 +143,7 @@ const Page = {
     }
     this.selectedId = null;
     this.editing = null;
-    this.revealed = null;
+    this.revealed = this.revealedOtp = null;
     let card = state == "none" ? "setup" : location.hash == "#forgot" ? "forgot" : "locked";
     for (let name of ["locked", "setup", "forgot"]) {
       $(`card-${name}`).hidden = name != card;
@@ -356,15 +359,24 @@ const Page = {
 
     let list = $("list");
     list.replaceChildren(...shown.map(entry => this._row(entry)));
+    // Passkeys (§20), after the logins: selected as "pk:" + their id.
+    let passkeys = PasswordVault.passkeys().filter(
+      p => !query || p.rpId.toLowerCase().includes(query) || p.userName.toLowerCase().includes(query)
+    );
+    if (passkeys.length) {
+      list.append(this._el("div", "list-group", "passwords-passkeys-group", { count: passkeys.length }));
+      list.append(...passkeys.map(passkey => this._passkeyRow(passkey)));
+    }
+    let shownIds = [...shown.map(e => e.id), ...passkeys.map(p => "pk:" + p.id)];
     let noResults = $("no-results");
-    noResults.hidden = !(query && !shown.length);
+    noResults.hidden = !(query && !shownIds.length);
     if (!noResults.hidden) {
       document.l10n.setAttributes(noResults, "passwords-no-results", { query: $("search").value.trim() });
     }
 
-    if (!keepSelection || !shown.some(e => e.id == this.selectedId)) {
-      this.selectedId = shown[0]?.id ?? null;
-      this.revealed = null;
+    if (!keepSelection || !shownIds.includes(this.selectedId)) {
+      this.selectedId = shownIds[0] ?? null;
+      this.revealed = this.revealedOtp = null;
     }
     this._markSelected();
     if (!this.editing) {
@@ -437,6 +449,99 @@ const Page = {
     return avatar;
   },
 
+  _passkeyRow(passkey) {
+    let row = document.createElement("div");
+    row.className = "row";
+    row.setAttribute("role", "option");
+    row.dataset.id = "pk:" + passkey.id;
+    let text = document.createElement("div");
+    text.className = "row-text";
+    let host = document.createElement("span");
+    host.className = "row-host";
+    host.textContent = passkey.rpId;
+    let user = document.createElement("span");
+    user.className = "row-user";
+    if (passkey.userName) {
+      user.textContent = passkey.userName;
+    } else {
+      document.l10n.setAttributes(user, "passwords-passkey-no-name");
+    }
+    text.append(host, user);
+    row.append(this._avatar("https://" + passkey.rpId, "small"), text);
+    row.addEventListener("click", () => this.select("pk:" + passkey.id));
+    return row;
+  },
+
+  // A passkey: its site and account, when it was made and last used, and
+  // Delete (with a warning: the site may have no other way in).
+  _renderPasskey(id) {
+    let passkey = PasswordVault.getPasskey(id);
+    if (!passkey) {
+      $("detail").replaceChildren();
+      return;
+    }
+    let head = this._el("div", "detail-head");
+    let titles = this._el("div", "detail-titles");
+    let title = this._el("h2", "detail-title");
+    title.textContent = passkey.rpId;
+    titles.append(title, this._el("span", "muted", "passwords-passkey-kind"));
+    head.append(
+      this._avatar("https://" + passkey.rpId, "large"),
+      titles,
+      this._el("span", "spacer"),
+      this._button("passwords-delete", () => {
+        let slot = $("inline-slot");
+        let box = this._el("div", "confirm-box");
+        let yes = this._button("passwords-delete-yes", async () => {
+          await PasswordVault.removePasskey(id);
+          this.selectedId = null;
+          this.renderList();
+        }, "danger small");
+        let no = this._button("passwords-cancel", () => slot.replaceChildren());
+        let row = this._el("div", "card-row");
+        row.append(yes, no);
+        box.append(this._el("p", null, "passwords-passkey-delete-confirm", { host: passkey.rpId }), row);
+        slot.replaceChildren(box);
+        yes.focus();
+      })
+    );
+    let fields = this._el("dl", "fields");
+    let field = (labelId, ...content) => {
+      let row = this._el("div", "field-row");
+      let dd = this._el("dd");
+      dd.append(...content);
+      row.append(this._el("dt", null, labelId), dd);
+      fields.append(row);
+    };
+    let account = this._el("span", "value");
+    account.textContent = passkey.userName || passkey.displayName;
+    if (!account.textContent) {
+      document.l10n.setAttributes(account, "passwords-passkey-no-name");
+      account.classList.add("muted");
+    }
+    field("passwords-field-account", account);
+    if (passkey.displayName && passkey.displayName != passkey.userName) {
+      let name = this._el("span", "value");
+      name.textContent = passkey.displayName;
+      field("passwords-field-display-name", name);
+    }
+    field(
+      "passwords-field-history",
+      this._el("span", "value muted", passkey.used ? "passwords-passkey-history" : "passwords-passkey-history-unused", {
+        created: this._date(passkey.created || Date.now()),
+        used: passkey.used ? this._date(passkey.used) : "",
+      })
+    );
+    let inline = this._el("div", "inline-slot");
+    inline.id = "inline-slot";
+    let note = this._el("p", "reveal-note");
+    let lock = this._el("img", "note-icon");
+    lock.src = "chrome://browser-wip/skin/icons/lock-page.svg";
+    lock.alt = "";
+    note.append(lock, this._el("span", null, "passwords-passkey-note"));
+    $("detail").replaceChildren(head, fields, inline, note);
+  },
+
   _row(entry) {
     let row = document.createElement("div");
     row.className = "row";
@@ -482,13 +587,13 @@ const Page = {
       return;
     }
     this.selectedId = id;
-    this.revealed = null;
+    this.revealed = this.revealedOtp = null;
     this._markSelected();
     this.renderDetail();
   },
 
   _listKey(event) {
-    let rows = [...$("list").children];
+    let rows = [...$("list").querySelectorAll(".row")];
     let index = rows.findIndex(r => r.dataset.id == this.selectedId);
     let next = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: rows.length - 1 }[event.key];
     if (next === undefined || !rows.length) {
@@ -531,6 +636,10 @@ const Page = {
     let detail = $("detail");
     if (this.editing) {
       this._renderEditor();
+      return;
+    }
+    if (this.selectedId?.startsWith("pk:")) {
+      this._renderPasskey(this.selectedId.slice(3));
       return;
     }
     let entry = this.selectedId && PasswordVault.getEntry(this.selectedId);
@@ -604,6 +713,8 @@ const Page = {
     let copy = this._copyButton(() => this._withMaster(() => PasswordVault.copyPassword(entry.id)));
     field("passwords-field-password", secret, show, copy);
 
+    field("passwords-field-otp", ...this._authenticator(entry));
+
     let also = this._el("div", "chips");
     for (let origin of entry.also) {
       let chip = this._el("span", "chip");
@@ -653,6 +764,105 @@ const Page = {
     health.append(warn, this._el("span"));
     detail.replaceChildren(head, fields, health, inline, note);
     this._applyHealth();
+  },
+
+  // The entry's authenticator: its code, counting down, with Copy, Show
+  // setup key and Remove; or Add, which takes the setup key or link.
+  _authenticator(entry) {
+    clearInterval(this._otpTimer);
+    if (!entry.otp) {
+      let add = this._button("passwords-otp-add", () => this._addAuthenticator(entry, add));
+      return [add];
+    }
+    let code = this._el("span", "value otp-code");
+    code.id = "otp-code";
+    let left = this._el("span", "muted small otp-left");
+    let refresh = async () => {
+      try {
+        let now = await PasswordVault.authenticatorCode(entry.id);
+        code.textContent = formatCode(now.code);
+        document.l10n.setAttributes(left, "passwords-otp-left", { seconds: now.remaining });
+        code.dataset.code = now.code;
+      } catch (e) {
+        clearInterval(this._otpTimer);
+      }
+    };
+    refresh();
+    this._otpTimer = setInterval(() => (code.isConnected ? refresh() : clearInterval(this._otpTimer)), 1000);
+    let copy = this._copyButton(() => PasswordVault.copyAuthenticatorCode(entry.id));
+    let key = this._button(this.revealedOtp?.id == entry.id ? "passwords-otp-hide-key" : "passwords-otp-show-key", () =>
+      this._withMaster(async () => {
+        this.revealedOtp =
+          this.revealedOtp?.id == entry.id ? null : { id: entry.id, uri: await PasswordVault.revealAuthenticator(entry.id) };
+        this.renderDetail();
+      })
+    , "link");
+    let remove = this._button("passwords-otp-remove", async () => {
+      await PasswordVault.removeAuthenticator(entry.id);
+    }, "link");
+    let parts = [code, left, copy, key, remove];
+    if (entry.otp.issuer || entry.otp.account) {
+      let label = this._el("p", "muted small otp-label");
+      label.textContent = [entry.otp.issuer, entry.otp.account].filter(Boolean).join(" · ");
+      parts.push(label);
+    }
+    if (this.revealedOtp?.id == entry.id) {
+      let uri = this._el("p", "value secret otp-key");
+      uri.textContent = this.revealedOtp.uri;
+      uri.setAttribute("revealed", "");
+      parts.push(uri);
+    }
+    return parts;
+  },
+
+  _addAuthenticator(entry, button) {
+    let dd = button.parentElement;
+    if (dd.querySelector(".otp-form")) {
+      return;
+    }
+    let form = this._el("form", "otp-form card-row");
+    let input = this._el("input", "field", "passwords-otp-placeholder");
+    input.type = "text";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    let add = this._el("button", "secondary small", "passwords-otp-add-button");
+    add.type = "submit";
+    let cancel = this._button("passwords-cancel", () => {
+      form.remove();
+      error.remove();
+      help.remove();
+      button.hidden = false;
+    });
+    let help = this._el("p", "muted small", "passwords-otp-help");
+    let error = this._el("p", "error");
+    error.hidden = true;
+    error.setAttribute("role", "alert");
+    form.append(input, add, cancel);
+    button.hidden = true;
+    dd.append(form, help, error);
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      add.disabled = true;
+      try {
+        await PasswordVault.setAuthenticator(entry.id, input.value);
+      } catch (err) {
+        add.disabled = false;
+        document.l10n.setAttributes(error, this._otpError(err.code));
+        error.hidden = false;
+        input.focus();
+      }
+    });
+    input.focus();
+  },
+
+  _otpError(code) {
+    return (
+      {
+        "otp-counter": "passwords-otp-error-counter",
+        "otp-short-key": "passwords-otp-error-short",
+        "otp-not-a-key": "passwords-otp-error-invalid",
+      }[code] ?? "passwords-error"
+    );
   },
 
   _copyButton(action) {
@@ -793,7 +1003,7 @@ const Page = {
 
   edit(id) {
     this.editing = { id };
-    this.revealed = null;
+    this.revealed = this.revealedOtp = null;
     this._renderEditor();
   },
 
@@ -840,6 +1050,14 @@ const Page = {
     passwordLabel.append(this._el("span", null, "passwords-field-password"), passwordRow);
     form.append(passwordLabel);
 
+    // Optional: the site's authenticator setup key (or replacing it).
+    let otp = labelled(
+      entry?.otp ? "passwords-field-otp-replace" : "passwords-field-otp-optional",
+      this._el("input", "field", "passwords-otp-placeholder")
+    );
+    otp.autocomplete = "off";
+    otp.spellcheck = false;
+
     let error = this._el("p", "error");
     error.hidden = true;
     error.setAttribute("role", "alert");
@@ -881,6 +1099,14 @@ const Page = {
         fail("passwords-duplicate");
         return;
       }
+      if (otp.value.trim()) {
+        try {
+          parseAuthenticator(otp.value);
+        } catch (err) {
+          fail(this._otpError(err.code));
+          return;
+        }
+      }
       save.disabled = true;
       try {
         if (entry) {
@@ -896,6 +1122,9 @@ const Page = {
             username: username.value,
             password: password.value,
           });
+        }
+        if (otp.value.trim()) {
+          await PasswordVault.setAuthenticator(this.selectedId, otp.value);
         }
       } catch (err) {
         fail("passwords-error");
@@ -1237,12 +1466,12 @@ const Transfer = {
     $("import-passphrase").value = "";
     $("import-passphrase-row").hidden = true;
     this.bytes = null;
-    if (!result.logins.length) {
+    if (!result.logins.length && !result.passkeys?.length) {
       this._message($("import-error"), "passwords-import-empty");
       return;
     }
     this.step = "preview";
-    this.plan = PasswordVault.planImport(result.logins);
+    this.plan = PasswordVault.planImport(result.logins, result.passkeys ?? []);
     this.replace = new Set();
     this._renderPreview(result.skipped);
   },
@@ -1259,6 +1488,7 @@ const Transfer = {
       }
     };
     line("passwords-import-fresh", plan.fresh.length);
+    line("passwords-import-passkeys", plan.passkeys.length);
     line("passwords-import-insecure", plan.insecure);
     line("passwords-import-skipped", skipped);
     line("passwords-import-repeated", plan.repeated);
@@ -1311,7 +1541,7 @@ const Transfer = {
   },
 
   _syncImportSubmit() {
-    let count = this.plan.fresh.length + this.replace.size;
+    let count = this.plan.fresh.length + this.replace.size + this.plan.passkeys.length;
     let submit = $("import-submit");
     document.l10n.setAttributes(submit, "passwords-import-submit", { count });
     submit.disabled = !count;

@@ -22,9 +22,12 @@ const COLUMNS = {
   realm: ["httprealm"],
   created: ["timecreated"],
   changed: ["timepasswordchanged"],
+  // An authenticator: an otpauth:// link or a setup key. Bitwarden:
+  // login_totp; 1Password: otpauth; KeePassXC: TOTP.
+  otp: ["totp", "login_totp", "otpauth", "otp"],
 };
 
-export const CSV_HEADER = ["url", "username", "password", "httpRealm"];
+export const CSV_HEADER = ["url", "username", "password", "httpRealm", "totp"];
 
 // The magic bytes of an encrypted vault file (bwvault.h).
 const VAULT_MAGIC = [0x42, 0x57, 0x56, 0x41, 0x55, 0x4c, 0x54, 0x00];
@@ -60,12 +63,16 @@ export function loginsFromCSV(header, rows) {
   let realm = column("realm");
   let created = column("created");
   let changed = column("changed");
+  let otp = column("otp");
   let logins = [];
   let skipped = 0;
   for (let row of rows) {
     let origin = normalizeOrigin(row[url] ?? "");
     let secret = row[password] ?? "";
-    if (!origin || !secret) {
+    let key = otp === undefined ? "" : String(row[otp] ?? "").trim();
+    // A login has a password, or at least an authenticator (one added from
+    // a QR code before its password was saved).
+    if (!origin || (!secret && !key)) {
       skipped++;
       continue;
     }
@@ -76,6 +83,7 @@ export function loginsFromCSV(header, rows) {
       realm: realm === undefined ? null : row[realm] || null,
       created: created === undefined ? 0 : timestamp(row[created]),
       changed: changed === undefined ? 0 : timestamp(row[changed]),
+      otp: key,
     });
   }
   return { logins, skipped };
@@ -128,7 +136,9 @@ function csvField(value) {
 export function toCSV(logins) {
   let lines = [CSV_HEADER.join(",")];
   for (let login of logins) {
-    lines.push([login.origin, login.username, login.password, login.realm ?? ""].map(csvField).join(","));
+    lines.push(
+      [login.origin, login.username, login.password, login.realm ?? "", login.otp ?? ""].map(csvField).join(",")
+    );
   }
   return lines.join("\r\n") + "\r\n";
 }

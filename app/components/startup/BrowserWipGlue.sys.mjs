@@ -17,6 +17,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   SessionStore: "resource://gre/modules/browserwip/SessionStore.sys.mjs",
   SiteIcons: "resource://gre/modules/browserwip/SiteIcons.sys.mjs",
   PageTranslations: "resource://gre/modules/browserwip/PageTranslations.sys.mjs",
+  Passkeys: "resource://gre/modules/browserwip/Passkeys.sys.mjs",
   DevBuilds: "resource://gre/modules/browserwip/DevBuilds.sys.mjs",
   Widevine: "resource://gre/modules/browserwip/Widevine.sys.mjs",
   YouTubeBlocking: "resource://gre/modules/browserwip/YouTubeBlocking.sys.mjs",
@@ -35,6 +36,19 @@ const JSWINDOWACTORS = {
     },
     messageManagerGroups: ["browsers"],
     allFrames: true,
+    safeForUntrustedWebProcess: true,
+  },
+  // Screenshots (screenshots.js): the page's size and scroll position, and
+  // the element under the pointer. Only the window asks, and it takes only
+  // numbers back, which it bounds, so web processes are safe for it.
+  Screenshots: {
+    parent: {
+      esModuleURI: "resource://gre/modules/browserwip/ScreenshotsParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource://gre/modules/browserwip/ScreenshotsChild.sys.mjs",
+    },
+    messageManagerGroups: ["browsers"],
     safeForUntrustedWebProcess: true,
   },
   ContentBlocking: {
@@ -163,6 +177,8 @@ const JSWINDOWACTORS = {
         DOMFormHasPassword: {},
         DOMInputPasswordAdded: {},
         DOMPossibleUsernameInputAdded: {},
+        // Fields for an authenticator code (§19).
+        focusin: {},
         "form-submission-detected": { createActor: false },
         pagehide: { createActor: false },
       },
@@ -313,6 +329,8 @@ BrowserWipGlue.prototype = {
     // blocker is ready instead of loading unchecked.
     lazy.ContentBlockingLists.start();
     lazy.YouTubeBlocking.init();
+    // Before any page asks for a passkey (session restore).
+    lazy.Passkeys.init();
     lazy.SessionStore.init();
     lazy.SiteIcons.init();
     lazy.DevBuilds.init();
