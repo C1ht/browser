@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/C1ht/browser/releases"><img alt="Latest dev build" src="https://img.shields.io/github/v/release/C1ht/browser?include_prereleases&amp;label=dev%20build&amp;color=0B6E6E"/></a>
   <img alt="Gecko: Firefox 157" src="https://img.shields.io/badge/gecko-Firefox%20157-0B6E6E"/>
-  <img alt="Platform: Linux" src="https://img.shields.io/badge/platform-Linux-0B6E6E"/>
+  <img alt="Platform: Linux | Windows" src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-0B6E6E"/>
   <a href="LICENSE"><img alt="License: MPL-2.0" src="https://img.shields.io/badge/license-MPL--2.0-0B6E6E"/></a>
 </p>
 
@@ -107,17 +107,19 @@
 
 ## Download
 
-Dev builds for Linux (x86_64) are on the [releases page](https://github.com/C1ht/browser/releases). Each one lists what's new and what's fixed.
+Dev builds for Linux and Windows (x86_64) are on the [releases page](https://github.com/C1ht/browser/releases). Each one lists what's new and what's fixed.
 
 | System | Get | How |
 |---|---|---|
 | Any distribution | `.tar.zst` or `.tar.xz` | Extract it and run `browser-wip/browser-wip` |
 | Any distribution, one file | `.AppImage` | `chmod +x` it and run it |
+| Windows | `-setup.exe` | Run it. It installs for your user only, without admin rights, and adds a Start Menu entry |
+| Windows, portable | `.zip` | Extract it and run `browser-wip\browser-wip.exe` |
 | Debian, Ubuntu | `.deb` | `sudo apt install ./browser-wip-….deb` |
 | Fedora, openSUSE | `.rpm` | `sudo dnf install ./browser-wip-….rpm` |
 | Arch Linux | `PKGBUILD` | Put it in an empty folder and run `makepkg -si` |
 
-Check a download with `sha256sum -c SHA256SUMS --ignore-missing`. The packages aren't signed yet. Windows builds aren't available yet.
+Check a download with `sha256sum -c SHA256SUMS --ignore-missing`. The packages aren't signed yet, so on Windows SmartScreen warns the first time.
 
 ## Build from source
 
@@ -135,6 +137,7 @@ MOZCONFIG=$PWD/../browser/mozconfigs/dev ./mach build
 - **First build:** about 13 minutes on a 16-core machine, longer on fewer cores. `mozconfigs/dev` is tuned for 4 cores and about 13 GB of memory.
 - **After that:** front-end changes need only `./mach build faster`.
 - **App launcher:** to start your build from the desktop's launcher, run `tools/install-launcher.sh ../mozilla-central/obj-browser-wip/dist/bin`.
+- **Windows:** build natively from the MozillaBuild shell with `mozconfigs/dev-bootstrap`. Mount `app/` with a junction (`mklink /J mozilla-central\browser-wip browser\app`), since Git Bash's `ln -s` copies. With about 32 GB of memory, use `./mach build -j8`: one job per thread runs out. `./mach package`, then `tools/installer/build.sh <unpacked package> <setup.exe>` makes the installer.
 
 ## Development
 

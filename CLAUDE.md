@@ -45,6 +45,7 @@ The Gecko checkout sits next to this repo, never inside it:
 | `tools/runtime/check.py` | Runtime checks against a built browser (Marionette) |
 | `tests/unit/` | Node and Python tests that need no Gecko build |
 | `tools/release/` | Local dev-build packaging and publishing |
+| `tools/installer/` | Windows installer (NSIS, per user, no admin) built from a packaged build |
 | `mozconfigs/` | `dev-bootstrap` (use this one), `dev` (Ubuntu, clang-20), `ci-linux`, `ci-win64`, `release` |
 
 ## Building
